@@ -10,5 +10,5 @@ export type MainTabParams = {
 export type AppStackParams = {
   Tabs: undefined;
   Session: { sessionId: string };
-  Summary: { sessionId: string };
+  Summary: { sessionId: string; rootCause?: string };
 };

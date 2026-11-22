@@ -24,6 +24,8 @@ const answerAttemptSchema = new Schema(
 // The unique index is the double-submit guard: a second tap on Submit hits it and gets a 409.
 answerAttemptSchema.index({ sessionId: 1, challengeId: 1, stageIndex: 1 }, { unique: true });
 answerAttemptSchema.index({ userId: 1, challengeId: 1 });
+// The revisit rule reads a user's Nth-latest answer (revisit.service.ts).
+answerAttemptSchema.index({ userId: 1, createdAt: -1 });
 answerAttemptSchema.index({ userId: 1, topicSlug: 1, createdAt: -1 });
 
 export type AnswerAttempt = InferSchemaType<typeof answerAttemptSchema>;

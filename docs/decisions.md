@@ -835,3 +835,49 @@ any countdown to the next Checkpoint on Home.
 a one-off moment.
 **Revisit if** testers miss the baseline because the flag was lost, or if Home feels empty before the first
 Checkpoint.
+
+### D-030 — P4 backend review: what was fixed and what was not
+- **Date:** 2026-11-22 · **Step:** P4 — backend review · **Status:** Active · **Type:** technical
+
+One review agent read the server and shared diff of the phase. It found no AuthZ gaps and no answer-key
+leaks, and confirmed that the streak compare-and-set and the Daily unique index are correct. Its findings and
+what we did:
+
+**Fixed.**
+1. *A retry could leave the summary's XP short.* If an answer was recorded but the follow-up write of its
+   `xpEarned` failed, the retry was refused as "already answered" before any repair ran. The summary sums
+   `xpEarned` per attempt, so it would show less XP than the ledger paid. Now an already-answered submit
+   first re-runs the XP award (a no-op thanks to the ledger) and writes back the XP the ledger holds for that
+   attempt, then returns the same 409.
+2. *The rank-up moment replayed.* The stored summary keeps `rankUp`, and reopening a finished Kata returns
+   it, so the full-screen moment would fire on every *See today's result*. Replays now leave out `rankUp`.
+3. *A changed index wouldn't apply to an existing database.* Adding CHECKPOINT to the "one open session"
+   index changed its partial filter under the same name. Mongoose's auto-index only creates indexes, so an
+   existing Atlas database would keep the old one and log a conflict. `npm run seed -w server` now runs
+   `syncIndexes` for every model first, which drops and recreates indexes whose options changed. **Run the
+   seed once after deploying P4.**
+4. *Missing index.* The revisit rule reads a user's 3rd-latest answer; added `{userId, createdAt: -1}` on
+   answer attempts so that doesn't sort the user's whole history.
+5. *Constants outside config.* The Kata scoring weights and the first-incident session types moved to
+   `config/game.ts`, per the project rule.
+
+**Not fixed, on purpose.**
+- *Ledger row and `totalXP` increment aren't atomic.* True since P1 and accepted in D-015 (no
+  transactions). A crash in that gap leaves `totalXP` short of the ledger. Parked in `TODOS.md` with a
+  reconcile fix.
+- *A crash after recording an answer loses its progress/revisit update.* Also accepted in D-015: it can
+  lose one update but never double-count. Replaying would need an "applied" marker per attempt. Parked.
+- *A fully answered Kata completed after midnight still pays its bonus and moves the streak.* Its answers
+  were all given on its own day (answers after midnight are refused), so it was played on time. The streak
+  uses the Kata's date, so this can't repair a broken streak; Home still shows the true current streak.
+- *`doneToday` uses `lastDate >= today`.* After moving the timezone west, Home can say "done" on a
+  "yesterday" the user already played. That is the same guard that stops timezone farming, and the user
+  really did play a Kata in that 24 hours. Kept.
+- *Checkpoint and baseline answers still update mastery, adaptive difficulty and the revisit queue.* They
+  are real answers about the user's skill, and a missed Checkpoint question is worth revisiting. Only XP is
+  withheld, because XP is what would make people rush a measurement.
+
+**Files.** `server/src/modules/sessions/{sessions.service,sessions.xp,sessions.settle}.ts`,
+`server/src/modules/daily/daily.selection.ts`, `server/src/config/game.ts`, `server/src/models/AnswerAttempt.ts`,
+`server/src/db/syncIndexes.ts`, `server/src/seed/seed.ts`, `TODOS.md`.
+**Concepts.** Index migrations; idempotent repair on retry; known-debt vs bug.

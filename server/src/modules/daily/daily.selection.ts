@@ -1,5 +1,5 @@
 import type { ChallengeType, TopicSlug } from '@luna/shared';
-import { DAILY_KATA_SLOTS, REVISIT } from '../../config/game';
+import { DAILY_KATA_SLOTS, KATA_WEIGHTS, REVISIT } from '../../config/game';
 import type { ChallengeDoc } from '../../models/Challenge';
 import { UserTopicProgressModel } from '../../models/UserTopicProgress';
 import { challengesRepo } from '../challenges/challenges.repository';
@@ -8,8 +8,7 @@ import { getProgressStats } from '../progress/progress.service';
 import { weakestTopic } from '../progress/mastery';
 import { seenIds, type PickedItem } from '../sessions/sessions.selection';
 
-/** Scoring weights for a Kata slot; lower wins. Unseen dominates, then fit, then variety. */
-const W = { seen: 10, preferred: -0.5, weakest: -0.75, repeatTopic: 0.75, jitter: 0.5 } as const;
+const W = KATA_WEIGHTS;
 
 type Context = {
   seen: Set<string>;

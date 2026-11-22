@@ -83,6 +83,18 @@ export const DAILY_KATA_SLOTS = [
   'INCIDENT',
 ] as const;
 
+/** Daily Kata slot scoring (lower wins): unseen dominates, then difficulty fit, then variety (D-028). */
+export const KATA_WEIGHTS = {
+  seen: 10,
+  preferred: -0.5,
+  weakest: -0.75,
+  repeatTopic: 0.75,
+  jitter: 0.5,
+} as const;
+
+/** Sessions whose completion can pay the first-incident bonus (not baseline or checkpoint). */
+export const INCIDENT_BONUS_SESSION_TYPES: readonly SessionType[] = ['INCIDENT', 'DAILY'];
+
 /** benchmarks.md §1: a Checkpoint unlocks after every N completed Daily Katas (active days). */
 export const CHECKPOINT = { everyKatas: 7, difficulty: 2 } as const;
 

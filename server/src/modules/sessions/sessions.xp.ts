@@ -53,3 +53,24 @@ export async function answerXP(input: AnswerXPInput): Promise<number> {
   if (session.type !== 'DAILY' || !session.dailyDate) return 0;
   return awardXP(userId, `review:${session.dailyDate}:${key}`, halveIf(REVIEW_XP, usedHint));
 }
+
+/**
+ * The XP the ledger holds for this attempt: its first-correct row if created at or after the
+ * attempt, else this Kata's review row. Lets a retry write the right `xpEarned` back onto the
+ * attempt even when the award itself happened on the first try.
+ */
+export async function ownedXP(
+  input: Omit<AnswerXPInput, 'isCorrect' | 'usedHint'>,
+): Promise<number> {
+  const { userId, session, challenge, stageIndex, attemptAt } = input;
+  const key = answerKey(challenge, stageIndex);
+  const keys = [`challenge:${key}`];
+  if (session.type === 'DAILY' && session.dailyDate)
+    keys.push(`review:${session.dailyDate}:${key}`);
+  const rows = await XpEventModel.find({ userId, sourceKey: { $in: keys } })
+    .select('sourceKey amount createdAt')
+    .lean();
+  const first = rows.find((r) => r.sourceKey === keys[0] && r.createdAt >= attemptAt);
+  const review = rows.find((r) => r.sourceKey === keys[1]);
+  return first?.amount ?? review?.amount ?? 0;
+}

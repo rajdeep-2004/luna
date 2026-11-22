@@ -1,5 +1,5 @@
 import type { SessionSummary, SessionType, TopicSlug } from '@luna/shared';
-import { levelForXP, START_DIFFICULTY } from '../../config/game';
+import { INCIDENT_BONUS_SESSION_TYPES, levelForXP, START_DIFFICULTY } from '../../config/game';
 import { Types } from 'mongoose';
 import { AnswerAttemptModel } from '../../models/AnswerAttempt';
 import { XpEventModel } from '../../models/XpEvent';
@@ -38,9 +38,6 @@ async function applyBaseline(userId: string, session: SessionDoc): Promise<void>
   }
 }
 
-/** Session types whose completion can pay the first-incident bonus (not baseline or checkpoint). */
-const INCIDENT_BONUS_TYPES: SessionType[] = ['INCIDENT', 'DAILY'];
-
 /**
  * Bonuses and streak for a finished session. Every step is idempotent (ledger keys, streak
  * compare-and-set), so it runs before the status flip: a crash or retry re-runs it safely and
@@ -61,7 +58,7 @@ export async function settleProgression(
     candidates.push(...dailyBonusCandidates(session.dailyDate, allCorrect, s));
   }
   if (type === 'BASELINE') await applyBaseline(userId, session);
-  if (INCIDENT_BONUS_TYPES.includes(type)) {
+  if (INCIDENT_BONUS_SESSION_TYPES.includes(type)) {
     const challenges = await challengesRepo.findByIds(session.items.map((i) => i.challengeId));
     if (challenges.some((c) => c.type === 'INCIDENT')) candidates.push(firstIncidentCandidate());
   }

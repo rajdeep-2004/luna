@@ -32,7 +32,7 @@ import {
   type PickedItem,
 } from './sessions.selection';
 import { settleProgression } from './sessions.settle';
-import { answerXP } from './sessions.xp';
+import { answerXP, ownedXP } from './sessions.xp';
 import { buildSummary } from './sessions.summary';
 
 const shuffle = <T>(xs: T[]): T[] => {
@@ -214,9 +214,34 @@ async function loadAnswerContext(
   if (!challenge) throw notFound('Challenge');
   if (stageIndex >= answerCount(challenge)) throw new AppError('VALIDATION_ERROR', 'Invalid stage');
   const answered = await AnswerAttemptModel.countDocuments({ sessionId, challengeId });
-  if (stageIndex < answered) throw conflict('Already answered');
+  const alreadyAnswered = stageIndex < answered;
   if (stageIndex > answered) throw conflict('Answer the earlier stage first');
-  return { session, item, challenge };
+  return { session, item, challenge, alreadyAnswered };
+}
+
+/**
+ * A retry of an answer that is already recorded: re-run the XP award (the ledger makes it a no-op
+ * if it already happened) and make the attempt's `xpEarned` match the ledger, since the summary
+ * sums it. Progress and revisit writes are not replayed: D-015 accepts losing one progress update
+ * on a crash, and replaying them without a marker could double-count.
+ */
+async function repairAnsweredXP(
+  userId: string,
+  session: SessionDoc,
+  challenge: ChallengeDoc,
+  stageIndex: number,
+): Promise<void> {
+  const prior = await AnswerAttemptModel.findOne({
+    sessionId: session._id,
+    challengeId: challenge._id,
+    stageIndex,
+  }).lean();
+  if (!prior) return;
+  const ctx = { userId, session, challenge, stageIndex, attemptAt: prior.createdAt };
+  await answerXP({ ...ctx, isCorrect: prior.isCorrect, usedHint: prior.usedHint });
+  const owned = prior.isCorrect ? await ownedXP(ctx) : 0;
+  if (owned !== prior.xpEarned)
+    await AnswerAttemptModel.updateOne({ _id: prior._id }, { $set: { xpEarned: owned } });
 }
 
 export async function submitAnswer(
@@ -225,12 +250,16 @@ export async function submitAnswer(
   input: SubmitAnswerRequest,
 ): Promise<AnswerResult> {
   const { challengeId, stageIndex, answer } = input;
-  const { session, item, challenge } = await loadAnswerContext(
+  const { session, item, challenge, alreadyAnswered } = await loadAnswerContext(
     userId,
     sessionId,
     challengeId,
     stageIndex,
   );
+  if (alreadyAnswered) {
+    await repairAnsweredXP(userId, session, challenge, stageIndex);
+    throw conflict('Already answered');
+  }
   const result = evaluate(challenge, stageIndex, answer);
 
   // Server-measured time since the previous answer in this session (or the session start).
@@ -263,20 +292,7 @@ export async function submitAnswer(
     attemptAt = attempt.createdAt;
   } catch (err) {
     if (!isDuplicateKey(err)) throw err;
-    // A retry after a partial failure: re-run the XP award (the ledger makes it a no-op if it
-    // already happened), then report the duplicate.
-    const prior = await AnswerAttemptModel.findOne({ sessionId, challengeId, stageIndex }).lean();
-    if (prior) {
-      await answerXP({
-        userId,
-        session,
-        challenge,
-        stageIndex,
-        isCorrect: prior.isCorrect,
-        usedHint: prior.usedHint,
-        attemptAt: prior.createdAt,
-      });
-    }
+    await repairAnsweredXP(userId, session, challenge, stageIndex);
     throw conflict('Already answered');
   }
 
@@ -333,12 +349,13 @@ export async function revealHint(
   sessionId: string,
   input: HintRequest,
 ): Promise<HintResult> {
-  const { challenge } = await loadAnswerContext(
+  const { challenge, alreadyAnswered } = await loadAnswerContext(
     userId,
     sessionId,
     input.challengeId,
     input.stageIndex,
   );
+  if (alreadyAnswered) throw conflict('Already answered');
   const hint =
     challenge.type === 'INCIDENT' ? challenge.stages[input.stageIndex]?.hint : challenge.hint;
   if (!hint) throw notFound('Hint');
@@ -358,7 +375,10 @@ export async function completeSession(userId: string, sessionId: string): Promis
       bonuses?: BonusAward[];
       fixedMistakes?: number;
     };
-    return { ...stored, bonuses: stored.bonuses ?? [], fixedMistakes: stored.fixedMistakes ?? 0 };
+    // A replay (reopening a finished Kata, a remount) must not re-fire the rank-up moment.
+    const { rankUp: _seen, ...rest } = stored;
+    void _seen;
+    return { ...rest, bonuses: stored.bonuses ?? [], fixedMistakes: stored.fixedMistakes ?? 0 };
   }
 
   const attempts = await AnswerAttemptModel.find({ sessionId })

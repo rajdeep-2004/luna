@@ -881,3 +881,12 @@ what we did:
 `server/src/modules/daily/daily.selection.ts`, `server/src/config/game.ts`, `server/src/models/AnswerAttempt.ts`,
 `server/src/db/syncIndexes.ts`, `server/src/seed/seed.ts`, `TODOS.md`.
 **Concepts.** Index migrations; idempotent repair on retry; known-debt vs bug.
+
+### D-031 — P4 accepted and merged
+- **Date:** 2026-11-22 · **Step:** P4 — manual review · **Status:** Active · **Type:** process
+
+Rajdeep reviewed P4 (Dojo home, Daily Kata, streaks, bonuses, rank-up, mastery moons, revisits, baseline
+offer) and accepted it with no changes. The whole phase ran on Opus at Rajdeep's request, instead of
+switching models per task. P4 is marked `shipped` in `prd.md` and merged into `main` with `--no-ff`, so the
+phase stays visible as one unit in history. Reminder carried forward: run `npm run seed -w server` once
+against each existing database so the changed session index is rebuilt (D-030).

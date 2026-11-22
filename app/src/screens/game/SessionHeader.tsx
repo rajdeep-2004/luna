@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
-import { AppText } from '../../components';
-import { colors, layout, spacing } from '../../theme';
+import { AppText, BrushMarks } from '../../components';
+import { layout, spacing } from '../../theme';
 
 type Props = {
   progress: number;
@@ -38,9 +38,9 @@ export function SessionHeader({
           accessibilityLabel="Leave session"
           style={styles.leave}
         >
-          <AppText color="textMuted">✕</AppText>
+          <AppText color="muted">✕</AppText>
         </Pressable>
-        <AppText variant="label" color="textMuted">
+        <AppText variant="label" color="muted">
           {Math.min(position, total)} / {total}
         </AppText>
         {clock}
@@ -54,30 +54,4 @@ const styles = StyleSheet.create({
   wrap: { gap: spacing.sm, paddingTop: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   leave: { width: layout.touchTarget, height: layout.touchTarget, justifyContent: 'center' },
-  marks: { flexDirection: 'row', gap: 6 },
-  mark: { flex: 1, height: 6, borderRadius: 3, transform: [{ skewX: '-18deg' }] },
-  markDone: { backgroundColor: colors.primary },
-  markNow: { backgroundColor: colors.seal },
-  markTodo: { backgroundColor: colors.wallLight },
 });
-
-/** One short brush stroke per answer: amber when done, vermilion for the current one, faint after. */
-function BrushMarks({ total, done }: { total: number; done: number }) {
-  return (
-    <View
-      style={styles.marks}
-      accessible
-      accessibilityLabel={`${Math.min(done, total)} of ${total} answered`}
-    >
-      {Array.from({ length: total }, (_, i) => (
-        <View
-          key={i}
-          style={[
-            styles.mark,
-            i < done ? styles.markDone : i === done ? styles.markNow : styles.markTodo,
-          ]}
-        />
-      ))}
-    </View>
-  );
-}

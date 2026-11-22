@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { AppText, Button, ProgressLine, Screen } from '../../components';
+import { AppText, BrushMarks, Button, Screen } from '../../components';
 import { spacing } from '../../theme';
 
 type Props = {
@@ -17,24 +17,24 @@ type Props = {
   children: ReactNode;
 };
 
-/** Shared layout: progress line, title, content, and one primary action pinned to the thumb zone. */
+/** Shared layout: brush-mark steps, title, content, and one primary action in the thumb zone. */
 export function OnboardingStep(p: Props) {
   return (
     <Screen>
       <View style={styles.top}>
-        <ProgressLine value={p.step / p.total} />
-        <AppText variant="label" color="textMuted">
+        <BrushMarks total={p.total} done={p.step - 1} label={`Step ${p.step} of ${p.total}`} />
+        <AppText variant="label" color="muted">
           Step {p.step} of {p.total}
         </AppText>
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <AppText variant="title">{p.title}</AppText>
-        <AppText color="textMuted">{p.subtitle}</AppText>
+        <AppText variant="display">{p.title}</AppText>
+        <AppText color="muted">{p.subtitle}</AppText>
         <View style={styles.body}>{p.children}</View>
       </ScrollView>
       <View style={styles.actions}>
         {p.error ? (
-          <AppText color="emberSoft" accessibilityRole="alert">
+          <AppText color="primary" accessibilityRole="alert">
             {p.error}
           </AppText>
         ) : null}

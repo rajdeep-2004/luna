@@ -1321,3 +1321,33 @@ only once. Tie replays to focus and app-state events instead.
 
 **Revisit** if the entrance starts to feel slow on the tenth visit of a day. One option is a shorter variant after
 the first play of the day.
+
+### D-041 — Mode rounds and boss incidents (P7 task 5)
+
+**Context.** Explore lets the player choose how to play a topic (D-037): a Trace round, a Bug Hunt round, an
+Engineer's Choice round, or the topic's boss incident. Some topic and mode pairs hold only one or two challenges.
+
+**Decision.**
+- `POST /sessions` PRACTICE takes an optional `mode` (`TRACE`, `BUG_HUNT` or `ENGINEER_CHOICE`; the list is
+  `PRACTICE_MODES` in `shared`). A mode round contains only that kind. It takes the topic's challenges first (at
+  most one due revisit, then unseen first, closest to the player's difficulty), then tops up to five from the
+  same kind in other topics, as Rajdeep chose in D-039. Without `mode` the round is the old mixed topic round.
+- INCIDENT takes an optional `topicSlug`, which picks that topic's boss incident (unseen first). When the topic
+  has no incident yet, it falls back to any incident rather than failing, so the boss stage never shows an error.
+- The session stores `mode`, and the view returns it. The "one open practice" unique index now keys on
+  `(userId, type, topicSlug, mode)`, so a Trace round and a Bug Hunt round in the same topic can both be open,
+  while a double tap on the same round still resumes it.
+
+**Alternatives rejected.** Failing when a topic is thin (the player would meet an empty round in a game they just
+opened). Topping up with *other kinds* from the same topic (that breaks the promise of a "Trace round").
+
+**Deploy note.** The index change needs `npm run seed -w server` against production once after deploy: the seed
+runs `syncIndexes`, which drops the old three-field index. Until then, a second mode round in a topic that
+already has an open round fails with a conflict, because the old index still counts it as a duplicate.
+
+**Tests** (`.scratch/api-tests/modes.test.ts`): a mode round holds five distinct challenges of one kind with the
+topic's own first; different modes open side by side, the same mode resumes, and concurrent starts collapse to
+one; `INCIDENT` and unknown values are rejected as modes; the boss incident matches the topic, or falls back.
+
+**Files.** `shared/src/domain.ts`, `shared/src/sessions.ts`, `server/src/models/Session.ts`,
+`server/src/modules/sessions/sessions.selection.ts`, `sessions.service.ts`.

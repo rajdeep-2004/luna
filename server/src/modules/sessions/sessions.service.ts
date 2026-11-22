@@ -10,6 +10,7 @@ import type {
   StartSessionRequest,
   SubmitAnswerRequest,
   TopicSlug,
+  PracticeMode,
 } from '@luna/shared';
 import { DUEL_TIMEOUT_ANSWER } from '@luna/shared';
 import { SessionModel, type SessionDoc } from '../../models/Session';
@@ -64,6 +65,7 @@ async function findOwnSession(userId: string, sessionId: string): Promise<Sessio
 type NewSession = {
   type: SessionType;
   topicSlug?: TopicSlug | null;
+  mode?: PracticeMode | null;
   dailyDate?: string | null;
   duelId?: string | null;
   picked: PickedItem[];
@@ -79,6 +81,7 @@ export async function createSession(userId: string, s: NewSession): Promise<Sess
       userId,
       type: s.type,
       topicSlug: s.topicSlug ?? null,
+      mode: s.mode ?? null,
       dailyDate: s.dailyDate ?? null,
       duelId: s.duelId ?? null,
       items: s.picked.map(({ challenge: c, isRevisit, optionOrders }, order) => ({
@@ -103,10 +106,10 @@ async function pickFor(userId: string, input: StartSessionRequest): Promise<Pick
   switch (input.type) {
     case 'PRACTICE': {
       const user = await usersRepo.findById(userId);
-      return pickPractice(userId, input.topicSlug, user?.timezone ?? 'UTC');
+      return pickPractice(userId, input.topicSlug, user?.timezone ?? 'UTC', input.mode);
     }
     case 'INCIDENT':
-      return pickIncident(userId, input.challengeId);
+      return pickIncident(userId, input.challengeId, input.topicSlug);
     case 'BASELINE':
       return pickBaseline();
     case 'CHECKPOINT':
@@ -119,8 +122,9 @@ export async function startSession(
   input: StartSessionRequest,
 ): Promise<SessionView> {
   const topicSlug: TopicSlug | null = input.type === 'PRACTICE' ? input.topicSlug : null;
+  const mode: PracticeMode | null = input.type === 'PRACTICE' ? (input.mode ?? null) : null;
   const findOpen = () =>
-    SessionModel.findOne({ userId, type: input.type, status: 'ACTIVE', topicSlug }).sort({
+    SessionModel.findOne({ userId, type: input.type, status: 'ACTIVE', topicSlug, mode }).sort({
       createdAt: -1,
     });
 
@@ -141,6 +145,7 @@ export async function startSession(
   const created = await createSession(userId, {
     type: input.type,
     topicSlug,
+    mode,
     picked: await pickFor(userId, input),
   });
   if (created) return created;
@@ -192,6 +197,7 @@ async function buildView(session: SessionDoc, challenges: ChallengeDoc[]): Promi
   return {
     id: session._id.toString(),
     type: session.type as SessionType,
+    ...(session.mode ? { mode: session.mode as PracticeMode } : {}),
     status: session.status as SessionView['status'],
     startedAt: session.startedAt.toISOString(),
     totalAnswers: session.totalAnswers,

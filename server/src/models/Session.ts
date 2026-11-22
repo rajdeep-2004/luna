@@ -1,5 +1,5 @@
 import { Schema, model, Types, type InferSchemaType, type HydratedDocument } from 'mongoose';
-import { SESSION_TYPES, TOPIC_SLUGS } from '@luna/shared';
+import { PRACTICE_MODES, SESSION_TYPES, TOPIC_SLUGS } from '@luna/shared';
 
 const itemSchema = new Schema(
   {
@@ -19,6 +19,8 @@ const sessionSchema = new Schema(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     type: { type: String, enum: SESSION_TYPES, required: true },
     topicSlug: { type: String, enum: [...TOPIC_SLUGS, null], default: null },
+    /** PRACTICE only: the round's mode (one challenge kind, D-039); null for a mixed topic round. */
+    mode: { type: String, enum: [...PRACTICE_MODES, null], default: null },
     /** DAILY only: the user's local date (`YYYY-MM-DD`) the Kata belongs to; keys its bonuses. */
     dailyDate: { type: String, default: null },
     /** DUEL only: the duel this session plays. */
@@ -36,10 +38,11 @@ const sessionSchema = new Schema(
 
 sessionSchema.index({ userId: 1, createdAt: -1 });
 sessionSchema.index({ userId: 1, type: 1, status: 1 });
-// At most one open practice (per topic) or baseline session per user, so a double tap or two
-// concurrent starts can't create two. Completing a session drops it out of this index.
+// At most one open practice (per topic and mode) or baseline session per user, so a double tap or
+// two concurrent starts can't create two. Completing a session drops it out of this index. `mode`
+// joined the key in P7, so a Trace round and a Bug Hunt round in one topic can both be open.
 sessionSchema.index(
-  { userId: 1, type: 1, topicSlug: 1 },
+  { userId: 1, type: 1, topicSlug: 1, mode: 1 },
   {
     unique: true,
     partialFilterExpression: {

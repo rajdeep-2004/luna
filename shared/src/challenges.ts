@@ -1,6 +1,12 @@
 import type { ChallengeType, Difficulty, TopicSlug } from './domain';
 
-export type Topic = { slug: TopicSlug; name: string; description: string; icon: string; order: number };
+export type Topic = {
+  slug: TopicSlug;
+  name: string;
+  description: string;
+  icon: string;
+  order: number;
+};
 
 export type PublicOption = { id: string; text: string };
 

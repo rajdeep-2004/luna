@@ -57,6 +57,8 @@ export function ProfileScreen() {
     }, [refetchAchievements, refetchHistory, refetchProgress]),
   );
   const p = progress.data;
+  // `stats` arrived with P7; an older server leaves it out.
+  const stats = p?.stats ?? { katasCompleted: 0, duelsWon: 0, duelsLost: 0, duelsDrawn: 0 };
   const items = history.data?.pages.flatMap((pg) => pg.items) ?? [];
 
   return (
@@ -86,15 +88,15 @@ export function ProfileScreen() {
             />
             <TrophyStat
               kind="duels"
-              value={`${p.stats.duelsWon}–${p.stats.duelsLost}`}
+              value={`${stats.duelsWon}–${stats.duelsLost}`}
               label="duels"
-              a11y={`Duels: ${p.stats.duelsWon} won, ${p.stats.duelsLost} lost, ${p.stats.duelsDrawn} drawn`}
+              a11y={`Duels: ${stats.duelsWon} won, ${stats.duelsLost} lost, ${stats.duelsDrawn} drawn`}
             />
             <TrophyStat
               kind="katas"
-              value={String(p.stats.katasCompleted)}
+              value={String(stats.katasCompleted)}
               label="katas"
-              a11y={`${p.stats.katasCompleted} Daily Katas completed`}
+              a11y={`${stats.katasCompleted} Daily Katas completed`}
             />
             <TrophyStat
               kind="week"

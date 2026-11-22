@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-na
 import { DUEL_FORMAT_RULES } from '@luna/shared';
 import { sessionsApi, userMessage } from '../../api';
 import { AppText, Button, ErrorState, Screen } from '../../components';
+import { formatOrClassic } from '../../lib/duelFormats';
 import { haptic } from '../../lib/haptics';
 import { answeredCount, DUEL_VERDICT_MS, findStep, progressOf } from '../../lib/session';
 import type { AppStackParams } from '../../navigation/types';
@@ -43,7 +44,7 @@ export function SessionScreen({ route, navigation }: Props) {
   const rootCause = useRef<string | undefined>(undefined);
 
   const isDuel = session?.type === 'DUEL';
-  const rules = DUEL_FORMAT_RULES[session?.duelFormat ?? 'CLASSIC'];
+  const rules = DUEL_FORMAT_RULES[formatOrClassic(session?.duelFormat)];
   // Blitz's 10 s clock restarts at each answer on the server, so its verdict is shorter.
   const verdictMs = session?.duelFormat === 'BLITZ' ? DUEL_VERDICT_MS / 2 : DUEL_VERDICT_MS;
   // A Sudden Death run that ended at a miss is finished even though questions are left.

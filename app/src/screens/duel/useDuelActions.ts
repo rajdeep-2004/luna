@@ -4,17 +4,17 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Alert, Share } from 'react-native';
 import type { DuelFormat, DuelView } from '@luna/shared';
-import { BLADES, rulesLine } from '../../lib/duelFormats';
+import { bladeOf, rulesLine } from '../../lib/duelFormats';
 import { duelsApi, userMessage } from '../../api';
 import type { AppStackParams } from '../../navigation/types';
 
 export const DUELS_KEY = ['duels'] as const;
 
 /** Opens the system share sheet with the code. Dismissing it is not an error. */
-export async function shareDuelCode(code: string, format: DuelFormat = 'CLASSIC'): Promise<void> {
+export async function shareDuelCode(code: string, format?: DuelFormat): Promise<void> {
   try {
     await Share.share({
-      message: `Duel me on Luna: ${BLADES[format].name}. Enter code ${code} in the Duel tab. ${rulesLine(format)}`,
+      message: `Duel me on Luna: ${bladeOf(format).name}. Enter code ${code} in the Duel tab. ${rulesLine(format)}`,
     });
   } catch {
     // The share sheet failed to open: the code is still on screen to read out.
@@ -24,11 +24,11 @@ export async function shareDuelCode(code: string, format: DuelFormat = 'CLASSIC'
 /** The duel rules, shown once before the timer starts, so nobody is surprised by the countdown. */
 export function confirmReady(
   rivalName: string | null,
-  format: DuelFormat,
+  format: DuelFormat | undefined,
   onPlay: () => void,
 ): void {
   Alert.alert(
-    `${BLADES[format].name}${rivalName ? ` vs @${rivalName}` : ''}`,
+    `${bladeOf(format).name}${rivalName ? ` vs @${rivalName}` : ''}`,
     `${rulesLine(format)} No hints. The timer starts as soon as you begin.`,
     [
       { text: 'Not now', style: 'cancel' },

@@ -4,7 +4,7 @@ import { Kanji } from '../../art/Kanji';
 import { YokaiMask } from '../../art/YokaiMask';
 import { AppText, PressableSink } from '../../components';
 import { formatRemaining } from '../../lib/duration';
-import { BLADES } from '../../lib/duelFormats';
+import { bladeOf } from '../../lib/duelFormats';
 import { colors, radii, spacing } from '../../theme';
 
 type Props = { duel: DuelView; pending: boolean; disabled: boolean; onPress: () => void };
@@ -13,7 +13,7 @@ type Props = { duel: DuelView; pending: boolean; disabled: boolean; onPress: () 
 export function DuelRow({ duel, pending, disabled, onPress }: Props) {
   const title = duel.rival ? `vs @${duel.rival.username}` : `Code ${duel.code}`;
   const line = statusLine(duel);
-  const blade = BLADES[duel.format];
+  const blade = bladeOf(duel.format);
   return (
     <PressableSink
       onPress={onPress}

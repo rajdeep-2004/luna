@@ -17,7 +17,7 @@ import { HankoStamp } from '../../art/HankoStamp';
 import { WinSeal } from '../../art/WinSeal';
 import { AppText, Button, ErrorState, Screen } from '../../components';
 import { formatClock, formatRemaining } from '../../lib/duration';
-import { BLADES, rulesLine } from '../../lib/duelFormats';
+import { bladeOf, formatOrClassic, rulesLine } from '../../lib/duelFormats';
 import { haptic } from '../../lib/haptics';
 import { useReduceMotion } from '../../lib/motion';
 import type { AppStackParams } from '../../navigation/types';
@@ -43,7 +43,7 @@ export function DuelResultScreen({ route, navigation }: Props) {
   const home = () => navigation.popToTop();
 
   async function rematch() {
-    const duel = await actions.create(query.data?.format ?? 'CLASSIC');
+    const duel = await actions.create(formatOrClassic(query.data?.format));
     if (duel) navigation.replace('DuelResult', { duelId: duel.id });
   }
 
@@ -77,7 +77,7 @@ export function DuelResultScreen({ route, navigation }: Props) {
           width={width}
           me={d.me.avatarId}
           rival={d.rival?.avatarId ?? null}
-          meLabel={`You · ${BLADES[d.format].name}`}
+          meLabel={`You · ${bladeOf(d.format).name}`}
           rivalLabel={d.rival ? `@${d.rival.username}` : 'A friend'}
           playKey={clash}
         />

@@ -145,7 +145,7 @@ Status: `todo` | `building` | `shipped`.
 | P4 | Progression: XP, levels, streaks, Daily Kata, adaptivity, checkpoint | F-02 baseline, F-03, F-10, F-13, F-14, F-21–F-25 | shipped |
 | P5 | Competition and profile: Dojo Board, duels, achievements | F-17–F-20 | shipped |
 | P6 | Polish, deploy and demo prep | Acceptance criteria 1–12 | building |
-| P7 | Game redesign: design system, game-first screens, Explore mode picker, duel formats | D-037, D-038, D-039 | building |
+| P7 | Game redesign: design system, game-first screens, Explore mode picker, duel formats | D-037–D-043 | shipped |
 | P8 | New mini-games for Explore (e.g. blitz, swipe rounds) | D-037 | todo |
 
 ## 10. Open questions

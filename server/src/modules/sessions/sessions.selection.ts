@@ -2,7 +2,7 @@ import { TOPIC_SLUGS, type TopicSlug } from '@luna/shared';
 import { AnswerAttemptModel } from '../../models/AnswerAttempt';
 import type { ChallengeDoc } from '../../models/Challenge';
 import { AppError } from '../../lib/errors';
-import { CHECKPOINT, REVISIT, SESSION } from '../../config/game';
+import { CHECKPOINT, PICK_WEIGHTS, REVISIT, SESSION } from '../../config/game';
 import { localDateKey } from '../../lib/time';
 import { challengesRepo } from '../challenges/challenges.repository';
 import { getDifficulty } from '../progress/topicProgress.service';
@@ -27,9 +27,9 @@ function rank(pool: ChallengeDoc[], seen: Set<string>, difficulty: number): Chal
     .map((c) => ({
       c,
       score:
-        (seen.has(c._id.toString()) ? 10 : 0) +
+        (seen.has(c._id.toString()) ? PICK_WEIGHTS.seen : 0) +
         Math.abs(c.difficulty - difficulty) +
-        Math.random() * 0.5,
+        Math.random() * PICK_WEIGHTS.jitter,
     }))
     .sort((a, b) => a.score - b.score)
     .map((x) => x.c);

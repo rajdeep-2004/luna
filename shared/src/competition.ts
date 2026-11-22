@@ -91,6 +91,9 @@ export type JoinDuelRequest = z.infer<typeof JoinDuelRequest>;
  */
 export const DUEL_TIMEOUT_ANSWER = 'TIMEOUT';
 
+/** game-modes.md §4: the per-challenge duel countdown. The app shows it; the server enforces it. */
+export const DUEL_TIMER_MS = 60_000;
+
 export type DuelStatus = 'OPEN' | 'ACTIVE' | 'COMPLETED' | 'EXPIRED';
 export type DuelEndReason = 'PLAYED' | 'FORFEIT' | 'EXPIRED';
 

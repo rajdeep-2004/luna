@@ -1,5 +1,6 @@
 import { rateLimit } from 'express-rate-limit';
 import { env } from '../config/env';
+import { RATE_LIMITS } from '../config/security';
 import { AppError } from '../lib/errors';
 
 const limited = new AppError(
@@ -7,10 +8,9 @@ const limited = new AppError(
   'Too many requests. Wait a few minutes and try again.',
 );
 
-/** Login and register: 10 attempts per 15 minutes per IP (D-015: basic limits on auth only). */
+/** Login and register, per IP (D-015). */
 export const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 10,
+  ...RATE_LIMITS.auth,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   handler: (_req, _res, next) => next(limited),
@@ -19,17 +19,15 @@ export const authLimiter = rateLimit({
 });
 
 export const globalLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  limit: 300,
+  ...RATE_LIMITS.global,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   handler: (_req, _res, next) => next(limited),
 });
 
-/** Duel codes are guessable in principle (32^6): 30 join tries per 15 minutes per IP. */
+/** Duel codes are guessable in principle (32^6), so joins are limited per IP. */
 export const duelJoinLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 30,
+  ...RATE_LIMITS.duelJoin,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   handler: (_req, _res, next) => next(limited),

@@ -2,9 +2,23 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
-import type { AchievementView, SessionHistoryItem, SessionType } from '@luna/shared';
+import type {
+  AchievementView,
+  SessionHistoryItem,
+  SessionType,
+  TopicProgressView,
+} from '@luna/shared';
 import { usersApi, userMessage } from '../../api';
-import { AppText, Button, Card, ErrorState, Screen, YokaiAvatar } from '../../components';
+import {
+  AppText,
+  Button,
+  Card,
+  ErrorState,
+  MoonPhase,
+  Screen,
+  YokaiAvatar,
+} from '../../components';
+import { MOON_FOR, MOON_LABEL } from '../../lib/moon';
 import { useProgress } from '../../lib/useProgress';
 import { useTopicNames } from '../../lib/useTopicNames';
 import { useAuthStore } from '../../store/auth';
@@ -20,7 +34,7 @@ const TYPE_LABEL: Record<SessionType, string> = {
 };
 const GRADE_WORD = { KANPEKI: 'Kanpeki', SUGOI: 'Sugoi', YOSHI: 'Yoshi', MADA_MADA: 'Mada mada' };
 
-/** ui-design.md §5 Profile: rank, XP, stats, achievements, history, log out. */
+/** ui-design.md §5 Profile: rank, XP, stats, topic mastery, achievements, history, log out. */
 export function ProfileScreen() {
   const user = useAuthStore((s) => s.user);
   const signOut = useAuthStore((s) => s.signOut);
@@ -64,6 +78,14 @@ export function ProfileScreen() {
           </View>
         ) : progress.isPending ? (
           <ActivityIndicator color={colors.moon} />
+        ) : null}
+
+        {p ? (
+          <Section title="Topics">
+            {p.topics.map((t) => (
+              <TopicRow key={t.topicSlug} t={t} />
+            ))}
+          </Section>
         ) : null}
 
         <Section title="Achievements">
@@ -147,6 +169,30 @@ function Achievement({ a }: { a: AchievementView }) {
           {earned ? `Earned ${new Date(a.awardedAt!).toLocaleDateString()}` : a.condition}
         </AppText>
       </View>
+    </View>
+  );
+}
+
+/** PRD F-24: per-topic answers, recent accuracy and moon-phase mastery. */
+function TopicRow({ t }: { t: TopicProgressView }) {
+  const topicName = useTopicNames();
+  const accuracy = t.recentAccuracy === null ? '–' : `${Math.round(t.recentAccuracy * 100)}%`;
+  return (
+    <View
+      style={styles.hist}
+      accessible
+      accessibilityLabel={`${topicName(t.topicSlug)}: ${MOON_LABEL[t.phase]}, ${t.answers} answers, recent accuracy ${accuracy}`}
+    >
+      <MoonPhase phase={MOON_FOR[t.phase]} size={28} />
+      <View style={styles.achBody}>
+        <AppText color="textSoft">{topicName(t.topicSlug)}</AppText>
+        <AppText variant="label" color="textMuted">
+          {MOON_LABEL[t.phase]} · {t.answers} answers
+        </AppText>
+      </View>
+      <AppText variant="code" color="textSoft">
+        {accuracy}
+      </AppText>
     </View>
   );
 }

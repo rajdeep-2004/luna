@@ -53,7 +53,6 @@ async function payWinBonus(duel: DuelDoc): Promise<void> {
   );
 }
 
-const BONUS_WAIT = { tries: 10, delayMs: 50 } as const;
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
@@ -62,8 +61,8 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
  */
 async function settledBonus(duel: DuelDoc): Promise<number> {
   let d: DuelDoc | null = duel;
-  for (let i = 0; d && d.winBonusClaimed && !d.winBonusSettled && i < BONUS_WAIT.tries; i++) {
-    await sleep(BONUS_WAIT.delayMs);
+  for (let i = 0; d && d.winBonusClaimed && !d.winBonusSettled && i < DUEL.bonusWait.tries; i++) {
+    await sleep(DUEL.bonusWait.delayMs);
     d = await DuelModel.findById(duel._id);
   }
   return d?.winBonusXP ?? 0;

@@ -1,5 +1,5 @@
 import { TOPIC_SLUGS } from '@luna/shared';
-import { ADAPTIVE, DUEL } from '../../config/game';
+import { ADAPTIVE, DUEL, PICK_WEIGHTS } from '../../config/game';
 import { AppError } from '../../lib/errors';
 import type { ChallengeDoc } from '../../models/Challenge';
 import { UserTopicProgressModel } from '../../models/UserTopicProgress';
@@ -29,8 +29,8 @@ export async function pickDuelChallenges(difficulty: number): Promise<ChallengeD
         c,
         score:
           Math.abs(c.difficulty - difficulty) +
-          (usedTopics.get(c.topicSlug) ?? 0) * 2 +
-          Math.random() * 0.5,
+          (usedTopics.get(c.topicSlug) ?? 0) * DUEL.repeatTopicPenalty +
+          Math.random() * PICK_WEIGHTS.jitter,
       }))
       .sort((a, b) => a.score - b.score)[0]?.c;
     if (!best) throw new AppError('NOT_FOUND', 'Not enough challenges for a duel yet');

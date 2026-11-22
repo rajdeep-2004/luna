@@ -11,6 +11,7 @@ Backlog, deferred ideas and known debt. Scope changes go here first; nothing her
 - Push notifications for streak reminders.
 
 ## Known debt / revisit
+- No API test covers the per-account login lockout (5 failures → 15 min). Add one to `.scratch/api-tests/auth.test.ts`.
 - Refresh tokens instead of a single 7-day JWT (D-008).
 - Cached `weeklyXP` counter if the leaderboard aggregation gets slow (architecture §12).
 - CI (lint + typecheck + API tests) if the project gets more contributors (D-006).

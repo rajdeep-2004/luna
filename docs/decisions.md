@@ -1016,3 +1016,71 @@ changes. The assumptions in D-032 (forfeit in both directions with no bonus, Inc
 Katas, no feedback sheet in duels) stand as built. P5 is marked `shipped` in `prd.md` and merged into `main`
 with `--no-ff`. Reminder carried forward: run `npm run seed -w server` once against each existing database so
 the new duel and history indexes are built. Next is P6: deploy, polish and demo prep.
+
+---
+
+### D-035 — P6 (part 1): consistency pass and README, deploy deferred
+- **Date:** 2026-11-22 · **Step:** P6 — polish · **Status:** Active · **Type:** process + technical
+
+**Context.** Rajdeep is away from the Mac, so P6 is split. This part covers what doesn't need a
+deploy: a consistency pass over the codebase, small fixes, and the README. Deploy (P6 task 1), the
+network-failure pass on a real Render instance, and the acceptance run with two accounts wait
+until he's back. Nothing was deployed.
+
+**What the consistency pass found and changed.**
+- *Magic numbers left in code.* Rate limits moved into `config/security.ts` next to the auth
+  constants. Selection weights, the duel topic-repeat penalty and the win-bonus wait moved into
+  `config/game.ts`. The 60-second duel timer now lives once in `shared/` and is imported by both the
+  app and the server, so the countdown on screen and the server's rule can't drift apart.
+- *Duplicated code.* Two copies of `shuffle` became one in `server/src/lib/random.ts`. It uses
+  `crypto.randomInt`, matching the duel-code generator.
+- *A PRD gap.* F-24 asks the Profile to show per-topic answers, accuracy and moon-phase mastery. The
+  P5 Profile didn't, so a Topics section was added.
+- *Copy that was wrong in duels.* "Leave session? You can pick it up later" hid the fact that the
+  duel clock keeps running on the server. Duels now say so.
+- *Docs that described the plan, not the build.* In `architecture.md`, the folder tree (no
+  `features/` folder, no controller layer), the rate limits (no per-user write limit exists), the
+  list envelope, the cold-start timing and the test setup were all corrected to match the code.
+- *Checked and fine.* No `process.env` outside the config modules, no unused files, no stray logs,
+  and every pressable has an accessibility role and label.
+
+**README.** Written as the project's front page for a reviewer or recruiter: the problem, the four
+modes and the progression systems, the architecture with two diagrams, setup in four steps, the
+config and API tables, and an "engineering notes" section on the integrity design (answer keys,
+the XP ledger, idempotency, the duel join race, the server clock). Every claim was checked against
+the code. Where a claim didn't hold (account lockout has no test; Expo web isn't installed), it was
+removed rather than left in. It states openly that the API tests are local and gitignored, and
+that deployment isn't live yet.
+
+**Files touched.** `README.md`, `docs/architecture.md`, `server/src/config/{game,security}.ts`,
+`server/src/lib/random.ts`, `server/src/middleware/rateLimit.ts`, the session and duel selection,
+service and settle modules, `shared/src/competition.ts`, `app/src/screens/profile/ProfileScreen.tsx`,
+`app/src/screens/game/{SessionHeader,SessionScreen,DuelVerdict}.tsx`, `app/src/lib/session.ts`.
+
+**Still to do in P6:** deploy to Render and Atlas prod and seed it; the network-failure pass (airplane
+mode, cold start, token expiry); the full acceptance checklist with two accounts; the demo script and
+metrics script.
+
+---
+
+### D-036 — API deployed to Render, production database seeded
+- **Date:** 2026-11-22 · **Step:** P6 — deploy · **Status:** Active · **Type:** infra
+
+Rajdeep created the Render web service (`https://luna-kloi.onrender.com`) from `main` with the settings in
+`architecture.md` §14: repo root as the root directory, `npm ci --include=dev && npm run build -w server`,
+`npm run start -w server`, health check `/api/v1/health`. The production database `luna_prod` on Atlas was
+seeded. Before the deploy, the production build was run locally with `NODE_ENV=production` to prove the
+bundle starts and reaches the database.
+
+**Verified on the live API:** health reports the database as connected; protected routes return 401
+without a token; helmet's security headers (CSP, HSTS) are present; a practice session builds 5 items and
+the response contains no answer keys. That check used one throwaway account, `smoke_p6`
+(`smoke-p6@luna.test`), which has 0 XP and does not appear on the Dojo Board. Delete it from `luna_prod`
+before the demo if a clean user list matters.
+
+**App.** `app/.env` now points at the Render URL. The previous LAN value is kept in the gitignored
+`app/.env.local-dev.bak`, so local development is one copy away.
+
+**Why this order.** The API went live from `main` (P5) before the P6 branch was merged. The P6 changes are a
+refactor, docs and two small UI fixes, so the live API behaves the same; they reach Render automatically when
+P6 is merged.

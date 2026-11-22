@@ -15,6 +15,7 @@ import { DUEL_TIMEOUT_ANSWER } from '@luna/shared';
 import { SessionModel, type SessionDoc } from '../../models/Session';
 import { AnswerAttemptModel } from '../../models/AnswerAttempt';
 import type { ChallengeDoc } from '../../models/Challenge';
+import { shuffle } from '../../lib/random';
 import { AppError, conflict, isDuplicateKey, notFound } from '../../lib/errors';
 import { DUEL, SESSION } from '../../config/game';
 import { localDateKey } from '../../lib/time';
@@ -37,15 +38,6 @@ import { settleProgression } from './sessions.settle';
 import { answerXP, ownedXP } from './sessions.xp';
 import { buildSummary } from './sessions.summary';
 import { evaluateAchievements } from '../achievements/achievements.service';
-
-const shuffle = <T>(xs: T[]): T[] => {
-  const a = [...xs];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j]!, a[i]!];
-  }
-  return a;
-};
 
 /** Mongoose infers nested string arrays loosely; at runtime they are plain string[][]. */
 const ordersOf = (item: { optionOrders: unknown }): string[][] => item.optionOrders as string[][];

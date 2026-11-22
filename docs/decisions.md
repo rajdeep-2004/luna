@@ -890,3 +890,118 @@ offer) and accepted it with no changes. The whole phase ran on Opus at Rajdeep's
 switching models per task. P4 is marked `shipped` in `prd.md` and merged into `main` with `--no-ff`, so the
 phase stays visible as one unit in history. Reminder carried forward: run `npm run seed -w server` once
 against each existing database so the changed session index is rebuilt (D-030).
+
+---
+
+### D-032 — P5 competition: how the Dojo Board, duels, achievements and history were built
+- **Date:** 2026-11-22 · **Step:** P5 — build · **Status:** Active · **Type:** product + technical
+
+**Context.** P5 turns Luna from a solo trainer into something two people can compete in. The rules were
+already approved in `docs/product/competition.md`, `scoring.md` and `progression.md`. What follows is
+what the build had to decide on top of them, including a few choices the rules didn't cover.
+
+**Dojo Board.** The weekly ranking is computed on each request from the XP ledger (`xpevents`), grouped by
+user for the current UTC week. It is sorted by weekly XP, then by who reached that total first (the
+earliest "last award" time), then by user id so the order is stable across pages. Pagination is an
+offset cursor inside the top 50, because the list is small and the order is fully determined; a keyset
+cursor would add complexity for no gain here. The caller's own row comes from the same aggregation,
+so it is always consistent with the visible rows. Last week's top 3 is a second, tiny aggregation.
+*Rejected:* a stored `weeklyXP` counter on the user. It is faster but needs a weekly reset and can drift
+from the ledger; the per-request aggregation is the documented first bottleneck and is fine at capstone
+scale (`TODOS.md`). *Why it matters for product:* ranking by this week's XP, not total XP, means a new user
+can top the board, which keeps the board from being a veterans' club.
+
+**Achievements.** Each of the five is checked right after a session is marked completed, using counts the
+server already stores (completed sessions, correct Bug Hunt answers, completed and perfect Daily Katas).
+Because the counts are cumulative, a check that was skipped by a crash is caught up next time. A unique
+index on `{userId, key}` means a badge is awarded once even if two completions race. Newly earned badges
+ride only on the completion response that earned them, like the rank-up, so the toast shows once.
+*Assumption (not confirmed):* "Complete 5 Incident Rooms" counts both solo incidents and Daily Katas,
+because every Kata ends with an incident. If Rajdeep wants solo incidents only, it is a one-line change.
+
+**Session history.** `GET /users/me/sessions` uses a keyset cursor (`completedAt` + id) instead of an offset,
+because new sessions are added at the top while the user scrolls; an offset would skip or repeat rows.
+
+**Duels — API shape (deviates from the P0 plan).** The plan had `POST /duels/:code/join` and a separate
+`GET /duels/:id/result`. The build uses `POST /duels/join` with the code in the body (validated by Zod like
+any input, and easy to rate-limit), folds the result into `GET /duels/:id`, and adds `GET /duels` for the
+three tabs and `POST /duels/:id/play`. The `play` step matters: creating or joining a duel no longer starts
+the 60-second clock. A player's session is created only when they tap Begin, after a confirmation that
+states the rules. Otherwise someone who joins at night and plays in the morning would time out on question 1.
+
+**Duels — fairness and integrity.**
+- *Same questions, same order.* The duel stores its 5 challenges and the shuffled option order once; both
+  players' sessions are built from that copy.
+- *Join race.* Joining is one conditional update (`status OPEN, no opponent, not the creator, not expired`), so
+  when two people use one code at the same moment exactly one gets in. The other is told "This duel is
+  already taken". A second tap by the person who did join just returns their duel.
+- *Timer on the server's clock.* The app shows a 60 s countdown, but the server decides: an answer that
+  arrives more than 60 s + 5 s grace after the previous one is a timeout (wrong, recorded as exactly 60 s),
+  whatever the client sends. The grace absorbs network latency. To show the real time left after the app
+  is reopened, the session view includes `stepElapsedMs`, measured by the server, so the phone's clock
+  can't skew it.
+- *No feedback sheet in duels.* The server's clock for the next question starts at the previous answer, so
+  time spent reading an explanation would come out of the next 60 seconds. Duels show a short ✓/✗ stamp and
+  move on by themselves; explanations are left to practice. This also fits "pressure belongs in duels".
+- *Expiry without a background job.* Every read of a duel settles it if it is due. *Assumption beyond the
+  spec:* the spec says the creator wins if the opponent joined but didn't finish. The build generalises this
+  to "whoever finished in time wins by default", in either direction, and if nobody finished the duel just
+  expires. A default win pays **no** win bonus, so an idle second account can't farm the bonus.
+- *Win-bonus cap.* The 10 XP bonus is capped at 3 per local day. Instead of counting and then paying (which
+  two simultaneous wins could both pass), the bonus uses three ledger keys per day, `duelwin:<date>:1..3`. The
+  ledger's unique index hands each slot out once, so the cap is enforced by the database. A claim flag on the
+  duel makes the bonus once per duel. This replaced the planned key `duelwin:<duelId>`, which could not express
+  a daily cap.
+- *Open-duel limit.* Max 5 live duels per creator is a count followed by an insert, so two simultaneous creates
+  could make a sixth. That only weakens a spam guard, so it is accepted rather than adding a counter.
+- *Code guessing.* Codes have 32^6 (about a billion) values, and join is limited to 30 tries per 15 minutes per IP.
+
+**Known limitation (accepted).** `GET /sessions/:id` returns all 5 duel questions at once (it is the same
+endpoint every mode uses). A player who inspects the network traffic could read question 5 while the clock runs
+on question 1. Hiding future questions would need a per-step endpoint; for friend duels this is not worth it now.
+
+**UI.** Duel tab (start and share a code, join by code, Your turn / Waiting / Finished), Duel Result (avatars
+slide in, then the score; per-question ✓/✗ and times; Rematch), Dojo Board (pinned own row, last week's medals,
+reset countdown) with a "weekly rank" card on the Dojo home, and the real Profile (rank, XP, streaks, the five
+achievements with locked ones dimmed, paginated history, log out). Sharing uses React Native's built-in `Share`
+sheet, so no new dependency.
+
+**Files touched.** Server: `modules/leaderboard/*`, `modules/achievements/*`, `modules/duels/*`,
+`modules/sessions/{sessions.history,sessions.service,sessions.settle,sessions.evaluator,sessions.selection}.ts`,
+`models/{Duel,UserAchievement,Session}.ts`, `config/game.ts`, `middleware/{validate,rateLimit}.ts`, `lib/time.ts`.
+Shared: `competition.ts`, `sessions.ts`. App: `screens/{duel,board,profile}/*`, `screens/dojo/BoardPreview.tsx`,
+`screens/game/{DuelCountdown,DuelVerdict,SessionScreen,SummaryScreen,SummaryExtras,useAnswerFlow}.tsx`.
+
+**Concepts worth learning.** *Conditional updates as locks:* `findOneAndUpdate` with the expected state in the
+filter is a compare-and-set; only one caller can win. *Lazy expiry:* instead of a scheduler, state is brought up
+to date whenever it is read, which is simple but means every read path must call the settle step. *Using unique
+indexes to enforce limits:* turning "max 3 per day" into three unique keys moves a race-prone count into the
+database. *Keyset vs offset pagination:* keyset stays correct while rows are being added.
+
+**Revisit if** the board gets slow (cached weekly counter), duels go public (hide future questions, stronger code
+limits), or Rajdeep wants a different reading of "Incident Commander" or the forfeit rule.
+
+---
+
+### D-033 — P5 backend review: what was fixed
+- **Date:** 2026-11-22 · **Step:** P5 — backend review · **Status:** Active · **Type:** technical
+
+One review agent read the server and shared diff of the phase. It found no AuthZ gaps (duels and their sessions
+404 for non-participants), no answer-key or email leaks, and confirmed the join race, the double-play guard, the
+win-bonus cap and both cursors. It raised three findings, all fixed:
+
+1. *High — a finish after the deadline could still count.* Expiry is applied when a duel is read, so a duel could
+   still say `ACTIVE` after 48 hours. If the opponent answered in time but tapped "Finish" after the deadline,
+   before anyone opened the duel, their score was written and they could win; if someone had opened it first,
+   the creator would have won by default. The outcome depended on read timing. Now a score is only written
+   while `expiresAt` is still in the future, so a late finish never counts. A regression test covers it.
+2. *Medium — the expiry step could act on a stale copy.* The forfeit decision used the document the caller had
+   read earlier. If the other player's score landed in between, the forfeit could overwrite a real result. The
+   expiry updates are now guarded in the database on the other side's score still being empty; if the guard
+   fails, the duel is re-read and settled as played.
+3. *Medium — the winner's summary could miss the bonus.* When two settles ran at once, the one that lost the
+   bonus claim could read the duel before the winner's amount was written and report 0, although the ledger paid
+   10. The payer now also sets `winBonusSettled`, and the winner's completion waits briefly (up to about 0.5 s)
+   for it before building the summary.
+
+Full API suite after the fixes: 55 tests, all passing.

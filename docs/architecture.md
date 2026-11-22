@@ -99,7 +99,7 @@ luna/
 | progress | XP ledger, levels, streaks, topic progress, mastery, adaptivity | — | award XP twice for the same source |
 | daily | build or return today's Daily Kata per user | challenges, progress | build two circuits for the same user and day |
 | leaderboard | weekly ranking aggregation | progress (XP ledger) | scan unbounded results |
-| duels | create, join, result | sessions | let a user join their own duel |
+| duels | create, join, play, settle (expiry, forfeit, winner, win bonus), list | sessions, progress (XP ledger) | let a user join their own duel; count a finish after the deadline |
 | achievements | evaluate and award badges after session events | progress | award the same badge twice |
 
 ## 6. Layering rules
@@ -166,14 +166,14 @@ not as magic numbers. Their values come from `docs/product/` (approved).
 | users | email, username, usernameLower, passwordHash (select: false), avatarId, preferredTopicSlugs, experienceLevel, onboardedAt, totalXP (level and rank are computed from it, not stored), currentStreak, longestStreak, lastDailyDate (`YYYY-MM-DD` local), timezone (IANA) | unique email, unique usernameLower |
 | topics | slug, name, description, icon, order | unique slug |
 | challenges | slug, title, topicSlug (slugs are stable, so no join to topics is needed), subtopic, type (`TRACE`/`BUG_HUNT`/`ENGINEER_CHOICE`/`INCIDENT`), difficulty 1–3, prompt, codeSnippet?, options[{id,text}], answerKey, explanation, misconception, optionFeedback?, hint?, estimatedTimeSec (XP comes from difficulty via config), stages[] (incident only: title, evidence, prompt, options, answerKey, explanation), rootCause?, isActive | unique slug; `{topicId, type, difficulty, isActive}` |
-| sessions | userId, type (`PRACTICE`/`DAILY`/`INCIDENT`/`BASELINE`/`CHECKPOINT`/`DUEL`), topicId?, dailyDate?, duelId?, items[{challengeId, order, optionOrders[][], isRevisit, hintsUsed[]}], status (`ACTIVE`/`COMPLETED`), startedAt, completedAt, correctCount, totalQuestions, totalTimeMs, totalXP | `{userId, createdAt:-1}`; unique partial `{userId, dailyDate}` (type DAILY); unique partial `{userId, type, topicSlug}` (ACTIVE PRACTICE/BASELINE/CHECKPOINT); unique partial `{duelId, userId}` |
+| sessions | userId, type (`PRACTICE`/`DAILY`/`INCIDENT`/`BASELINE`/`CHECKPOINT`/`DUEL`), topicId?, dailyDate?, duelId?, items[{challengeId, order, optionOrders[][], isRevisit, hintsUsed[]}], status (`ACTIVE`/`COMPLETED`), startedAt, completedAt, correctCount, totalQuestions, totalTimeMs, totalXP | `{userId, createdAt:-1}`; unique partial `{userId, dailyDate}` (type DAILY); unique partial `{userId, type, topicSlug}` (ACTIVE PRACTICE/BASELINE/CHECKPOINT); unique partial `{duelId, userId}` (type DUEL); `{userId, status, completedAt:-1, _id:-1}` (history) |
 | answerattempts | userId, sessionId, challengeId, stageIndex (0 for non-incident), answer, isCorrect, usedHint, isTimeout, timeTakenMs (server-measured), topicId, difficulty, createdAt | **unique `{sessionId, challengeId, stageIndex}`** (blocks double submits); `{userId, challengeId}`; `{userId, topicId, createdAt:-1}` |
 | usertopicprogress | userId, topicSlug, answers, correct, recentResults (last 10 booleans, mastery), adaptWindow (answers since last difficulty change, max 5), difficultyLevel 1–3, hasAdvancedCorrect, lastPractisedAt | unique `{userId, topicId}` |
-| xpevents | userId, sourceKey (`challenge:<id>[:<stage>]`, `review:<date>:<id>`, `daily:<date>`, `perfect:<date>`, `first-incident`, `streak<N>:<runStart>`, `duelwin:<duelId>`), amount, weekKey (`2026-W47`), createdAt | **unique `{userId, sourceKey}`** (first-completion XP only); `{weekKey, userId}` |
+| xpevents | userId, sourceKey (`challenge:<id>[:<stage>]`, `review:<date>:<id>`, `daily:<date>`, `perfect:<date>`, `first-incident`, `streak<N>:<runStart>`, `duelwin:<localDate>:<1..3>`), amount, weekKey (`2026-W47`), createdAt | **unique `{userId, sourceKey}`** (first-completion XP only); `{weekKey, userId}` |
 | revisititems | userId, challengeId, topicSlug, missedAt, missedDate (local `YYYY-MM-DD`), notBeforeDate? (set when a revisit is missed again) | unique `{userId, challengeId}`; `{userId, missedAt}` |
-| duels | code, creatorId, opponentId?, challengeIds[5], creatorSessionId, opponentSessionId?, status (`OPEN`/`ACTIVE`/`COMPLETED`/`EXPIRED`), winnerId?, expiresAt | unique code; TTL-free (expiry checked on read); `{creatorId}`, `{opponentId}` |
+| duels | code, creatorId, opponentId?, items[5]{challengeId, optionOrders[][]}, status (`OPEN`/`ACTIVE`/`COMPLETED`/`EXPIRED`), creatorResult?/opponentResult? {correct, totalTimeMs, finishedAt}, winnerId?, endReason (`PLAYED`/`FORFEIT`/`EXPIRED`), winBonusClaimed, winBonusSettled, winBonusXP, expiresAt | unique code; TTL-free (expiry checked on read); `{creatorId, createdAt:-1}`, `{opponentId, createdAt:-1}`. A player's DUEL session is found by `{duelId, userId}` |
 | revisits | userId, challengeId, answersAtMiss, notBefore (date), status | unique `{userId, challengeId}` while open; `{userId, status, notBefore}` |
-| userachievements | userId, achievementKey, awardedAt | unique `{userId, achievementKey}` |
+| userachievements | userId, key, awardedAt | unique `{userId, key}` |
 
 ## 12. Key flows and failure handling
 
@@ -213,7 +213,27 @@ because the streak only moves when a Daily Kata completes and `lastDailyDate` is
 collision (up to 5 times). Join → atomic `findOneAndUpdate({code, status: OPEN, opponentId: null,
 creatorId: {$ne: me}, expiresAt > now})`, so only one opponent can ever join. Both play DUEL sessions
 on the same `challengeIds`. Result is computed when both sessions are COMPLETED: more correct wins,
-then lower `totalTimeMs`, else draw. Duel sessions still earn first-completion XP (same ledger rules).
+then lower `totalTimeMs` (compared in whole seconds), else draw. Duel sessions still earn first-completion XP
+(same ledger rules). Details of what P5 built (D-032):
+- *Play:* `POST /duels/:id/play` creates the player's DUEL session on the duel's fixed challenges and option
+  order. The unique `{duelId, userId}` index turns a double tap into one session.
+- *Timer:* 60 s per challenge on the server's clock, measured from the previous answer. An answer later than
+  60 s + 5 s grace, or the `TIMEOUT` answer the app sends at zero, is wrong and records exactly 60 s. There are
+  no hints. The app shows a brief ✓/✗ instead of the feedback sheet, so reading time doesn't eat the next timer.
+- *Settle:* when a DUEL session completes, the player's score is written onto the duel only if the duel is live
+  and before `expiresAt`. Every read of a duel then settles it: both scores → `COMPLETED`/`PLAYED`; past expiry →
+  the player who finished wins by default (`FORFEIT`, no bonus), or `EXPIRED` if nobody finished or joined. Each
+  transition is a conditional update guarded on the fields it depends on.
+- *Win bonus:* claimed once per duel (`winBonusClaimed` false→true), then paid into the first free daily slot
+  `duelwin:<date>:1..3`, so the 3-per-day cap is enforced by the ledger's unique index.
+
+**Dojo Board** (`GET /leaderboard/weekly`): one aggregation over this week's `xpevents` grouped by user, sorted by
+XP, then by who reached it first (earliest last award), then id. Pages are offsets inside the top 50; the `me` row
+comes from the same aggregation. Last week's top 3 is a second aggregation with `$limit: 3`.
+
+**Achievements:** checked right after a session flips to `COMPLETED`, from cumulative counts (completed sessions,
+correct Bug Hunt answers, completed Katas, perfect Katas). A missed check catches up on the next completion. Newly
+earned ones ride on that one completion response, like `rankUp`.
 
 **First bottleneck:** the leaderboard aggregation over `xpevents` per request. Fine at capstone
 scale with the `{weekKey, userId}` index. Later: a cached `weeklyXP` counter per user with a

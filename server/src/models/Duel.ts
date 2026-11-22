@@ -42,6 +42,8 @@ const duelSchema = new Schema(
     /** Claimed with a false→true update before paying, so the win bonus is paid at most once. */
     winBonusClaimed: { type: Boolean, default: false },
     winBonusXP: { type: Number, default: 0 },
+    /** Set once the claimed bonus is paid or found capped, so a concurrent reader knows it's final. */
+    winBonusSettled: { type: Boolean, default: false },
     expiresAt: { type: Date, required: true },
   },
   { timestamps: true },

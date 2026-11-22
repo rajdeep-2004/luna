@@ -10,6 +10,8 @@ import { usersRepo } from '../users/users.repository';
 type Result = { correct: number; totalTimeMs: number };
 type Id = Types.ObjectId | string;
 
+const LIVE: DuelStatus[] = ['OPEN', 'ACTIVE'];
+
 const sameId = (a: Id | null | undefined, b: Id | null | undefined) =>
   a != null && b != null && a.toString() === b.toString();
 
@@ -41,18 +43,43 @@ async function payWinBonus(duel: DuelDoc): Promise<void> {
   const winnerId = claimed.winnerId.toString();
   const winner = await usersRepo.findById(winnerId);
   const date = localDateKey(new Date(), winner?.timezone ?? 'UTC');
-  for (let slot = 1; slot <= DUEL.winBonusesPerDay; slot++) {
-    const paid = await awardXP(winnerId, `duelwin:${date}:${slot}`, DUEL.winBonusXP);
-    if (paid > 0) {
-      await DuelModel.updateOne({ _id: duel._id }, { $set: { winBonusXP: paid } });
-      return;
-    }
+  let paid = 0;
+  for (let slot = 1; slot <= DUEL.winBonusesPerDay && paid === 0; slot++) {
+    paid = await awardXP(winnerId, `duelwin:${date}:${slot}`, DUEL.winBonusXP);
   }
+  await DuelModel.updateOne(
+    { _id: duel._id },
+    { $set: { winBonusXP: paid, winBonusSettled: true } },
+  );
 }
 
-/** Conditional transition out of `from`: only the first caller moves it. */
-function finish(duel: DuelDoc, from: DuelStatus[], set: Record<string, unknown>) {
-  return DuelModel.updateOne({ _id: duel._id, status: { $in: from } }, { $set: set });
+const BONUS_WAIT = { tries: 10, delayMs: 50 } as const;
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/**
+ * The bonus as final: if a concurrent settle holds the claim but hasn't written the amount yet,
+ * wait briefly for it, so the winner's summary doesn't report 0 for a bonus the ledger paid.
+ */
+async function settledBonus(duel: DuelDoc): Promise<number> {
+  let d: DuelDoc | null = duel;
+  for (let i = 0; d && d.winBonusClaimed && !d.winBonusSettled && i < BONUS_WAIT.tries; i++) {
+    await sleep(BONUS_WAIT.delayMs);
+    d = await DuelModel.findById(duel._id);
+  }
+  return d?.winBonusXP ?? 0;
+}
+
+/**
+ * Conditional transition out of `from`: only the first caller moves it. `guard` adds conditions
+ * that must still hold in the database (not just in the caller's possibly stale copy).
+ */
+function finish(
+  duel: DuelDoc,
+  from: DuelStatus[],
+  set: Record<string, unknown>,
+  guard: Record<string, unknown> = {},
+) {
+  return DuelModel.updateOne({ _id: duel._id, status: { $in: from }, ...guard }, { $set: set });
 }
 
 /**
@@ -61,7 +88,7 @@ function finish(duel: DuelDoc, from: DuelStatus[], set: Record<string, unknown>)
  * At expiry a player who finished beats one who didn't (a forfeit, no win bonus, so an idle alt
  * account can't farm it); if nobody finished, or nobody joined, the duel just expires.
  */
-export async function settleDuel(duel: DuelDoc): Promise<DuelDoc> {
+export async function settleDuel(duel: DuelDoc, depth = 0): Promise<DuelDoc> {
   if (duel.status === 'COMPLETED' || duel.status === 'EXPIRED') return duel;
   const c = duel.creatorResult;
   const o = duel.opponentResult;
@@ -71,19 +98,29 @@ export async function settleDuel(duel: DuelDoc): Promise<DuelDoc> {
     await finish(duel, ['ACTIVE'], { status: 'COMPLETED', endReason: 'PLAYED', winnerId });
   } else if (duel.expiresAt.getTime() <= Date.now()) {
     const finisher = c ? duel.creatorId : o ? duel.opponentId : null;
+    // Guards: our copy may be stale. If the other result landed (in time) since we read it,
+    // the update matches nothing and the re-read below settles the duel as played instead.
     if (duel.status === 'ACTIVE' && finisher) {
-      await finish(duel, ['ACTIVE'], {
-        status: 'COMPLETED',
-        endReason: 'FORFEIT',
-        winnerId: finisher,
-      });
+      await finish(
+        duel,
+        ['ACTIVE'],
+        { status: 'COMPLETED', endReason: 'FORFEIT', winnerId: finisher },
+        c ? { opponentResult: null } : { creatorResult: null },
+      );
     } else {
-      await finish(duel, ['OPEN', 'ACTIVE'], { status: 'EXPIRED', endReason: 'EXPIRED' });
+      await finish(
+        duel,
+        ['OPEN', 'ACTIVE'],
+        { status: 'EXPIRED', endReason: 'EXPIRED' },
+        { creatorResult: null, opponentResult: null },
+      );
     }
   } else {
     return duel;
   }
   const fresh = (await DuelModel.findById(duel._id))!;
+  // A guarded update lost to a fresher state: decide again on the real document (once).
+  if (LIVE.includes(fresh.status as DuelStatus) && depth === 0) return settleDuel(fresh, 1);
   if (fresh.endReason === 'PLAYED') await payWinBonus(fresh);
   return (await DuelModel.findById(duel._id))!;
 }
@@ -111,19 +148,21 @@ export async function recordDuelResult(
     totalTimeMs: summary.totalTimeMs,
     finishedAt: new Date(),
   };
-  const live = { $in: ['OPEN', 'ACTIVE'] as DuelStatus[] };
+  // Only a result written before the deadline counts. Expiry is lazy, so the status alone could
+  // still say ACTIVE after 48 h; a late finish must not turn a forfeit into a win.
+  const live = { status: { $in: LIVE }, expiresAt: { $gt: new Date() } };
   await DuelModel.updateOne(
-    { _id: duelId, creatorId: userId, creatorResult: null, status: live },
+    { _id: duelId, creatorId: userId, creatorResult: null, ...live },
     { $set: { creatorResult: result } },
   );
   await DuelModel.updateOne(
-    { _id: duelId, opponentId: userId, opponentResult: null, status: live },
+    { _id: duelId, opponentId: userId, opponentResult: null, ...live },
     { $set: { opponentResult: result } },
   );
   const duel = await DuelModel.findById(duelId);
   if (!duel) return [];
   const settled = await settleDuel(duel);
-  return sameId(settled.winnerId, userId) && settled.winBonusXP > 0
-    ? [{ kind: 'DUEL_WIN', xp: settled.winBonusXP }]
-    : [];
+  if (!sameId(settled.winnerId, userId) || settled.endReason !== 'PLAYED') return [];
+  const xp = await settledBonus(settled);
+  return xp > 0 ? [{ kind: 'DUEL_WIN', xp }] : [];
 }

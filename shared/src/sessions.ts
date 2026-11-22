@@ -45,6 +45,11 @@ export type SessionView = {
   startedAt: string;
   totalAnswers: number;
   items: SessionItemView[];
+  /**
+   * DUEL only: server-measured time already spent on the current question, so a resumed duel
+   * shows the real remaining seconds of the 60 s timer (no phone-clock skew).
+   */
+  stepElapsedMs?: number;
 };
 
 export type AnswerResult = {

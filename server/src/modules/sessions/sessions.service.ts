@@ -164,10 +164,16 @@ export async function getSession(userId: string, sessionId: string): Promise<Ses
   return buildView(session, challenges);
 }
 
+/** Time since the session's latest answer (or its start): the server clock for the current step. */
+function elapsedSince(session: SessionDoc, attempts: { createdAt: Date }[]): number {
+  const last = attempts.reduce((t, a) => (a.createdAt > t ? a.createdAt : t), session.startedAt);
+  return Math.max(0, Date.now() - last.getTime());
+}
+
 async function buildView(session: SessionDoc, challenges: ChallengeDoc[]): Promise<SessionView> {
   const byId = new Map(challenges.map((c) => [c._id.toString(), c]));
   const attempts = await AnswerAttemptModel.find({ sessionId: session._id })
-    .select('challengeId stageIndex answer isCorrect')
+    .select('challengeId stageIndex answer isCorrect createdAt')
     .sort({ stageIndex: 1 })
     .lean();
   const items = session.items.flatMap((item) => {
@@ -198,6 +204,7 @@ async function buildView(session: SessionDoc, challenges: ChallengeDoc[]): Promi
     startedAt: session.startedAt.toISOString(),
     totalAnswers: session.totalAnswers,
     items: items.sort((a, b) => a.order - b.order),
+    ...(session.type === 'DUEL' ? { stepElapsedMs: elapsedSince(session, attempts) } : {}),
   };
 }
 

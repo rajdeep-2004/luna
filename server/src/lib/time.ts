@@ -32,3 +32,11 @@ export function addDays(dateKey: string, days: number): string {
   const [y, m, d] = dateKey.split('-').map(Number) as [number, number, number];
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
+
+/** Next Monday 00:00 UTC after `date`: when the Dojo Board resets (competition.md §1). */
+export function nextWeekStartUTC(date: Date): Date {
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const day = d.getUTCDay() || 7; // Monday = 1 … Sunday = 7
+  d.setUTCDate(d.getUTCDate() + 8 - day);
+  return d;
+}

@@ -34,6 +34,7 @@ import {
 import { settleProgression } from './sessions.settle';
 import { answerXP, ownedXP } from './sessions.xp';
 import { buildSummary } from './sessions.summary';
+import { evaluateAchievements } from '../achievements/achievements.service';
 
 const shuffle = <T>(xs: T[]): T[] => {
   const a = [...xs];
@@ -403,7 +404,13 @@ export async function completeSession(userId: string, sessionId: string): Promis
     { $set: { status: 'COMPLETED', completedAt: new Date(), summary } },
     { returnDocument: 'after' },
   );
-  if (updated) return summary;
+  if (updated) {
+    // After the flip, so this session counts. Not stored: like rankUp, the toast shows once.
+    const unlocked = await evaluateAchievements(userId);
+    return unlocked.length
+      ? { ...summary, newAchievements: unlocked.map(({ key, name, icon }) => ({ key, name, icon })) }
+      : summary;
+  }
   // Lost a race with a parallel completion: return what that call stored.
   const stored = await SessionModel.findById(sessionId).select('summary').lean();
   return (stored?.summary as SessionSummary) ?? summary;

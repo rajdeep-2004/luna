@@ -8,6 +8,7 @@ const BONUS_LABEL: Record<BonusAward['kind'], (b: BonusAward) => string> = {
   PERFECT_KATA: () => 'Perfect Kata',
   FIRST_INCIDENT: () => 'First Incident Room',
   STREAK_MILESTONE: (b) => `${b.days}-day streak`,
+  DUEL_WIN: () => 'Duel won',
 };
 
 /** Bonuses, the lantern and fixed mistakes: what this session did for progress. */

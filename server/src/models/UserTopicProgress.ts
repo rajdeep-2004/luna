@@ -9,6 +9,8 @@ const userTopicProgressSchema = new Schema(
     correct: { type: Number, default: 0 },
     /** Rolling window of the last 10 results, newest last. Drives moon-phase mastery. */
     recentResults: { type: [Boolean], default: [] },
+    /** Results since the last difficulty change, newest last, at most ADAPTIVE.window (§4). */
+    adaptWindow: { type: [Boolean], default: [] },
     difficultyLevel: { type: Number, enum: [1, 2, 3], default: 1 },
     hasAdvancedCorrect: { type: Boolean, default: false },
     lastPractisedAt: { type: Date, default: null },

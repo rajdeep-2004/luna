@@ -83,6 +83,8 @@ export type SessionSummary = {
   perTopic: TopicResult[];
   weakTopics: TopicSlug[];
   bonuses: BonusAward[];
+  /** Revisits (past misses) answered correctly in this session: "You fixed a past mistake". */
+  fixedMistakes: number;
   /** Daily Kata only: the streak after this Kata. */
   streak?: { current: number; longest: number; extended: boolean };
   /** Set when this session's XP crossed a level threshold. */

@@ -44,6 +44,31 @@ export const SESSION = {
   recentResultsWindow: 10,
 } as const;
 
+/** progression.md §2: moon-phase mastery, judged on the rolling `recentResultsWindow`. */
+export const MASTERY = {
+  minAnswers: 5,
+  fullMinAnswers: 10,
+  /** Below this recent accuracy: crescent. */
+  crescentBelow: 0.5,
+  /** At or above this (plus an advanced correct): full moon. */
+  fullAtLeast: 0.8,
+} as const;
+
+/** progression.md §4: per-topic difficulty moves after 5 answers, then the window resets. */
+export const ADAPTIVE = { window: 5, upAtCorrect: 4, downAtCorrect: 2, min: 1, max: 3 } as const;
+
+/** progression.md §5: light spaced repetition of missed single challenges. */
+export const REVISIT = {
+  /** A miss can come back only after this many other answers. */
+  minOtherAnswers: 3,
+  /** A revisit answered wrong waits this many local days. */
+  retryWaitDays: 2,
+  perKata: 2,
+  perPractice: 1,
+  /** Bounds the queue read; the bank is ~60 challenges. */
+  maxScan: 100,
+} as const;
+
 /** scoring.md §5 grade bands, by accuracy. */
 export const GRADES = [
   { grade: 'KANPEKI', minAccuracy: 1 },

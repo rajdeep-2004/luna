@@ -1,6 +1,7 @@
 import type {
   AnswerResult,
   BonusAward,
+  ChallengeType,
   HintRequest,
   HintResult,
   SessionSummary,
@@ -18,6 +19,7 @@ import { HINT_XP_DIVISOR, levelForXP, SESSION, XP_BY_DIFFICULTY } from '../../co
 import { challengesRepo } from '../challenges/challenges.repository';
 import { answerCount, toPublicChallenge, toPublicStage } from '../challenges/challenges.projection';
 import { recordAnswer } from '../progress/topicProgress.service';
+import { trackRevisit } from '../progress/revisit.service';
 import { awardXP } from '../progress/xp.service';
 import {
   dailyBonusCandidates,
@@ -81,9 +83,11 @@ export async function startSession(
     throw conflict('You have already taken the baseline');
   }
 
+  const user = await usersRepo.findById(userId);
+  if (!user) throw notFound('User');
   const picked =
     input.type === 'PRACTICE'
-      ? await pickPractice(userId, input.topicSlug)
+      ? await pickPractice(userId, input.topicSlug, user.timezone)
       : input.type === 'INCIDENT'
         ? await pickIncident(userId, input.challengeId)
         : await pickBaseline();
@@ -94,12 +98,13 @@ export async function startSession(
       userId,
       type: input.type,
       topicSlug,
-      items: picked.map((c, order) => ({
+      items: picked.map(({ challenge: c, isRevisit }, order) => ({
         challengeId: c._id,
         order,
+        isRevisit,
         optionOrders: optionOrdersFor(c),
       })),
-      totalAnswers: picked.reduce((n, c) => n + answerCount(c), 0),
+      totalAnswers: picked.reduce((n, p) => n + answerCount(p.challenge), 0),
     });
   } catch (err) {
     // A concurrent start won the race: return the session it created.
@@ -113,7 +118,10 @@ export async function startSession(
     if (!winner) throw err;
     return getSession(userId, winner._id.toString());
   }
-  return buildView(session, picked);
+  return buildView(
+    session,
+    picked.map((p) => p.challenge),
+  );
 }
 
 export async function getSession(userId: string, sessionId: string): Promise<SessionView> {
@@ -239,6 +247,17 @@ export async function submitAnswer(
     result.isCorrect,
     challenge.difficulty,
   );
+  const user = await usersRepo.findById(userId);
+  await trackRevisit(
+    userId,
+    {
+      id: challengeId,
+      topicSlug: challenge.topicSlug as TopicSlug,
+      type: challenge.type as ChallengeType,
+    },
+    result.isCorrect,
+    user?.timezone ?? 'UTC',
+  );
   const isIncident = challenge.type === 'INCIDENT';
   const isLastStage = stageIndex === answerCount(challenge) - 1;
   let xpEarned = 0;
@@ -331,17 +350,29 @@ export async function completeSession(userId: string, sessionId: string): Promis
   const session = await findOwnSession(userId, sessionId);
   // Summaries stored before P4 have no `bonuses`; default it so clients can rely on the field.
   if (session.status === 'COMPLETED' && session.summary) {
-    const stored = session.summary as Omit<SessionSummary, 'bonuses'> & { bonuses?: BonusAward[] };
-    return { ...stored, bonuses: stored.bonuses ?? [] };
+    const stored = session.summary as Omit<SessionSummary, 'bonuses' | 'fixedMistakes'> & {
+      bonuses?: BonusAward[];
+      fixedMistakes?: number;
+    };
+    return { ...stored, bonuses: stored.bonuses ?? [], fixedMistakes: stored.fixedMistakes ?? 0 };
   }
 
   const attempts = await AnswerAttemptModel.find({ sessionId })
-    .select('topicSlug isCorrect timeTakenMs xpEarned')
+    .select('challengeId topicSlug isCorrect timeTakenMs xpEarned')
     .lean();
   if (attempts.length < session.totalAnswers)
     throw conflict('Answer every challenge before finishing');
 
-  const base = buildSummary(sessionId, session.type as SessionType, attempts);
+  const revisitIds = new Set(
+    session.items.filter((i) => i.isRevisit).map((i) => i.challengeId.toString()),
+  );
+  const fixedMistakes = attempts.filter(
+    (a) => a.isCorrect && revisitIds.has(a.challengeId.toString()),
+  ).length;
+  const base = {
+    ...buildSummary(sessionId, session.type as SessionType, attempts),
+    fixedMistakes,
+  };
   const summary = await settleProgression(userId, session, base);
   const updated = await SessionModel.findOneAndUpdate(
     { _id: sessionId, userId, status: 'ACTIVE' },

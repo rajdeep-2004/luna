@@ -1,10 +1,17 @@
 import type { PublicUser } from '@luna/shared';
 import type { UserDoc } from '../../models/User';
 import { levelForXP } from '../../config/game';
+import { localDateKey } from '../../lib/time';
+import { streakStatus } from '../progress/streak';
 
 /** The only way a user leaves the server. Never includes passwordHash. */
 export function toPublicUser(u: UserDoc): PublicUser {
   const lvl = levelForXP(u.totalXP);
+  // A broken run shows 0, not the stale stored number (progression.md §6).
+  const streak = streakStatus(
+    { current: u.currentStreak, longest: u.longestStreak, lastDate: u.lastDailyDate ?? null },
+    localDateKey(new Date(), u.timezone),
+  );
   return {
     id: u._id.toString(),
     email: u.email,
@@ -17,7 +24,7 @@ export function toPublicUser(u: UserDoc): PublicUser {
     totalXP: u.totalXP,
     level: lvl.level,
     rankName: lvl.name,
-    currentStreak: u.currentStreak,
+    currentStreak: streak.current,
     longestStreak: u.longestStreak,
   };
 }

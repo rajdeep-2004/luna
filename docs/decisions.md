@@ -677,3 +677,53 @@ over transactions). Storing `streakRunStart` on the user (derivable, so one less
 `shared/src/sessions.ts` (`bonuses`, `streak`, `rankUp` on the summary).
 **Concepts.** Compare-and-set (optimistic concurrency); idempotency keys; pure functions for time rules.
 **Revisit if** a streak freeze is added (it would need a stored state, not just a date comparison).
+
+### D-027 — Mastery, adaptive difficulty and the revisit queue
+- **Date:** 2026-11-22 · **Step:** P4 task 2 · **Status:** Active · **Type:** technical + product
+
+**Context.** `progression.md` §2–5 defines moon-phase mastery, per-topic adaptive difficulty, a light
+revisit queue for mistakes, and the "weakest blade" recommendation. The Dojo home (task 4) needs all of
+it in one call.
+
+**Adaptive difficulty in one atomic update.** Each answer already updated the topic row with one
+`updateOne`. The adaptive rule needs to read the last 5 results, decide, and maybe reset the window, which
+looks like a read-modify-write. Instead it runs as a MongoDB **update pipeline**: a list of `$set` stages
+that the database evaluates on the document itself, in one atomic step. Stage 1 appends the result to
+`recentResults` (kept to 10) and `adaptWindow` (kept to 5); stage 2 counts the hits; stage 3 picks the new
+difficulty (4–5 correct: +1, 0–2: −1, 3: same, clamped to 1–3); stage 4 empties the window only if the
+difficulty changed. Two answers arriving at once are applied one after the other by the database, so no
+answer is lost and the decision is never made on a stale window. When a change is blocked by the clamp
+(already at 3 with 5/5), the window keeps sliding instead of resetting, because nothing changed.
+
+**Mastery and weakest topic are pure functions** (`mastery.ts`) over the stored row, computed on read.
+Storing the phase would mean keeping it in sync on every answer, and it is cheap to compute for 5 topics.
+
+**Revisit queue.** A new `revisititems` collection, one row per missed challenge (unique on user +
+challenge). A correct answer anywhere deletes the row; a miss upserts it. If the row already existed (a
+revisit missed again), the same atomic pipeline sets `notBeforeDate = today + 2 days`. "At least 3 other
+answers since the miss" is checked with one query: find the user's 3rd-latest answer, and an item is due
+only if it was missed strictly before that. The Daily Kata also skips items missed today. Topic Practice
+puts up to 1 due revisit first, marked `isRevisit`, and the summary reports `fixedMistakes`.
+
+**Product choice: incidents are not queued.** An incident is a three-stage story; dropping one back into
+a Kata as a "revisit" would cost a whole slot and replay the story. Players can replay incidents from the
+incident list. Revisits are single challenges only. Revisit this if testers want missed incidents back.
+
+**The lantern is honest.** The stored streak only changes when a Kata completes, so a run that broke still
+holds its old number. `streakStatus` shows `0` with `wentOut: true` when the last Kata was before yesterday,
+both in `/users/me` and in the progress view, so the app can show "Your lantern went out. Light it again
+today." without guessing.
+
+**`GET /users/me/progress`** returns rank (with XP for the current and next level, for a progress bar),
+the lantern, the five moons (phase, answers, recent accuracy, difficulty), the weakest topic, and the queue
+size. All reads are bounded (5 topic rows, one count).
+
+**Alternatives rejected.** Read the row, decide in Node, write back (racy without a version guard). A
+full spaced-repetition scheduler such as SM-2 (more than V1 needs; the brainstorm asked for "light").
+
+**Files.** `server/src/modules/progress/{topicProgress.service,mastery,revisit.service,progress.service,streak}.ts`,
+`server/src/models/{UserTopicProgress,RevisitItem}.ts`, `server/src/modules/sessions/{sessions.selection,sessions.service}.ts`,
+`server/src/modules/users/{users.routes,users.mapper}.ts`, `server/src/config/game.ts`, `shared/src/progress.ts`.
+**Concepts.** MongoDB update pipelines (atomic conditional updates); derived vs stored state; spaced repetition.
+**Revisit if** difficulty bounces too often in play tests (raise the window), or the queue grows large enough
+to need a cap.

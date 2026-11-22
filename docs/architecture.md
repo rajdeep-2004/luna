@@ -171,6 +171,7 @@ not as magic numbers. Their values come from `docs/product/` (approved).
 | usertopicprogress | userId, topicSlug, answers, correct, recentResults (last 10 booleans, mastery), adaptWindow (answers since last difficulty change, max 5), difficultyLevel 1–3, hasAdvancedCorrect, lastPractisedAt | unique `{userId, topicId}` |
 | xpevents | userId, sourceKey (`challenge:<id>[:<stage>]`, `review:<date>:<id>`, `daily:<date>`, `perfect:<date>`, `first-incident`, `streak<N>:<runStart>`, `duelwin:<duelId>`), amount, weekKey (`2026-W47`), createdAt | **unique `{userId, sourceKey}`** (first-completion XP only); `{weekKey, userId}` |
 | dailycircuits | userId, date (local `YYYY-MM-DD`), challengeIds[5], sessionId | unique `{userId, date}` |
+| revisititems | userId, challengeId, topicSlug, missedAt, missedDate (local `YYYY-MM-DD`), notBeforeDate? (set when a revisit is missed again) | unique `{userId, challengeId}`; `{userId, missedAt}` |
 | duels | code, creatorId, opponentId?, challengeIds[5], creatorSessionId, opponentSessionId?, status (`OPEN`/`ACTIVE`/`COMPLETED`/`EXPIRED`), winnerId?, expiresAt | unique code; TTL-free (expiry checked on read); `{creatorId}`, `{opponentId}` |
 | revisits | userId, challengeId, answersAtMiss, notBefore (date), status | unique `{userId, challengeId}` while open; `{userId, status, notBefore}` |
 | userachievements | userId, achievementKey, awardedAt | unique `{userId, achievementKey}` |

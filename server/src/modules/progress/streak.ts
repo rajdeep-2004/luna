@@ -19,3 +19,21 @@ export function nextStreak(prev: StreakState, today: string): StreakResult {
 export function runStartDate(current: number, lastDate: string): string {
   return addDays(lastDate, -(current - 1));
 }
+
+export type StreakStatus = { current: number; longest: number; doneToday: boolean; wentOut: boolean };
+
+/**
+ * What the lantern shows now. The stored streak only changes when a Kata completes, so a run
+ * that broke (last Kata before yesterday) still holds its old number: report it as 0 and
+ * flag `wentOut` for the kind "Light it again today" message.
+ */
+export function streakStatus(state: StreakState, today: string): StreakStatus {
+  const doneToday = state.lastDate !== null && state.lastDate >= today;
+  const alive = doneToday || state.lastDate === addDays(today, -1);
+  return {
+    current: alive ? state.current : 0,
+    longest: state.longest,
+    doneToday,
+    wentOut: !alive && state.current > 0,
+  };
+}

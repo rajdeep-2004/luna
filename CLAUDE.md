@@ -1,7 +1,7 @@
-# StackSprint (repo: luna)
+# Luna
 
 A mobile app for CS students to train engineering intuition through short game-like challenges
-(Trace the Stack, Bug Hunt, Engineer's Choice, Incident Room). Details in `docs/prd.md`.
+(Trace the Stack, Bug Hunt, Engineer's Choice, Incident Room). Details in `docs/prd.md`. Game rules (levels, scoring, modes, competition): `docs/product/`.
 
 Delivery setup: `docs/architecture.md` §0. Engineering standards: `~/.claude/CLAUDE.md`.
 Phase tasks: `docs/build-plan.md`. Original brainstorm: `docs/luna-idea.md` (do not edit).

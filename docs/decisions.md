@@ -1,4 +1,4 @@
-# Decision Log — StackSprint
+# Decision Log — Luna
 
 Every non-trivial decision made while building this project, with the reasoning behind it.
 Written so that someone reading it after the project is finished can understand **what** was built,
@@ -16,11 +16,13 @@ entry and mark the old one `Superseded by D-###`.
 | D-004 | 2026-11-22 | P0 planning | Monorepo with npm workspaces and a shared Zod contract package | Active |
 | D-005 | 2026-11-22 | P0 planning | Testing: backend API tests only, kept out of the repo | Active |
 | D-006 | 2026-11-22 | P0 planning | Deployment: Render + Atlas + Expo Go, no CI, no Docker | Active |
-| D-007 | 2026-11-22 | P0 planning | App name StackSprint, repo name luna (assumption) | Active |
+| D-007 | 2026-11-22 | P0 planning | App name StackSprint, repo name luna (assumption) | Superseded by D-012 |
 | D-008 | 2026-11-22 | P0 planning | Single 7-day JWT, no refresh tokens | Active |
 | D-009 | 2026-11-22 | P0 planning | API shape changes from the brainstorm | Active |
 | D-010 | 2026-11-22 | P0 planning | Server-side integrity: answer keys, XP ledger, idempotent writes | Active |
 | D-011 | 2026-11-22 | P0 planning | Time rules: local-day streaks, UTC-week leaderboard | Active |
+| D-012 | 2026-11-22 | P0 planning | The app is called Luna | Active |
+| D-013 | 2026-11-22 | P0 planning | Product design spec written before development (docs/product/) | Proposed |
 
 ---
 
@@ -159,7 +161,7 @@ locally before every commit.
 ---
 
 ### D-007 — App name StackSprint, repo name luna (assumption)
-- **Date:** 2026-11-22 · **Step:** P0 planning · **Status:** Active · **Type:** assumption
+- **Date:** 2026-11-22 · **Step:** P0 planning · **Status:** Superseded by D-012 · **Type:** assumption
 
 The brainstorm calls the product **StackSprint**, and the repo folder is `luna`. Unless Rajdeep
 says otherwise, the app's display name, Expo `name` and docs use "StackSprint", and the repo stays
@@ -240,5 +242,52 @@ boundary, or users in different timezones would be on different weeks.
 
 **Edge cases.** Same day → streak unchanged. Exactly the previous local day → +1. Any other gap
 → reset to 1. An invalid timezone falls back to UTC.
+
+---
+
+### D-012 — The app is called Luna
+- **Date:** 2026-11-22 · **Step:** P0 planning · **Status:** Active · **Type:** product
+
+Rajdeep decided that the product name is **Luna**, not the brainstorm's "StackSprint". This
+supersedes D-007. All docs, the Expo app name and database names (`luna_dev`, `luna_prod`) use
+Luna. The brainstorm file `docs/luna-idea.md` keeps its original text as a historical record.
+
+---
+
+### D-013 — Product design spec written before development (`docs/product/`)
+- **Date:** 2026-11-22 · **Step:** P0 planning · **Status:** Proposed, awaiting Rajdeep's approval · **Type:** product
+
+**Context.** The first version of the docs only covered engineering. The brainstorm left the game
+rules loose: 5 provisional level names, "optional timer", no durations, no duel details, a
+50–60 question target with no breakdown. Leaving these to development would mean building, then
+being told to change the rules, then rebuilding. That doubles the work.
+
+**Decision.** Write a product design spec in `docs/product/` (users, game modes, scoring,
+progression, competition, benchmarks) and get it approved before P1. The proposed headline choices:
+- **Theme:** a night dojo. Levels are **10 samurai ranks** (Deshi → Shogun). Topic mastery is shown
+  as **moon phases** 🌑🌒🌓🌕. The daily session is renamed **Daily Kata**.
+- **Answers as the unit:** an incident stage counts as one answer, so one rule covers accuracy,
+  mastery and duel scores.
+- **XP:** first-correct only, 10/15/20 by difficulty. Hints halve the XP. 2 "review XP" for repeats
+  inside the Daily Kata only. Bonuses are capped and recorded in the ledger.
+- **Timer:** only Duels have a countdown (60 s). Learning sessions are untimed but measured.
+- **Duels:** 5 single challenges, no incident, 48 h expiry, max 3 win bonuses per day.
+- **Cut:** the daily leaderboard and promotion/relegation leagues, because they need more users
+  than a capstone has.
+- **Proposed new scope:** a Checkpoint re-assessment every 7 active days, so learning can be measured.
+
+**Alternatives considered.** *Keep the brainstorm's 5 levels:* the top would be reached in about
+2 weeks, leaving no long-term goal. *Percent mastery:* the brainstorm explicitly rejects
+"you know 87%". *Timers everywhere:* they punish slow readers and conflict with the "don't exclude
+beginners" principle. *Speed XP:* it rewards guessing.
+
+**Concepts worth learning.**
+- *Core loop:* the repeated cycle a product is built around (open → Kata → feedback → progress → return).
+- *Separating effort from skill metrics:* XP only grows and rewards showing up. Mastery can drop,
+  and it tells the truth about skill. Mixing the two makes both meaningless.
+- *Anti-farming:* designing rewards so the cheapest way to earn them is the behaviour you want.
+
+**Revisit if** usability testing shows the levels are too slow or fast (adjust the thresholds in
+`server/src/config/game.ts`), or users find the theme confusing.
 
 ---

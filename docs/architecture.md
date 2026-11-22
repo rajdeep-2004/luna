@@ -1,4 +1,4 @@
-# Architecture — StackSprint
+# Architecture — Luna
 
 > Last updated: 2026-11-22 — Written at planning time (P0). Update whenever the build diverges.
 
@@ -225,7 +225,7 @@ scale with the `{weekKey, userId}` index. Later: a cached `weeklyXP` counter per
 - **Render web service** (set up in P7): root `server/`, build `npm ci && npm run build`, start
   `node dist/index.js`, health check `/api/v1/health`. Auto-deploys on push to `main`.
   Env vars: `MONGODB_URI`, `JWT_SECRET`, `NODE_ENV=production`, `CORS_ORIGINS`.
-- **MongoDB Atlas M0:** one cluster, separate databases `stacksprint_dev` and `stacksprint_prod`.
+- **MongoDB Atlas M0:** one cluster, separate databases `luna_dev` and `luna_prod`.
   Network access: `0.0.0.0/0` (Render free tier has no static IPs). Protected by a strong DB user
   password. This trade-off is logged in D-006.
 - **App:** `npx expo start`, scanned with Expo Go. `EXPO_PUBLIC_API_URL` points at the LAN IP in dev

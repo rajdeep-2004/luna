@@ -1,10 +1,10 @@
-# Product Requirements — StackSprint
+# Product Requirements — Luna
 
 > Status: approved — Last updated: 2026-11-22
 > Source: `docs/luna-idea.md` (the original brainstorm, kept unchanged). Scope confirmed in chat on
 > 2026-11-22: **P0 + P1** from the brainstorm (see `decisions.md` D-001).
 
-StackSprint is a mobile app that helps computer science students build engineering intuition
+Luna is a mobile app that helps computer science students build engineering intuition
 through short, game-like technical challenges: predicting code output, finding bugs, choosing
 between engineering trade-offs, and investigating simulated production incidents.
 
@@ -143,5 +143,5 @@ Status: `todo` | `building` | `shipped`.
 
 | # | Question | Owner | Resolved? |
 |---|---|---|---|
-| 1 | Final app name: "StackSprint" (from the brainstorm) while the repo is `luna`? | Rajdeep | Assumed StackSprint (D-007) |
-| 2 | Level names (Rookie → Engineer) are provisional. Keep them? | Rajdeep | Using them for now |
+| 1 | Final app name | Rajdeep | Yes: **Luna** (D-012) |
+| 2 | Level names, game design, scoring | Rajdeep | Proposed in `docs/product/`, awaiting approval |

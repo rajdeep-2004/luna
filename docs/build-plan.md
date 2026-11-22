@@ -1,4 +1,4 @@
-# Build Plan — StackSprint
+# Build Plan — Luna
 
 > Last updated: 2026-11-22. Phase status lives in `docs/prd.md` §9. This file holds the task list
 > per phase, the API surface, and how each phase is checked.

@@ -22,7 +22,7 @@ entry and mark the old one `Superseded by D-###`.
 | D-010 | 2026-11-22 | P0 planning | Server-side integrity: answer keys, XP ledger, idempotent writes | Active |
 | D-011 | 2026-11-22 | P0 planning | Time rules: local-day streaks, UTC-week leaderboard | Active |
 | D-012 | 2026-11-22 | P0 planning | The app is called Luna | Active |
-| D-013 | 2026-11-22 | P0 planning | Product design spec written before development (docs/product/) | Proposed |
+| D-013 | 2026-11-22 | P0 planning | Product design spec written before development (docs/product/) | Active (approved) |
 
 ---
 
@@ -255,7 +255,7 @@ Luna. The brainstorm file `docs/luna-idea.md` keeps its original text as a histo
 ---
 
 ### D-013 — Product design spec written before development (`docs/product/`)
-- **Date:** 2026-11-22 · **Step:** P0 planning · **Status:** Proposed, awaiting Rajdeep's approval · **Type:** product
+- **Date:** 2026-11-22 · **Step:** P0 planning · **Status:** Active, approved by Rajdeep on 2026-11-22 · **Type:** product
 
 **Context.** The first version of the docs only covered engineering. The brainstorm left the game
 rules loose: 5 provisional level names, "optional timer", no durations, no duel details, a

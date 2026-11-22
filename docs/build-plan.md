@@ -52,6 +52,7 @@ session, not a challenge. `PATCH /users/me` was added for onboarding. See D-009.
 ## P0 — Docs and plan
 - [x] PRD, architecture, build plan, decisions log, CLAUDE.md, TODOS.md, .gitignore.
 - [x] Move `luna-idea.md` into `docs/` unchanged.
+- [x] Product design spec in `docs/product/` (approved).
 
 ## P1 — Backend foundation and auth  *(backend review)*
 1. Root npm workspaces (`app`, `server`, `shared`), shared ESLint + Prettier + tsconfig base, root scripts `lint`, `typecheck`.
@@ -89,9 +90,9 @@ session, not a challenge. `PATCH /users/me` was added for onboarding. See D-009.
 1. XP ledger (`xpevents`), level thresholds, first-completion rule, daily bonus, first-incident bonus.
 2. Streak manager (timezone-aware) + tests: same day, next day, gap, timezone edge, double complete.
 3. Topic progress: mastery labels, adaptive difficulty (last 5), weakest topic, mistake revisiting queue.
-4. Daily Circuit service + `GET /daily` (unique per user per day, composition, personalisation, fallbacks) + tests incl. concurrent first open.
-5. `GET /users/me/progress`. Baseline assessment sets the initial difficulty per topic.
-6. UI: Home dashboard (all F-03 widgets), Start Daily Circuit, baseline step at the end of onboarding, streak/XP updates on the summary.
+4. Daily Kata service + `GET /daily` (unique per user per day, composition, personalisation, fallbacks) + tests incl. concurrent first open.
+5. `GET /users/me/progress`. Baseline sets the initial difficulty per topic. Checkpoint session (F-25). Revisit queue.
+6. UI: Home dashboard (all F-03 widgets), Start Daily Kata, baseline step at the end of onboarding, streak/XP updates on the summary.
 
 ## P6 — Competition and profile  *(backend review for the server part, manual test for the UI)*
 1. Weekly leaderboard aggregation (paginated + `me` row, tier = level title) + tests (week boundary, ties).

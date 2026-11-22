@@ -46,6 +46,9 @@ V1 optimises for the CS student.
 
 ## 5. Features
 
+> The exact game rules (XP numbers, levels, mastery, timers, duel rules, content counts) live in
+> `docs/product/`, approved on 2026-11-22. Where this table and `docs/product/` differ, `docs/product/` wins.
+
 ### Must have — P0
 
 | ID | Feature | Acceptance criteria |
@@ -59,11 +62,11 @@ V1 optimises for the CS student.
 | F-07 | Bug Hunt | Tap the line that contains the bug. Optional hint. |
 | F-08 | Engineer's Choice | Scenario + options. Feedback explains why the alternatives are worse. |
 | F-09 | Incident Room | A 3-stage investigation (alert, investigation, resolution). Each answer reveals new evidence. Ends with an incident report (stages correct, score, time, root cause, XP). |
-| F-10 | Daily Circuit | 5 challenges per user per day (1 Trace, 1 Bug Hunt, 2 Engineer's Choice, 1 Incident). Same set if reopened the same day. Completing it extends the streak. |
+| F-10 | Daily Kata (the brainstorm's Daily Circuit) | 5 challenges (7 answers) per user per local day: 1 Trace, 1 Bug Hunt, 2 Engineer's Choice, 1 Incident, with up to 2 revisits. Same set if reopened the same day. Completing it extends the streak. |
 | F-11 | Answer feedback | Correct/incorrect, correct answer, explanation, main misconception, XP earned, Next button. |
 | F-12 | Session summary | Questions, correct, accuracy, time, XP, streak, per-topic performance, weak areas. |
-| F-13 | XP and levels | XP from the brainstorm's table. Awarded only on the **first** correct completion of a challenge. Levels from XP thresholds. |
-| F-14 | Streaks | +1 when a Daily Circuit is completed on a new calendar day in the user's timezone. A missed day resets it to 1. Current and longest streak stored. |
+| F-13 | XP and levels | 10/15/20 XP per correct answer, first-correct only. A hint halves the XP. 2 review XP inside the Daily Kata. Capped bonuses (`product/scoring.md`). 10 samurai ranks, Deshi → Shogun (`product/progression.md`). |
+| F-14 | Streaks | +1 when a Daily Circuit is completed on a new calendar day in the user's timezone. A missed day resets it to 1. Current and longest streak stored. Milestone bonuses at 3, 7 and 30 days. |
 | F-15 | Persistent progress | All attempts, XP, streaks and topic progress are stored server-side and survive reinstall and new devices. |
 | F-16 | Question bank | 50–60 hand-written challenges across 5 topics × 3 difficulties, plus at least 4 Incident Room scenarios, loaded by a seed script. |
 
@@ -71,14 +74,15 @@ V1 optimises for the CS student.
 
 | ID | Feature | Acceptance criteria |
 |---|---|---|
-| F-17 | Weekly leaderboard | Ranks users by XP earned this week (resets Monday 00:00 UTC). Shows rank, username, avatar, weekly XP and tier. Paginated. Always shows the current user's own rank. |
-| F-18 | Friend Duel | User A creates a 5-question duel and gets a 6-character code. User B joins with the code. Both play the same questions independently. Winner: more correct answers, then lower total time. Duels expire after 48 hours. A user can't join their own duel. |
+| F-17 | Dojo Board (weekly leaderboard) | Ranks users by XP earned this week (resets Monday 00:00 UTC). Shows rank, username, avatar, weekly XP and rank title. Last week's top 3 get a badge. Paginated. Always shows the current user's own rank. |
+| F-18 | Friend Duel | User A creates a duel (5 single challenges, no incident, 60 s per question, no hints) and gets a 6-character code. Max 5 open duels per user. Win bonus 10 XP (max 3 per day). User B joins with the code. Both play the same questions independently. Winner: more correct answers, then lower total time. Duels expire after 48 hours. A user can't join their own duel. |
 | F-19 | Session history | Paginated list of past sessions on the profile. |
 | F-20 | Achievements | First Commit, Bug Hunter, Daily Grinder, Incident Commander, Perfect Run. Each is awarded once and shown on the profile. |
 | F-21 | Weak-topic recommendations | Home shows the weakest topic (lowest accuracy with enough attempts) and recommends practising it. |
 | F-22 | Adaptive difficulty | Per topic: 4–5 correct of the last 5 attempts moves difficulty up, 2 or fewer moves it down, otherwise it stays the same. |
 | F-23 | Mistake revisiting | Missed challenges come back in later sessions after at least 3 other questions. |
-| F-24 | Topic statistics | Profile shows per-topic attempts, accuracy and mastery label (New / Practising / Developing / Strong). |
+| F-24 | Topic statistics | Profile shows per-topic answers, accuracy and moon-phase mastery 🌑🌒🌓🌕 (`product/progression.md` §2). |
+| F-25 | Checkpoint assessment | After every 7 active days, Home offers 5 unseen intermediate questions (1 per topic, no XP). The result is compared with the baseline. Approved new scope (D-013). |
 
 ### Later / maybe (P2, not in V1)
 - Real-time duels, AI tutor, AI question generation with review, new tracks (DSA, DevOps,
@@ -130,12 +134,12 @@ Status: `todo` | `building` | `shipped`.
 
 | ID | Phase | Features | Status |
 |---|---|---|---|
-| P0 | Docs and plan | — | building |
+| P0 | Docs, plan and product design | — | shipped |
 | P1 | Backend foundation and auth | F-01 (API), F-15 base | todo |
 | P2 | App foundation, auth and onboarding UI | F-01 (UI), F-02 (without baseline) | todo |
 | P3 | Content and challenge engine API | F-05, F-09 (API), F-11 (API), F-16 | todo |
 | P4 | Game UI: 4 modes, feedback, summary, explore | F-04, F-06–F-09, F-11, F-12 | todo |
-| P5 | Progression: XP, levels, streaks, Daily Circuit, adaptivity | F-02 baseline, F-03, F-10, F-13, F-14, F-21–F-24 | todo |
+| P5 | Progression: XP, levels, streaks, Daily Kata, adaptivity, checkpoint | F-02 baseline, F-03, F-10, F-13, F-14, F-21–F-25 | todo |
 | P6 | Competition and profile: leaderboard, duels, achievements | F-17–F-20 | todo |
 | P7 | Polish, deploy and demo prep | Acceptance criteria 1–12 | todo |
 
@@ -144,4 +148,4 @@ Status: `todo` | `building` | `shipped`.
 | # | Question | Owner | Resolved? |
 |---|---|---|---|
 | 1 | Final app name | Rajdeep | Yes: **Luna** (D-012) |
-| 2 | Level names, game design, scoring | Rajdeep | Proposed in `docs/product/`, awaiting approval |
+| 2 | Level names, game design, scoring | Rajdeep | Approved 2026-11-22 (`docs/product/`, D-013) |

@@ -1,6 +1,6 @@
 # Luna — Product Design
 
-> Status: **proposal, awaiting Rajdeep's approval** — 2026-11-22.
+> Status: **approved** by Rajdeep — 2026-11-22.
 > Once approved, `docs/prd.md` and `docs/architecture.md` are updated to match, and these files
 > become the source of truth for *how the game works*. Engineering docs describe *how it's built*.
 

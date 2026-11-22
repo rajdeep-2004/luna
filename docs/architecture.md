@@ -153,8 +153,9 @@ Controllers never import models. Services never touch `req`/`res`. Only `src/con
 | `LOG_LEVEL` | pino level | no (`info`) | `debug` |
 | `EXPO_PUBLIC_API_URL` | (app) API base URL | yes | `http://192.168.1.5:8080/api/v1` |
 
-Game constants (XP table, level thresholds, duel expiry, circuit composition, mastery thresholds)
-live in `server/src/config/game.ts`, not as magic numbers.
+Game constants (XP table, bonuses and caps, level thresholds and names, mastery and adaptivity
+thresholds, Kata/duel composition, duel timer, expiry and open limit) live in `server/src/config/game.ts`,
+not as magic numbers. Their values come from `docs/product/` (approved).
 
 ## 11. Data model
 
@@ -163,12 +164,13 @@ live in `server/src/config/game.ts`, not as magic numbers.
 | users | email, username, passwordHash, avatarId, preferredTopicIds, experienceLevel, onboardedAt, totalXP, level, currentStreak, longestStreak, lastDailyDate (`YYYY-MM-DD` local), timezone (IANA) | unique email, unique usernameLower |
 | topics | slug, name, description, icon, order | unique slug |
 | challenges | slug, title, topicId, subtopic, type (`TRACE`/`BUG_HUNT`/`ENGINEER_CHOICE`/`INCIDENT`), difficulty 1–3, prompt, codeSnippet?, options[{id,text}], answerKey, explanation, misconception, optionFeedback?, hint?, xpReward, estimatedTime, stages[] (incident only: title, evidence, prompt, options, answerKey, explanation), rootCause?, isActive | unique slug; `{topicId, type, difficulty, isActive}` |
-| sessions | userId, type (`PRACTICE`/`DAILY`/`BASELINE`/`DUEL`), topicId?, dailyDate?, duelId?, items[{challengeId, order}], status (`ACTIVE`/`COMPLETED`), startedAt, completedAt, correctCount, totalQuestions, totalTimeMs, totalXP | `{userId, createdAt:-1}`; unique partial `{userId, type:DAILY, dailyDate}`; unique partial `{duelId, userId}` |
-| answerattempts | userId, sessionId, challengeId, stageIndex (0 for non-incident), selectedAnswer, isCorrect, timeTakenMs (server-measured), topicId, difficulty, createdAt | **unique `{sessionId, challengeId, stageIndex}`** (blocks double submits); `{userId, challengeId}`; `{userId, topicId, createdAt:-1}` |
-| usertopicprogress | userId, topicId, attempts, correct, recentResults (last 10 booleans), difficultyLevel 1–3, lastPractisedAt | unique `{userId, topicId}` |
-| xpevents | userId, sourceKey (`challenge:<id>`, `daily:<date>`, `first-incident`), amount, weekKey (`2026-W47`), createdAt | **unique `{userId, sourceKey}`** (first-completion XP only); `{weekKey, userId}` |
+| sessions | userId, type (`PRACTICE`/`DAILY`/`INCIDENT`/`BASELINE`/`CHECKPOINT`/`DUEL`), topicId?, dailyDate?, duelId?, items[{challengeId, order, optionOrder[], isRevisit}], status (`ACTIVE`/`COMPLETED`), startedAt, completedAt, correctCount, totalQuestions, totalTimeMs, totalXP | `{userId, createdAt:-1}`; unique partial `{userId, type:DAILY, dailyDate}`; unique partial `{duelId, userId}` |
+| answerattempts | userId, sessionId, challengeId, stageIndex (0 for non-incident), selectedAnswer, isCorrect, usedHint, isTimeout, timeTakenMs (server-measured), topicId, difficulty, createdAt | **unique `{sessionId, challengeId, stageIndex}`** (blocks double submits); `{userId, challengeId}`; `{userId, topicId, createdAt:-1}` |
+| usertopicprogress | userId, topicId, answers, correct, recentResults (last 10 booleans, mastery), adaptWindow (answers since last difficulty change, max 5), difficultyLevel 1–3, hasAdvancedCorrect, lastPractisedAt | unique `{userId, topicId}` |
+| xpevents | userId, sourceKey (`challenge:<id>[:<stage>]`, `review:<date>:<id>`, `daily:<date>`, `perfect:<date>`, `first-incident`, `streak<N>:<runStart>`, `duelwin:<duelId>`), amount, weekKey (`2026-W47`), createdAt | **unique `{userId, sourceKey}`** (first-completion XP only); `{weekKey, userId}` |
 | dailycircuits | userId, date (local `YYYY-MM-DD`), challengeIds[5], sessionId | unique `{userId, date}` |
 | duels | code, creatorId, opponentId?, challengeIds[5], creatorSessionId, opponentSessionId?, status (`OPEN`/`ACTIVE`/`COMPLETED`/`EXPIRED`), winnerId?, expiresAt | unique code; TTL-free (expiry checked on read); `{creatorId}`, `{opponentId}` |
+| revisits | userId, challengeId, answersAtMiss, notBefore (date), status | unique `{userId, challengeId}` while open; `{userId, status, notBefore}` |
 | userachievements | userId, achievementKey, awardedAt | unique `{userId, achievementKey}` |
 
 ## 12. Key flows and failure handling
@@ -190,7 +192,7 @@ so only the first call does the work, and repeats return the stored summary (ide
 sessions it also awards the daily bonus XpEvent `daily:<date>` and updates the streak with a
 conditional update on `lastDailyDate`, then runs the achievement checks.
 
-**Daily Circuit** (`GET /daily`): compute the user's local date from `users.timezone`. Upsert the
+**Daily Kata** (`GET /daily`): compute the user's local date from `users.timezone`. Upsert the
 `dailycircuits` doc on `{userId, date}`. Two concurrent first opens produce a single circuit, because
 the unique index makes the loser re-read. Selection: 1 TRACE, 1 BUG_HUNT, 2 ENGINEER_CHOICE,
 1 INCIDENT. Prefer unseen challenges at the user's per-topic difficulty, include up to 2 previously

@@ -3,7 +3,6 @@
  * Change a rule here, not in services.
  */
 import {
-  DUEL_TIMER_MS,
   type ChallengeType,
   type Difficulty,
   type DuelFormat,
@@ -148,9 +147,7 @@ export const DUEL = {
   } satisfies Record<DuelFormat, readonly ChallengeType[]>,
   codeLength: 6,
   codeRetries: 5,
-  timerMs: DUEL_TIMER_MS,
-  /** Network allowance on top of the timer before a late answer counts as a timeout. */
-  timerGraceMs: 5_000,
+  // Timers and grace per format live in DUEL_FORMAT_RULES (shared), so the app reads the same numbers.
   expiryMs: 48 * 60 * 60 * 1000,
   maxOpenPerUser: 5,
   winBonusXP: 10,

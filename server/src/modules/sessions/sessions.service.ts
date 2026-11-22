@@ -18,7 +18,7 @@ import { AnswerAttemptModel } from '../../models/AnswerAttempt';
 import type { ChallengeDoc } from '../../models/Challenge';
 import { shuffle } from '../../lib/random';
 import { AppError, conflict, isDuplicateKey, notFound } from '../../lib/errors';
-import { DUEL, SESSION } from '../../config/game';
+import { SESSION } from '../../config/game';
 import { localDateKey } from '../../lib/time';
 import { challengesRepo } from '../challenges/challenges.repository';
 import { answerCount, toPublicChallenge, toPublicStage } from '../challenges/challenges.projection';

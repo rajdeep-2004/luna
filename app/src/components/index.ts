@@ -15,3 +15,4 @@ export * from './Marker';
 export * from './OptionRow';
 export * from './Stamp';
 export * from './PressableSink';
+export * from './CodeCells';

@@ -127,6 +127,7 @@ export function SessionScreen({ route, navigation }: Props) {
             <DuelCountdown
               key={stepKey}
               remainingMs={DUEL_TIMER_MS - (session.stepElapsedMs ?? 0)}
+              totalMs={DUEL_TIMER_MS}
               paused={flow.submitting || !!flow.result}
               onExpire={() => void flow.submitTimeout()}
             />

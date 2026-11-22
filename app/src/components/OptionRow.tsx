@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -10,6 +10,7 @@ import Animated, {
 import { colors, layout, radii, spacing } from '../theme';
 import { AppText } from './AppText';
 import { Marker, type MarkState } from './Marker';
+import { PressableSink } from './PressableSink';
 
 type Props = {
   text: string;
@@ -18,7 +19,10 @@ type Props = {
   disabled?: boolean;
 };
 
-/** One answer option. default / selected (moon ring) / correct / wrong. Plain, readable text (ui-design.md §1). */
+/**
+ * One answer option as a paper slip (DESIGN.md). Idle: tatami. Selected and correct: lit shoji paper
+ * with ink text. Wrong: dimmed with a grey 誤. The text stays plain and readable.
+ */
 export function OptionRow({ text, state, onPress, disabled = false }: Props) {
   const reduce = useReducedMotion();
   const scale = useSharedValue(1);
@@ -47,7 +51,8 @@ export function OptionRow({ text, state, onPress, disabled = false }: Props) {
 
   return (
     <Animated.View style={motion}>
-      <Pressable
+      <PressableSink
+        hapticOnPress={false}
         onPress={onPress}
         disabled={disabled}
         accessibilityRole="radio"
@@ -60,11 +65,14 @@ export function OptionRow({ text, state, onPress, disabled = false }: Props) {
           state === 'wrong' && styles.wrong,
         ]}
       >
-        <AppText color="textSoft" style={styles.text}>
+        <AppText
+          color={state === 'selected' || state === 'correct' ? 'onShoji' : 'text'}
+          style={styles.text}
+        >
           {text}
         </AppText>
         <Marker state={state} />
-      </Pressable>
+      </PressableSink>
     </Animated.View>
   );
 }
@@ -76,12 +84,10 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     minHeight: layout.buttonHeight,
     padding: spacing.lg,
-    borderRadius: radii.card,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: 'transparent',
+    borderRadius: radii.md,
+    backgroundColor: colors.tatami,
   },
-  selected: { backgroundColor: colors.surfaceRaised, borderColor: colors.moon },
-  wrong: { borderColor: colors.ember },
+  selected: { backgroundColor: colors.shoji },
+  wrong: { opacity: 0.7 },
   text: { flex: 1 },
 });

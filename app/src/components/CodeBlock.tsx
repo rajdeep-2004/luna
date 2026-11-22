@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { colors, layout, radii, spacing, typography } from '../theme';
 import { AppText } from './AppText';
-import type { MarkState } from './Marker';
+import { Marker, type MarkState } from './Marker';
 
 type Props = {
   code: string;
@@ -32,6 +32,7 @@ export function CodeBlock({ code, onSelectLine, lineStates = {} }: Props) {
 type LineProps = { number: number; text: string; state: MarkState; onPress?: () => void };
 
 export function CodeLine({ number, text, state, onPress }: LineProps) {
+  const lit = state === 'selected' || state === 'correct';
   const content = (
     <View
       style={[
@@ -41,14 +42,13 @@ export function CodeLine({ number, text, state, onPress }: LineProps) {
         state === 'wrong' && styles.wrong,
       ]}
     >
-      <AppText color="textMuted" style={[typography.code, styles.gutter]}>
+      <AppText color={lit ? 'wood' : 'muted'} style={[typography.code, styles.gutter]}>
         {number}
       </AppText>
-      <AppText color="textSoft" style={[typography.code, styles.code]}>
+      <AppText color={lit ? 'onShoji' : 'text'} style={[typography.code, styles.code]}>
         {text === '' ? ' ' : text}
       </AppText>
-      {state === 'correct' ? <AppText color="moon">✓</AppText> : null}
-      {state === 'wrong' ? <AppText color="emberSoft">✕</AppText> : null}
+      {state === 'correct' || state === 'wrong' ? <Marker state={state} /> : null}
     </View>
   );
   if (!onPress) return content;
@@ -67,8 +67,8 @@ export function CodeLine({ number, text, state, onPress }: LineProps) {
 
 const styles = StyleSheet.create({
   block: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
+    backgroundColor: colors.tatami,
+    borderRadius: radii.md,
     paddingVertical: spacing.sm,
     overflow: 'hidden',
   },
@@ -79,12 +79,10 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingVertical: 6,
     paddingHorizontal: spacing.lg,
-    borderLeftWidth: 3,
-    borderLeftColor: 'transparent',
   },
   gutter: { width: 20, textAlign: 'right' },
   code: { flex: 1 },
-  selected: { backgroundColor: colors.surfaceRaised, borderLeftColor: colors.moon },
-  correct: { backgroundColor: colors.surfaceRaised, borderLeftColor: colors.moon },
-  wrong: { backgroundColor: colors.surfaceRaised, borderLeftColor: colors.ember },
+  selected: { backgroundColor: colors.shoji },
+  correct: { backgroundColor: colors.shoji },
+  wrong: { backgroundColor: colors.wallLight },
 });

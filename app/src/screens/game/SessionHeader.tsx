@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
-import { AppText, ProgressLine } from '../../components';
-import { layout, spacing } from '../../theme';
+import { AppText } from '../../components';
+import { colors, layout, spacing } from '../../theme';
 
 type Props = {
   progress: number;
@@ -13,7 +13,7 @@ type Props = {
   leaveMessage?: string;
 };
 
-/** Top of every game screen: leave button, "n / total", elapsed clock, and the 3 pt progress line. */
+/** Top of every game screen: leave, "n / total", the clock, and one brush mark per answer (DESIGN.md: no progress bars). */
 const DEFAULT_LEAVE = 'Your answers are saved. You can pick it up again later.';
 
 export function SessionHeader({
@@ -45,7 +45,7 @@ export function SessionHeader({
         </AppText>
         {clock}
       </View>
-      <ProgressLine value={progress} />
+      <BrushMarks total={total} done={Math.round(progress * total)} />
     </View>
   );
 }
@@ -54,4 +54,30 @@ const styles = StyleSheet.create({
   wrap: { gap: spacing.sm, paddingTop: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   leave: { width: layout.touchTarget, height: layout.touchTarget, justifyContent: 'center' },
+  marks: { flexDirection: 'row', gap: 6 },
+  mark: { flex: 1, height: 6, borderRadius: 3, transform: [{ skewX: '-18deg' }] },
+  markDone: { backgroundColor: colors.primary },
+  markNow: { backgroundColor: colors.seal },
+  markTodo: { backgroundColor: colors.wallLight },
 });
+
+/** One short brush stroke per answer: amber when done, vermilion for the current one, faint after. */
+function BrushMarks({ total, done }: { total: number; done: number }) {
+  return (
+    <View
+      style={styles.marks}
+      accessible
+      accessibilityLabel={`${Math.min(done, total)} of ${total} answered`}
+    >
+      {Array.from({ length: total }, (_, i) => (
+        <View
+          key={i}
+          style={[
+            styles.mark,
+            i < done ? styles.markDone : i === done ? styles.markNow : styles.markTodo,
+          ]}
+        />
+      ))}
+    </View>
+  );
+}

@@ -2,7 +2,7 @@
  * Game rules as data. Every number here comes from docs/product/ (approved 2026-11-22).
  * Change a rule here, not in services.
  */
-import type { Difficulty, SessionType } from '@luna/shared';
+import { DUEL_TIMER_MS, type Difficulty, type SessionType } from '@luna/shared';
 
 export const XP_BY_DIFFICULTY: Record<Difficulty, number> = { 1: 10, 2: 15, 3: 20 };
 /** scoring.md §2: a correct answer on content already earned, inside the Daily Kata only. */
@@ -129,7 +129,7 @@ export const DUEL = {
   slots: ['TRACE', 'BUG_HUNT', 'ENGINEER_CHOICE', 'ENGINEER_CHOICE', 'ENGINEER_CHOICE'],
   codeLength: 6,
   codeRetries: 5,
-  timerMs: 60_000,
+  timerMs: DUEL_TIMER_MS,
   /** Network allowance on top of the timer before a late answer counts as a timeout. */
   timerGraceMs: 5_000,
   expiryMs: 48 * 60 * 60 * 1000,
@@ -139,7 +139,14 @@ export const DUEL = {
   finishedListSize: 20,
   /** Bounds the "your turn" and "waiting" lists; a user has at most 5 open duels as creator. */
   activeListMax: 50,
+  /** Penalty per earlier pick from the same topic, so a duel mixes topics. */
+  repeatTopicPenalty: 2,
+  /** How long a winner's completion waits for a concurrent bonus payment (D-033). */
+  bonusWait: { tries: 10, delayMs: 50 },
 } as const;
+
+/** Practice, incident and checkpoint picks (lower score wins): unseen first, random among equals. */
+export const PICK_WEIGHTS = { seen: 10, jitter: 0.5 } as const;
 
 /** progression.md §7. Awarded once each; no XP. `target` is the count the condition needs. */
 export const ACHIEVEMENTS = [

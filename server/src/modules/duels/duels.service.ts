@@ -8,6 +8,7 @@ import {
   type SessionView,
 } from '@luna/shared';
 import { DUEL } from '../../config/game';
+import { shuffle } from '../../lib/random';
 import { AppError, conflict, isDuplicateKey, notFound } from '../../lib/errors';
 import { AnswerAttemptModel } from '../../models/AnswerAttempt';
 import { DuelModel, type DuelDoc } from '../../models/Duel';
@@ -28,15 +29,6 @@ function newCode(): string {
     () => DUEL_CODE_ALPHABET[randomInt(DUEL_CODE_ALPHABET.length)],
   ).join('');
 }
-
-const shuffle = <T>(xs: T[]): T[] => {
-  const a = [...xs];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = randomInt(i + 1);
-    [a[i], a[j]] = [a[j]!, a[i]!];
-  }
-  return a;
-};
 
 const isParticipant = (d: DuelDoc, userId: string) =>
   d.creatorId.toString() === userId || d.opponentId?.toString() === userId;

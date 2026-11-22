@@ -1,7 +1,6 @@
 import { StyleSheet, View } from 'react-native';
-import type { AnswerResult } from '@luna/shared';
+import { DUEL_TIMER_MS, type AnswerResult } from '@luna/shared';
 import { AppText, Stamp } from '../../components';
-import { DUEL_TIMER_MS } from '../../lib/session';
 import { spacing } from '../../theme';
 
 /** The short duel verdict: the stamp and one word. Explanations wait for practice. */

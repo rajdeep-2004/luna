@@ -2,16 +2,11 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { DUEL_TIMER_MS } from '@luna/shared';
 import { sessionsApi, userMessage } from '../../api';
 import { AppText, Button, Card, ErrorState, Screen } from '../../components';
 import { haptic } from '../../lib/haptics';
-import {
-  answeredCount,
-  DUEL_TIMER_MS,
-  DUEL_VERDICT_MS,
-  findStep,
-  progressOf,
-} from '../../lib/session';
+import { answeredCount, DUEL_VERDICT_MS, findStep, progressOf } from '../../lib/session';
 import type { AppStackParams } from '../../navigation/types';
 import { colors, spacing } from '../../theme';
 import { BugHuntBody } from './BugHuntBody';

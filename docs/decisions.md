@@ -1171,3 +1171,47 @@ large shapes.
 
 **Next.** Plan the P7 rebuild against `DESIGN.md`: the tab bar, Dojo, Explore mode picker, Duel with formats
 (server rules too), Profile, challenge, feedback and summary.
+
+---
+
+### D-039 — P7 engineering plan: rebuild on a scene and art kit, plus duel formats and mode rounds
+- **Date:** 2026-11-23 · **Step:** P7 — planning · **Status:** Active · **Type:** technical + product
+
+**Context.** P7 rebuilds the app to the approved Kiri-e Den system (D-038) and adds the server features the new
+screens need. The full plan, with its eleven tasks, is in `docs/build-plan.md` under P7.
+
+**Decisions made with Rajdeep.**
+1. **Thin content: top up mode rounds from other topics.** Per topic, a mode has only 1–7 questions; Caching &
+   Queues and Debugging & Production have one Trace question each. A topic + mode round therefore takes that
+   topic first and fills to 5 with the same mode from other topics, each question labelled with its topic.
+   *Rejected:* short rounds (some would be a single question) and repeats (they feel like the game ran out).
+   *Revisit* when P8 grows the bank.
+2. **Sudden Death:** up to 10 questions, 30 s each, and the run ends at your first miss. Score = correct answers
+   before the miss; a tie goes to lower total time. *Rejected:* endless runs (too long for a quick evening game)
+   and a fixed 5 (too close to Classic). Blitz is 10 questions at 10 s, with a 2 s network grace instead of 5 s,
+   because 5 s of grace would be half the timer.
+3. **A checkpoint after the Dojo and one game round** (task 4), before the rest of the app is rebuilt, because
+   the last UI was rejected only after all of it was built.
+
+**Technical choices.**
+- *Theme swap with temporary aliases:* old token names point at the new values, so the app keeps compiling while
+  screens move over one at a time. Deleting the aliases at the end makes `tsc` list anything missed.
+- *Brush kanji baked to SVG paths* by a dev-only script using `opentype.js`. This is a devDependency of the app
+  workspace and is never bundled. It is the simplest way to turn font glyphs into path data, and it avoids
+  shipping an 8.6 MB brush font for ~30 glyphs. The generated file is committed, so the build never needs the
+  script.
+- *Art as `react-native-svg` components on a shared 390-wide grid,* with interactive objects as positioned
+  pressables. This keeps the scenes accessible and scalable. *Rejected:* PNG art, which is not editable or
+  animatable and is blurry on scaling, and Lottie, a new dependency and tool chain for six moments that
+  Reanimated already covers.
+- *Sudden Death in the session model:* an `endedEarly` flag lets a session complete with fewer answers. This is
+  the only change to the completion rule, and it is limited to DUEL sessions in that format.
+- *Profile stats from counts on existing collections,* with no new writes or counters.
+
+**New dependencies.** `@expo-google-fonts/dela-gothic-one` and `@expo-google-fonts/source-sans-3` (fonts, D-038).
+`opentype.js` (dev only, the kanji bake). `@expo-google-fonts/shippori-mincho` and `@expo-google-fonts/inter` are
+removed.
+
+**Concepts worth learning.** *Strangler-style migration of a design system:* aliases let old and new coexist until
+the last caller moves. *Build-time code generation:* turning a big asset (a font) into a small, typed data file
+(only the glyphs you need) at development time instead of at runtime.

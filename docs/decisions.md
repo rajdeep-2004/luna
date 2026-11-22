@@ -23,6 +23,8 @@ entry and mark the old one `Superseded by D-###`.
 | D-011 | 2026-11-22 | P0 planning | Time rules: local-day streaks, UTC-week leaderboard | Active |
 | D-012 | 2026-11-22 | P0 planning | The app is called Luna | Active |
 | D-013 | 2026-11-22 | P0 planning | Product design spec written before development (docs/product/) | Active (approved) |
+| D-014 | 2026-11-22 | P0 design | UI direction: calm night, one moon accent | Active |
+| D-015 | 2026-11-22 | P0 design | Lean backend, UI first; phases merged from 7 to 6 | Active |
 
 ---
 
@@ -289,5 +291,61 @@ beginners" principle. *Speed XP:* it rewards guessing.
 
 **Revisit if** usability testing shows the levels are too slow or fast (adjust the thresholds in
 `server/src/config/game.ts`), or users find the theme confusing.
+
+---
+
+### D-014 — UI direction: calm night, one moon accent
+- **Date:** 2026-11-22 · **Step:** P0 design (HTML mockups, 2 rounds) · **Status:** Active · **Type:** product / design
+
+**Context.** Rajdeep wants a UI that doesn't look like a basic template app, with good motion
+and a coherent theme. Before writing any React Native, six key screens were mocked up as HTML
+on a private design canvas.
+
+**Round 1 → feedback.** The dark night background, the Sugoi grade and the small animations
+worked. But the fonts and palette felt overwhelming: heavy serif everywhere, vermilion buttons,
+coloured chips, syntax-highlighted code. Home showed too much (XP bar, 5 moons, 2 extra cards),
+and Bug Hunt and Incident Room felt busy.
+
+**Decision (round 2, approved).**
+- **One accent:** moon-gold for every primary action, progress and correct answer. Ember is kept
+  only for wrong answers and alerts.
+- **The serif at most once per screen**, at a lighter weight. Inter for questions and body text.
+- **No card borders.** Depth comes from surface vs background.
+- **Home shows three things only:** rank and streak, the Daily Kata moon with *Begin kata*, and
+  the weakest topic.
+- **Game screens:** plain code, a thin progress line, evidence in plain English, simple option rows.
+
+Full tokens, components and motion specs are in `docs/product/ui-design.md`.
+
+**Concepts worth learning.**
+- *Visual hierarchy:* when everything is emphasised, nothing is. A single accent colour lets the
+  eye find the one action that matters.
+- *Design tokens:* named values (`moon`, `surface`) used everywhere instead of raw hex codes,
+  so the whole look can change in one file.
+
+---
+
+### D-015 — Lean backend, UI first; phases merged from 7 to 6
+- **Date:** 2026-11-22 · **Step:** P0 design · **Status:** Active · **Type:** process / architecture
+
+**Context.** Rajdeep said the backend can be lighter: this is a capstone presentation, and the
+UI and experience matter most.
+
+**Decision.**
+- **Keep** what makes the demo correct: authentication, answer keys only on the server,
+  first-correct XP through the unique-keyed ledger, idempotent session completion, correct streaks,
+  and only one duel opponent.
+- **Drop multi-document transactions.** Use ordered single-document writes instead, with the
+  idempotency write (the attempt insert) first. Worst case after a crash: one lost progress update,
+  never double XP.
+- **Smoke tests only** in `.scratch/`, covering the critical paths, not every edge case.
+- **Basic rate limiting** on `/auth/*` only.
+- **Phases:** the old P1 (foundation + auth) and P3 (content + engine) become one backend phase,
+  P1. That leaves six phases, P1–P6.
+
+**Alternatives considered.** Keeping transactions: safer, but more code and harder test setup
+(it needs a replica-set test DB), for a failure that's very unlikely at demo scale.
+
+**Revisit if** the app is used beyond the capstone. Add transactions around the answer flow then.
 
 ---

@@ -19,6 +19,8 @@ const sessionSchema = new Schema(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     type: { type: String, enum: SESSION_TYPES, required: true },
     topicSlug: { type: String, enum: [...TOPIC_SLUGS, null], default: null },
+    /** DAILY only: the user's local date (`YYYY-MM-DD`) the Kata belongs to; keys its bonuses. */
+    dailyDate: { type: String, default: null },
     status: { type: String, enum: ['ACTIVE', 'COMPLETED'], default: 'ACTIVE' },
     startedAt: { type: Date, default: () => new Date() },
     completedAt: { type: Date, default: null },

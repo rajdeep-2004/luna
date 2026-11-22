@@ -631,3 +631,49 @@ daily kata, duels, profile), and polish is cheaper and better judged once every 
 whole app can be given one consistent set of micro-interactions. The idea is logged in `TODOS.md` and
 belongs to the P6 polish pass. This is a deliberate trade-off: function first, delight second, with a date
 on the second. P3 is marked `shipped` in `prd.md` and merged into `main`.
+
+### D-026 — Streaks, bonuses and rank-up are settled when a session completes
+- **Date:** 2026-11-22 · **Step:** P4 task 1 · **Status:** Active · **Type:** technical
+
+**Context.** P4 adds the Daily Kata bonus (15), the Perfect Kata bonus (+10), streak milestones (3, 7
+and 30 days) and the rank-up moment. The first-incident bonus already existed but was paid inside the
+answer to the last incident stage.
+
+**Decision.** All bonuses are now paid in one place, `settleProgression` in the sessions service, which
+runs when a session completes. It runs *before* the session is flipped to `COMPLETED`, because every step
+inside it is idempotent: each bonus is a ledger row under a unique key (`daily:<date>`, `perfect:<date>`,
+`streak<N>:<runStart>`, `first-incident`), and the streak moves through a compare-and-set update on
+`lastDailyDate`. If the server crashes halfway, the app's retry re-runs the whole thing and nothing is
+lost or paid twice. Had the bonuses run after the flip, a crash would leave a completed session whose
+bonuses were never paid, and the retry would just return the stored summary.
+
+**How the streak works.** `nextStreak` is a pure function over the user's local date (`YYYY-MM-DD` in
+their IANA timezone, computed with `Intl.DateTimeFormat`). Same day: no change. The day after the last
+Kata: +1. Any gap: back to 1. If the stored date is *later* than today (the user moved their timezone
+west), it is also "no change", so changing timezone can never add a day. Day arithmetic is done on the
+date string in UTC, so daylight-saving changes cannot shift it. The streak uses the date the Kata is
+*completed*, not the date it was built for, so an old unfinished Kata cannot be used to repair a broken
+streak. The bonus keys use the Kata's own date, so each Kata pays its bonus once.
+
+**Milestones once per run.** The run start is derived (`lastDate − (current − 1)` days) instead of
+stored, and keys the milestone. A new run after a break has a new start date, so it can earn the
+milestones again, as `scoring.md` §3 says.
+
+**Reporting bonuses.** The summary lists the bonuses the session earned. It does not trust "what my
+own insert just did": it reads back the ledger rows for its keys created since the session started. A
+parallel retry therefore reports the same list instead of zero. `xpEarned` in the summary now includes
+the bonuses, so the existing XP count-up shows the true total.
+
+**Rank-up.** Computed at completion as `level(totalXP)` vs `level(totalXP − session XP)`. A rank-up in a
+different session running at the same moment could be attributed to this one; that is harmless and
+not worth a stored "last seen level" field.
+
+**Alternatives rejected.** A multi-document transaction (D-015 already chose ordered idempotent writes
+over transactions). Storing `streakRunStart` on the user (derivable, so one less field to keep in sync).
+
+**Files.** `server/src/modules/progress/{streak,progression.service}.ts`, `server/src/lib/time.ts`,
+`server/src/config/game.ts`, `server/src/modules/sessions/{sessions.service,sessions.summary}.ts`,
+`server/src/modules/users/users.repository.ts`, `server/src/models/Session.ts` (`dailyDate`),
+`shared/src/sessions.ts` (`bonuses`, `streak`, `rankUp` on the summary).
+**Concepts.** Compare-and-set (optimistic concurrency); idempotency keys; pure functions for time rules.
+**Revisit if** a streak freeze is added (it would need a stored state, not just a date comparison).

@@ -16,3 +16,19 @@ export function isValidTimezone(tz: string): boolean {
     return false;
   }
 }
+
+/** Local calendar date `YYYY-MM-DD` of `date` in an IANA timezone (en-CA formats as ISO). */
+export function localDateKey(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+/** Pure calendar arithmetic on a `YYYY-MM-DD` key; timezone-free, so DST can't shift it. */
+export function addDays(dateKey: string, days: number): string {
+  const [y, m, d] = dateKey.split('-').map(Number) as [number, number, number];
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}

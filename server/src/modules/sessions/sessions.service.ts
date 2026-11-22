@@ -1,5 +1,6 @@
 import type {
   AnswerResult,
+  BonusAward,
   HintRequest,
   HintResult,
   SessionSummary,
@@ -13,11 +14,18 @@ import { SessionModel, type SessionDoc } from '../../models/Session';
 import { AnswerAttemptModel } from '../../models/AnswerAttempt';
 import type { ChallengeDoc } from '../../models/Challenge';
 import { AppError, conflict, isDuplicateKey, notFound } from '../../lib/errors';
-import { BONUS_XP, HINT_XP_DIVISOR, SESSION, XP_BY_DIFFICULTY } from '../../config/game';
+import { HINT_XP_DIVISOR, levelForXP, SESSION, XP_BY_DIFFICULTY } from '../../config/game';
 import { challengesRepo } from '../challenges/challenges.repository';
 import { answerCount, toPublicChallenge, toPublicStage } from '../challenges/challenges.projection';
 import { recordAnswer } from '../progress/topicProgress.service';
 import { awardXP } from '../progress/xp.service';
+import {
+  dailyBonusCandidates,
+  firstIncidentCandidate,
+  payBonuses,
+  updateStreak,
+} from '../progress/progression.service';
+import { usersRepo } from '../users/users.repository';
 import { evaluate } from './sessions.evaluator';
 import { pickBaseline, pickIncident, pickPractice } from './sessions.selection';
 import { buildSummary } from './sessions.summary';
@@ -239,9 +247,6 @@ export async function submitAnswer(
     const amount = usedHint ? Math.floor(base / HINT_XP_DIVISOR) : base;
     xpEarned += await awardXP(userId, xpSourceKey(challenge, stageIndex), amount);
   }
-  if (isIncident && isLastStage && session.type !== 'BASELINE') {
-    xpEarned += await awardXP(userId, 'first-incident', BONUS_XP.firstIncident);
-  }
   if (xpEarned > 0) await AnswerAttemptModel.updateOne({ _id: attemptId }, { $set: { xpEarned } });
 
   const answeredInSession = await AnswerAttemptModel.countDocuments({ sessionId });
@@ -282,10 +287,53 @@ export async function revealHint(
   return { hint };
 }
 
+/** Session types whose completion can pay the first-incident bonus (not baseline or checkpoint). */
+const INCIDENT_BONUS_TYPES: SessionType[] = ['INCIDENT', 'DAILY'];
+
+/**
+ * Bonuses and streak for a finished session. Every step is idempotent (ledger keys, streak
+ * compare-and-set), so it runs before the status flip: a crash or retry re-runs it safely and
+ * a bonus is never lost or paid twice.
+ */
+async function settleProgression(
+  userId: string,
+  session: SessionDoc,
+  summary: SessionSummary,
+): Promise<SessionSummary> {
+  const type = session.type as SessionType;
+  const candidates = [];
+  let streak: SessionSummary['streak'];
+  if (type === 'DAILY' && session.dailyDate) {
+    const s = await updateStreak(userId);
+    streak = { current: s.current, longest: s.longest, extended: s.extended };
+    const allCorrect = summary.correctAnswers === summary.totalAnswers;
+    candidates.push(...dailyBonusCandidates(session.dailyDate, allCorrect, s));
+  }
+  if (INCIDENT_BONUS_TYPES.includes(type)) {
+    const challenges = await challengesRepo.findByIds(session.items.map((i) => i.challengeId));
+    if (challenges.some((c) => c.type === 'INCIDENT')) candidates.push(firstIncidentCandidate());
+  }
+  const bonuses = await payBonuses(userId, candidates, session.startedAt);
+  const xpEarned = summary.xpEarned + bonuses.reduce((n, b) => n + b.xp, 0);
+
+  const user = await usersRepo.findById(userId);
+  const after = levelForXP(user?.totalXP ?? 0);
+  const before = levelForXP(Math.max(0, (user?.totalXP ?? 0) - xpEarned));
+  const rankUp =
+    after.level > before.level
+      ? { level: after.level, rankName: after.name, kanji: after.kanji }
+      : undefined;
+  return { ...summary, xpEarned, bonuses, ...(streak ? { streak } : {}), ...(rankUp ? { rankUp } : {}) };
+}
+
 /** Idempotent: only the first call completes the session; later calls return the stored summary. */
 export async function completeSession(userId: string, sessionId: string): Promise<SessionSummary> {
   const session = await findOwnSession(userId, sessionId);
-  if (session.status === 'COMPLETED' && session.summary) return session.summary as SessionSummary;
+  // Summaries stored before P4 have no `bonuses`; default it so clients can rely on the field.
+  if (session.status === 'COMPLETED' && session.summary) {
+    const stored = session.summary as Omit<SessionSummary, 'bonuses'> & { bonuses?: BonusAward[] };
+    return { ...stored, bonuses: stored.bonuses ?? [] };
+  }
 
   const attempts = await AnswerAttemptModel.find({ sessionId })
     .select('topicSlug isCorrect timeTakenMs xpEarned')
@@ -293,7 +341,8 @@ export async function completeSession(userId: string, sessionId: string): Promis
   if (attempts.length < session.totalAnswers)
     throw conflict('Answer every challenge before finishing');
 
-  const summary = buildSummary(sessionId, session.type as SessionType, attempts);
+  const base = buildSummary(sessionId, session.type as SessionType, attempts);
+  const summary = await settleProgression(userId, session, base);
   const updated = await SessionModel.findOneAndUpdate(
     { _id: sessionId, userId, status: 'ACTIVE' },
     { $set: { status: 'COMPLETED', completedAt: new Date(), summary } },

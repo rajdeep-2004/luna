@@ -67,6 +67,9 @@ export type HintResult = { hint: string };
 
 export type TopicResult = { topicSlug: TopicSlug; correct: number; total: number };
 
+export type BonusKind = 'DAILY_KATA' | 'PERFECT_KATA' | 'FIRST_INCIDENT' | 'STREAK_MILESTONE';
+export type BonusAward = { kind: BonusKind; xp: number; /** Streak milestones only. */ days?: number };
+
 export type SessionSummary = {
   sessionId: string;
   type: SessionType;
@@ -75,7 +78,13 @@ export type SessionSummary = {
   accuracy: number;
   grade: 'KANPEKI' | 'SUGOI' | 'YOSHI' | 'MADA_MADA';
   totalTimeMs: number;
+  /** Answer XP plus bonuses. */
   xpEarned: number;
   perTopic: TopicResult[];
   weakTopics: TopicSlug[];
+  bonuses: BonusAward[];
+  /** Daily Kata only: the streak after this Kata. */
+  streak?: { current: number; longest: number; extended: boolean };
+  /** Set when this session's XP crossed a level threshold. */
+  rankUp?: { level: number; rankName: string; kanji: string };
 };

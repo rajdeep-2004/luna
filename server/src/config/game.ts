@@ -8,9 +8,20 @@ export const XP_BY_DIFFICULTY: Record<Difficulty, number> = { 1: 10, 2: 15, 3: 2
 /** A hint halves the XP for that answer, rounded down (scoring.md §2). */
 export const HINT_XP_DIVISOR = 2;
 
+/** scoring.md §3. Each bonus is a ledger entry under a unique key, so it can never be paid twice. */
 export const BONUS_XP = {
   firstIncident: 25,
+  dailyKata: 15,
+  /** On top of the Kata bonus when every answer in the Kata is correct. */
+  perfectKata: 10,
 } as const;
+
+/** scoring.md §3: paid once per streak run, keyed `streak<days>:<runStartDate>`. */
+export const STREAK_MILESTONES = [
+  { days: 3, xp: 10 },
+  { days: 7, xp: 25 },
+  { days: 30, xp: 50 },
+] as const;
 
 /** progression.md §1: 10 samurai ranks. `minXP` is total XP needed. */
 export const LEVELS = [

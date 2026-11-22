@@ -1,13 +1,28 @@
 import { useQuery } from '@tanstack/react-query';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { topicsApi, userMessage } from '../../api';
-import { AppText, Card, EmptyState, ErrorState, MoonPhase, Screen } from '../../components';
+import type { MasteryPhase } from '@luna/shared';
+import {
+  AppText,
+  Card,
+  EmptyState,
+  ErrorState,
+  MoonPhase,
+  Screen,
+  type MoonPhaseName,
+} from '../../components';
+import { MOON_FOR, MOON_LABEL } from '../../lib/moon';
+import { useProgress } from '../../lib/useProgress';
 import { colors, layout, radii, spacing } from '../../theme';
 import { useStartSession } from './useStartSession';
 
 export function ExploreScreen() {
   const topics = useQuery({ queryKey: ['topics'], queryFn: topicsApi.list });
   const { start, pendingKey, error } = useStartSession();
+  // Moons are a bonus on this screen: if progress fails to load, topics still show (as new moons).
+  const progress = useProgress();
+  const phaseOf = (slug: string): MasteryPhase =>
+    progress.data?.topics.find((t) => t.topicSlug === slug)?.phase ?? 'NEW';
 
   return (
     <Screen>
@@ -30,6 +45,8 @@ export function ExploreScreen() {
             key={t.slug}
             title={t.name}
             subtitle={t.description}
+            moon={MOON_FOR[phaseOf(t.slug)]}
+            moonLabel={MOON_LABEL[phaseOf(t.slug)]}
             busy={pendingKey === t.slug}
             disabled={pendingKey !== null}
             onPress={() => void start(t.slug, { type: 'PRACTICE', topicSlug: t.slug })}
@@ -59,18 +76,20 @@ export function ExploreScreen() {
 type RowProps = {
   title: string;
   subtitle: string;
+  moon?: MoonPhaseName;
+  moonLabel?: string;
   busy: boolean;
   disabled: boolean;
   onPress: () => void;
 };
 
-function Row({ title, subtitle, busy, disabled, onPress }: RowProps) {
+function Row({ title, subtitle, moon = 'new', moonLabel, busy, disabled, onPress }: RowProps) {
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
-      accessibilityLabel={`${title}. ${subtitle}`}
+      accessibilityLabel={`${title}${moonLabel ? `, ${moonLabel}` : ''}. ${subtitle}`}
       accessibilityState={{ disabled, busy }}
       style={({ pressed }) => [
         styles.row,
@@ -79,7 +98,7 @@ function Row({ title, subtitle, busy, disabled, onPress }: RowProps) {
       ]}
     >
       <Card style={styles.card}>
-        {busy ? <ActivityIndicator color={colors.moon} /> : <MoonPhase phase="new" size={44} />}
+        {busy ? <ActivityIndicator color={colors.moon} /> : <MoonPhase phase={moon} size={44} />}
         <View style={styles.text}>
           <AppText variant="button">{title}</AppText>
           <AppText color="textMuted">{subtitle}</AppText>

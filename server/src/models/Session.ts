@@ -19,6 +19,8 @@ const sessionSchema = new Schema(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     type: { type: String, enum: SESSION_TYPES, required: true },
     topicSlug: { type: String, enum: [...TOPIC_SLUGS, null], default: null },
+    /** DAILY only: the user's local date (`YYYY-MM-DD`) the Kata belongs to; keys its bonuses. */
+    dailyDate: { type: String, default: null },
     status: { type: String, enum: ['ACTIVE', 'COMPLETED'], default: 'ACTIVE' },
     startedAt: { type: Date, default: () => new Date() },
     completedAt: { type: Date, default: null },
@@ -38,8 +40,16 @@ sessionSchema.index(
   { userId: 1, type: 1, topicSlug: 1 },
   {
     unique: true,
-    partialFilterExpression: { status: 'ACTIVE', type: { $in: ['PRACTICE', 'BASELINE'] } },
+    partialFilterExpression: {
+      status: 'ACTIVE',
+      type: { $in: ['PRACTICE', 'BASELINE', 'CHECKPOINT'] },
+    },
   },
+);
+// One Daily Kata per user per local day: two concurrent first opens can't build two (D-028).
+sessionSchema.index(
+  { userId: 1, dailyDate: 1 },
+  { unique: true, partialFilterExpression: { type: 'DAILY' } },
 );
 
 export type Session = InferSchemaType<typeof sessionSchema>;

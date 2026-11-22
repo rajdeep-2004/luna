@@ -11,4 +11,5 @@ export type AppStackParams = {
   Tabs: undefined;
   Session: { sessionId: string };
   Summary: { sessionId: string; rootCause?: string };
+  BaselineIntro: undefined;
 };

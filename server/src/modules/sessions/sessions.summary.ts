@@ -37,5 +37,7 @@ export function buildSummary(
     weakTopics: perTopic
       .filter((t) => t.correct / t.total < WEAK_TOPIC_ACCURACY)
       .map((t) => t.topicSlug),
+    bonuses: [],
+    fixedMistakes: 0,
   };
 }

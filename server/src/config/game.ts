@@ -2,15 +2,31 @@
  * Game rules as data. Every number here comes from docs/product/ (approved 2026-11-22).
  * Change a rule here, not in services.
  */
-import type { Difficulty } from '@luna/shared';
+import type { Difficulty, SessionType } from '@luna/shared';
 
 export const XP_BY_DIFFICULTY: Record<Difficulty, number> = { 1: 10, 2: 15, 3: 20 };
+/** scoring.md §2: a correct answer on content already earned, inside the Daily Kata only. */
+export const REVIEW_XP = 2;
+/** Measurements, not play: no answer XP and no bonuses (scoring.md §2 rule 4). */
+export const NO_XP_SESSION_TYPES: readonly SessionType[] = ['BASELINE', 'CHECKPOINT'];
+
 /** A hint halves the XP for that answer, rounded down (scoring.md §2). */
 export const HINT_XP_DIVISOR = 2;
 
+/** scoring.md §3. Each bonus is a ledger entry under a unique key, so it can never be paid twice. */
 export const BONUS_XP = {
   firstIncident: 25,
+  dailyKata: 15,
+  /** On top of the Kata bonus when every answer in the Kata is correct. */
+  perfectKata: 10,
 } as const;
+
+/** scoring.md §3: paid once per streak run, keyed `streak<days>:<runStartDate>`. */
+export const STREAK_MILESTONES = [
+  { days: 3, xp: 10 },
+  { days: 7, xp: 25 },
+  { days: 30, xp: 50 },
+] as const;
 
 /** progression.md §1: 10 samurai ranks. `minXP` is total XP needed. */
 export const LEVELS = [
@@ -32,6 +48,55 @@ export const SESSION = {
   maxAnswerTimeMs: 10 * 60 * 1000,
   recentResultsWindow: 10,
 } as const;
+
+/** progression.md §2: moon-phase mastery, judged on the rolling `recentResultsWindow`. */
+export const MASTERY = {
+  minAnswers: 5,
+  fullMinAnswers: 10,
+  /** Below this recent accuracy: crescent. */
+  crescentBelow: 0.5,
+  /** At or above this (plus an advanced correct): full moon. */
+  fullAtLeast: 0.8,
+} as const;
+
+/** progression.md §4: per-topic difficulty moves after 5 answers, then the window resets. */
+export const ADAPTIVE = { window: 5, upAtCorrect: 4, downAtCorrect: 2, min: 1, max: 3 } as const;
+
+/** progression.md §5: light spaced repetition of missed single challenges. */
+export const REVISIT = {
+  /** A miss can come back only after this many other answers. */
+  minOtherAnswers: 3,
+  /** A revisit answered wrong waits this many local days. */
+  retryWaitDays: 2,
+  perKata: 2,
+  perPractice: 1,
+  /** Bounds the queue read; the bank is ~60 challenges. */
+  maxScan: 100,
+} as const;
+
+/** game-modes.md §2. Slot order is the play order; the incident closes the Kata. */
+export const DAILY_KATA_SLOTS = [
+  'TRACE',
+  'BUG_HUNT',
+  'ENGINEER_CHOICE',
+  'ENGINEER_CHOICE',
+  'INCIDENT',
+] as const;
+
+/** Daily Kata slot scoring (lower wins): unseen dominates, then difficulty fit, then variety (D-028). */
+export const KATA_WEIGHTS = {
+  seen: 10,
+  preferred: -0.5,
+  weakest: -0.75,
+  repeatTopic: 0.75,
+  jitter: 0.5,
+} as const;
+
+/** Sessions whose completion can pay the first-incident bonus (not baseline or checkpoint). */
+export const INCIDENT_BONUS_SESSION_TYPES: readonly SessionType[] = ['INCIDENT', 'DAILY'];
+
+/** benchmarks.md §1: a Checkpoint unlocks after every N completed Daily Katas (active days). */
+export const CHECKPOINT = { everyKatas: 7, difficulty: 2 } as const;
 
 /** scoring.md §5 grade bands, by accuracy. */
 export const GRADES = [

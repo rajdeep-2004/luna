@@ -631,3 +631,262 @@ daily kata, duels, profile), and polish is cheaper and better judged once every 
 whole app can be given one consistent set of micro-interactions. The idea is logged in `TODOS.md` and
 belongs to the P6 polish pass. This is a deliberate trade-off: function first, delight second, with a date
 on the second. P3 is marked `shipped` in `prd.md` and merged into `main`.
+
+### D-026 — Streaks, bonuses and rank-up are settled when a session completes
+- **Date:** 2026-11-22 · **Step:** P4 task 1 · **Status:** Active · **Type:** technical
+
+**Context.** P4 adds the Daily Kata bonus (15), the Perfect Kata bonus (+10), streak milestones (3, 7
+and 30 days) and the rank-up moment. The first-incident bonus already existed but was paid inside the
+answer to the last incident stage.
+
+**Decision.** All bonuses are now paid in one place, `settleProgression` in the sessions service, which
+runs when a session completes. It runs *before* the session is flipped to `COMPLETED`, because every step
+inside it is idempotent: each bonus is a ledger row under a unique key (`daily:<date>`, `perfect:<date>`,
+`streak<N>:<runStart>`, `first-incident`), and the streak moves through a compare-and-set update on
+`lastDailyDate`. If the server crashes halfway, the app's retry re-runs the whole thing and nothing is
+lost or paid twice. Had the bonuses run after the flip, a crash would leave a completed session whose
+bonuses were never paid, and the retry would just return the stored summary.
+
+**How the streak works.** `nextStreak` is a pure function over the user's local date (`YYYY-MM-DD` in
+their IANA timezone, computed with `Intl.DateTimeFormat`). Same day: no change. The day after the last
+Kata: +1. Any gap: back to 1. If the stored date is *later* than today (the user moved their timezone
+west), it is also "no change", so changing timezone can never add a day. Day arithmetic is done on the
+date string in UTC, so daylight-saving changes cannot shift it. The streak and the bonus keys both use the
+Kata's own date. *(Amended in D-028: answers to a Kata are refused once its day ends, so an old Kata can't
+be finished later to repair a broken streak.)*
+
+**Milestones once per run.** The run start is derived (`lastDate − (current − 1)` days) instead of
+stored, and keys the milestone. A new run after a break has a new start date, so it can earn the
+milestones again, as `scoring.md` §3 says.
+
+**Reporting bonuses.** The summary lists the bonuses the session earned. It does not trust "what my
+own insert just did": it reads back the ledger rows for its keys created since the session started. A
+parallel retry therefore reports the same list instead of zero. `xpEarned` in the summary now includes
+the bonuses, so the existing XP count-up shows the true total.
+
+**Rank-up.** Computed at completion as `level(totalXP)` vs `level(totalXP − session XP)`. A rank-up in a
+different session running at the same moment could be attributed to this one; that is harmless and
+not worth a stored "last seen level" field.
+
+**Alternatives rejected.** A multi-document transaction (D-015 already chose ordered idempotent writes
+over transactions). Storing `streakRunStart` on the user (derivable, so one less field to keep in sync).
+
+**Files.** `server/src/modules/progress/{streak,progression.service}.ts`, `server/src/lib/time.ts`,
+`server/src/config/game.ts`, `server/src/modules/sessions/{sessions.service,sessions.summary}.ts`,
+`server/src/modules/users/users.repository.ts`, `server/src/models/Session.ts` (`dailyDate`),
+`shared/src/sessions.ts` (`bonuses`, `streak`, `rankUp` on the summary).
+**Concepts.** Compare-and-set (optimistic concurrency); idempotency keys; pure functions for time rules.
+**Revisit if** a streak freeze is added (it would need a stored state, not just a date comparison).
+
+### D-027 — Mastery, adaptive difficulty and the revisit queue
+- **Date:** 2026-11-22 · **Step:** P4 task 2 · **Status:** Active · **Type:** technical + product
+
+**Context.** `progression.md` §2–5 defines moon-phase mastery, per-topic adaptive difficulty, a light
+revisit queue for mistakes, and the "weakest blade" recommendation. The Dojo home (task 4) needs all of
+it in one call.
+
+**Adaptive difficulty in one atomic update.** Each answer already updated the topic row with one
+`updateOne`. The adaptive rule needs to read the last 5 results, decide, and maybe reset the window, which
+looks like a read-modify-write. Instead it runs as a MongoDB **update pipeline**: a list of `$set` stages
+that the database evaluates on the document itself, in one atomic step. Stage 1 appends the result to
+`recentResults` (kept to 10) and `adaptWindow` (kept to 5); stage 2 counts the hits; stage 3 picks the new
+difficulty (4–5 correct: +1, 0–2: −1, 3: same, clamped to 1–3); stage 4 empties the window only if the
+difficulty changed. Two answers arriving at once are applied one after the other by the database, so no
+answer is lost and the decision is never made on a stale window. When a change is blocked by the clamp
+(already at 3 with 5/5), the window keeps sliding instead of resetting, because nothing changed.
+
+**Mastery and weakest topic are pure functions** (`mastery.ts`) over the stored row, computed on read.
+Storing the phase would mean keeping it in sync on every answer, and it is cheap to compute for 5 topics.
+
+**Revisit queue.** A new `revisititems` collection, one row per missed challenge (unique on user +
+challenge). A correct answer anywhere deletes the row; a miss upserts it. If the row already existed (a
+revisit missed again), the same atomic pipeline sets `notBeforeDate = today + 2 days`. "At least 3 other
+answers since the miss" is checked with one query: find the user's 3rd-latest answer, and an item is due
+only if it was missed strictly before that. The Daily Kata also skips items missed today. Topic Practice
+puts up to 1 due revisit first, marked `isRevisit`, and the summary reports `fixedMistakes`.
+
+**Product choice: incidents are not queued.** An incident is a three-stage story; dropping one back into
+a Kata as a "revisit" would cost a whole slot and replay the story. Players can replay incidents from the
+incident list. Revisits are single challenges only. Revisit this if testers want missed incidents back.
+
+**The lantern is honest.** The stored streak only changes when a Kata completes, so a run that broke still
+holds its old number. `streakStatus` shows `0` with `wentOut: true` when the last Kata was before yesterday,
+both in `/users/me` and in the progress view, so the app can show "Your lantern went out. Light it again
+today." without guessing.
+
+**`GET /users/me/progress`** returns rank (with XP for the current and next level, for a progress bar),
+the lantern, the five moons (phase, answers, recent accuracy, difficulty), the weakest topic, and the queue
+size. All reads are bounded (5 topic rows, one count).
+
+**Alternatives rejected.** Read the row, decide in Node, write back (racy without a version guard). A
+full spaced-repetition scheduler such as SM-2 (more than V1 needs; the brainstorm asked for "light").
+
+**Files.** `server/src/modules/progress/{topicProgress.service,mastery,revisit.service,progress.service,streak}.ts`,
+`server/src/models/{UserTopicProgress,RevisitItem}.ts`, `server/src/modules/sessions/{sessions.selection,sessions.service}.ts`,
+`server/src/modules/users/{users.routes,users.mapper}.ts`, `server/src/config/game.ts`, `shared/src/progress.ts`.
+**Concepts.** MongoDB update pipelines (atomic conditional updates); derived vs stored state; spaced repetition.
+**Revisit if** difficulty bounces too often in play tests (raise the window), or the queue grows large enough
+to need a cap.
+
+### D-028 — Daily Kata as a session, review XP, baseline effect, Checkpoint
+- **Date:** 2026-11-22 · **Step:** P4 task 3 · **Status:** Active · **Type:** technical + product
+
+**The Kata is a session, not a separate "circuit".** The architecture planned a `dailycircuits`
+collection holding the five challenge ids plus a link to the session. The session already stores its
+challenges, their option order and now its `dailyDate`, so the circuit would only duplicate it. Instead a
+unique partial index on sessions `{userId, dailyDate}` (only for `DAILY`) is the "one Kata per user per
+day" guarantee. Two phones opening the app at the same moment both try to insert; the database accepts
+one, the other gets a duplicate-key error and returns the winner's Kata. One less collection to keep in
+sync. `GET /daily` returns `{ date, session, summary }`: building it on the first open, resuming it after,
+and including the stored summary once it is finished.
+
+**Composition.** Five slots: Trace, Bug Hunt, two Engineer's Choice, Incident (incident last, as the
+climax). Up to 2 due revisits (missed before today, 3+ answers ago) take a slot of their own type. Each
+other slot takes the lowest-scoring challenge of its type, where the score adds: +10 if seen, the distance
+from the user's difficulty for that topic, −0.5 for a preferred topic, −0.75 for the weakest topic, +0.75
+per earlier slot already from that topic (spread), and a little randomness. Because "seen" only adds a
+penalty, a user who has seen everything still gets a full Kata of the least-bad options: that is the
+fallback `game-modes.md` describes.
+
+**Expiry.** `game-modes.md` says an unfinished Kata expires at the end of the local day: answers count for
+mastery, but no bonus or streak. Implemented as: answering (or asking for a hint in) a Kata whose
+`dailyDate` is before today is a 409 "This Kata ended at midnight". The next `GET /daily` builds today's.
+So the streak can safely use the Kata's own date.
+
+**Review XP.** A correct answer to content already earned pays 2 XP, only inside the Kata, under the key
+`review:<date>:<challenge>[:stage]`. The subtle part is the retry path: a retry finds the first-correct
+ledger row already there (inserted by the first try) and must not mistake it for "earned before". So
+"earned before" means a ledger row created *before this attempt's timestamp*. The XP rules moved to
+`sessions.xp.ts`, used by both the normal and the retry path. Baseline and Checkpoint pay nothing
+(`NO_XP_SESSION_TYPES`).
+
+**Baseline effect.** When the baseline completes, each topic's difficulty is set from its one question:
+correct keeps the onboarding segment's difficulty, wrong sets 1 (`progression.md` §4). Plain `$set`s, so a
+retry is harmless.
+
+**Checkpoint (approved scope, `benchmarks.md` §1).** `POST /sessions {type: CHECKPOINT}`: one intermediate
+single challenge per topic, unseen first, no XP. "Every 7 active days" is defined as every 7 completed
+Daily Katas (one per local day, so each is an active day): the Nth Checkpoint needs N × 7. That rule is
+computed, not stored, and can't be farmed. The progress view gets `assessments` (baseline score, latest
+checkpoint score, availability, Katas to go), which is the "Baseline 2/5 → Checkpoint 4/5" learning metric.
+Concurrent starts are de-duplicated by adding CHECKPOINT to the existing "one open session" index.
+
+**Refactor.** `sessions.service.ts` was near 400 lines, so progression settlement moved to
+`sessions.settle.ts` and answer XP to `sessions.xp.ts`. `createSession` is shared by `startSession` and
+the Daily service.
+
+**Alternatives rejected.** Keep `dailycircuits` (duplicate state). Let an expired Kata be finished
+without bonus (more states for the app to explain, same outcome). Count "active days" from XP events by
+day (a practice-only day would count, which isn't what a checkpoint window means).
+
+**Files.** `server/src/modules/daily/*`, `server/src/modules/sessions/{sessions.service,sessions.settle,sessions.xp,sessions.selection}.ts`,
+`server/src/modules/progress/{assessments.service,progression.service,progress.service}.ts`,
+`server/src/models/Session.ts`, `server/src/config/game.ts`, `shared/src/{sessions,progress}.ts`, `docs/architecture.md`.
+**Concepts.** Partial unique indexes as concurrency guards; deriving rules from history instead of storing
+counters; timestamp-ordered idempotency.
+**Revisit if** the bank grows enough that the scoring weights need tuning, or testers ask to finish
+yesterday's Kata.
+
+### D-029 — Dojo home, rank-up moment, baseline offer, Checkpoint card
+- **Date:** 2026-11-22 · **Step:** P4 task 4 · **Status:** Active · **Type:** product + technical
+
+**Dojo home.** Follows `ui-design.md` §1.3: three things only. The header holds the avatar, rank (name,
+kanji, level), the lantern, and a thin XP line to the next rank. The centre is the Daily Kata: a floating
+moon (±4 px float and a breathing halo, both off under Reduce Motion), the serif title (the screen's one
+serif element), and the one primary button, *Begin kata*. Below it is the weakest blade card, with the five
+topic moons in a row underneath, because `progression.md` §2 calls that row "the clearest possible weakest
+topic display". When a Checkpoint is ready, a quiet card appears; otherwise nothing, so the screen stays
+calm.
+
+**The Kata is built on tap, not on view.** `GET /daily` creates today's Kata. Home doesn't call it on load;
+it reads `doneToday` from the progress view and only calls `/daily` when the user taps. Otherwise simply
+opening the app would count as "started a Kata" and make the completion-rate benchmark (≥ 85%) look worse
+than it is. Once done, the button becomes the ghost *See today's result*.
+
+**The lantern is kind.** When the server reports `wentOut`, Home says "Your lantern went out. Light it
+again today." (`progression.md` §6) and shows 0, never the stale number.
+
+**Rank-up moment.** When the summary carries `rankUp`, a full-screen layer covers the summary: full moon,
+the rank's kanji, "You are now Ronin", and *Continue*, which reveals the summary underneath. It pops with a
+spring (fades only under Reduce Motion) and fires the success haptic. The summary also lists the bonuses
+earned, the lantern line ("Lantern lit: 3 days · your longest yet"), and "You fixed a past mistake" for
+revisits.
+
+**Baseline offer.** Onboarding sets a one-time in-memory flag. The Dojo sees it and pushes the
+*One quick check?* screen over the tabs, with *Take the baseline* and *Skip for now*. It's pushed over the
+tabs (not the first screen of a new stack) so that after the baseline's summary, *Back to the dojo* lands
+on the Dojo. The flag isn't persisted: if the app is killed at that exact moment, the offer is lost.
+That's acceptable for an optional step. The baseline summary says the starting difficulty is set; the
+Checkpoint summary shows "Baseline 2/5 → Checkpoint 4/5".
+
+**Explore** now shows each topic's real moon phase. If the progress call fails, topics still render as
+new moons: the moons are extra information there, not the content.
+
+**Freshness.** Progress is a React Query key refetched whenever the Dojo or Explore regains focus, and
+invalidated when a summary loads, so XP, rank and the lantern are current after every session.
+
+**Left out (parked for P6 polish):** the petals on the summary, a dedicated Checkpoint intro screen, and
+any countdown to the next Checkpoint on Home.
+
+**Files.** `app/src/screens/dojo/*`, `app/src/screens/game/{RankUpOverlay,SummaryExtras,SummaryScreen}.tsx`,
+`app/src/screens/onboarding/{BaselineIntroScreen,LevelScreen}.tsx`, `app/src/screens/explore/ExploreScreen.tsx`,
+`app/src/lib/{moon,useProgress}.ts`, `app/src/navigation/*`, `app/src/store/onboarding.ts`, `app/src/api/endpoints.ts`.
+**Concepts.** Measuring intent (create on action, not on view); focus-based refetching; overlay vs route for
+a one-off moment.
+**Revisit if** testers miss the baseline because the flag was lost, or if Home feels empty before the first
+Checkpoint.
+
+### D-030 — P4 backend review: what was fixed and what was not
+- **Date:** 2026-11-22 · **Step:** P4 — backend review · **Status:** Active · **Type:** technical
+
+One review agent read the server and shared diff of the phase. It found no AuthZ gaps and no answer-key
+leaks, and confirmed that the streak compare-and-set and the Daily unique index are correct. Its findings and
+what we did:
+
+**Fixed.**
+1. *A retry could leave the summary's XP short.* If an answer was recorded but the follow-up write of its
+   `xpEarned` failed, the retry was refused as "already answered" before any repair ran. The summary sums
+   `xpEarned` per attempt, so it would show less XP than the ledger paid. Now an already-answered submit
+   first re-runs the XP award (a no-op thanks to the ledger) and writes back the XP the ledger holds for that
+   attempt, then returns the same 409.
+2. *The rank-up moment replayed.* The stored summary keeps `rankUp`, and reopening a finished Kata returns
+   it, so the full-screen moment would fire on every *See today's result*. Replays now leave out `rankUp`.
+3. *A changed index wouldn't apply to an existing database.* Adding CHECKPOINT to the "one open session"
+   index changed its partial filter under the same name. Mongoose's auto-index only creates indexes, so an
+   existing Atlas database would keep the old one and log a conflict. `npm run seed -w server` now runs
+   `syncIndexes` for every model first, which drops and recreates indexes whose options changed. **Run the
+   seed once after deploying P4.**
+4. *Missing index.* The revisit rule reads a user's 3rd-latest answer; added `{userId, createdAt: -1}` on
+   answer attempts so that doesn't sort the user's whole history.
+5. *Constants outside config.* The Kata scoring weights and the first-incident session types moved to
+   `config/game.ts`, per the project rule.
+
+**Not fixed, on purpose.**
+- *Ledger row and `totalXP` increment aren't atomic.* True since P1 and accepted in D-015 (no
+  transactions). A crash in that gap leaves `totalXP` short of the ledger. Parked in `TODOS.md` with a
+  reconcile fix.
+- *A crash after recording an answer loses its progress/revisit update.* Also accepted in D-015: it can
+  lose one update but never double-count. Replaying would need an "applied" marker per attempt. Parked.
+- *A fully answered Kata completed after midnight still pays its bonus and moves the streak.* Its answers
+  were all given on its own day (answers after midnight are refused), so it was played on time. The streak
+  uses the Kata's date, so this can't repair a broken streak; Home still shows the true current streak.
+- *`doneToday` uses `lastDate >= today`.* After moving the timezone west, Home can say "done" on a
+  "yesterday" the user already played. That is the same guard that stops timezone farming, and the user
+  really did play a Kata in that 24 hours. Kept.
+- *Checkpoint and baseline answers still update mastery, adaptive difficulty and the revisit queue.* They
+  are real answers about the user's skill, and a missed Checkpoint question is worth revisiting. Only XP is
+  withheld, because XP is what would make people rush a measurement.
+
+**Files.** `server/src/modules/sessions/{sessions.service,sessions.xp,sessions.settle}.ts`,
+`server/src/modules/daily/daily.selection.ts`, `server/src/config/game.ts`, `server/src/models/AnswerAttempt.ts`,
+`server/src/db/syncIndexes.ts`, `server/src/seed/seed.ts`, `TODOS.md`.
+**Concepts.** Index migrations; idempotent repair on retry; known-debt vs bug.
+
+### D-031 — P4 accepted and merged
+- **Date:** 2026-11-22 · **Step:** P4 — manual review · **Status:** Active · **Type:** process
+
+Rajdeep reviewed P4 (Dojo home, Daily Kata, streaks, bonuses, rank-up, mastery moons, revisits, baseline
+offer) and accepted it with no changes. The whole phase ran on Opus at Rajdeep's request, instead of
+switching models per task. P4 is marked `shipped` in `prd.md` and merged into `main` with `--no-ff`, so the
+phase stays visible as one unit in history. Reminder carried forward: run `npm run seed -w server` once
+against each existing database so the changed session index is rebuilt (D-030).

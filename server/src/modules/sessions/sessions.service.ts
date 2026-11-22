@@ -1,5 +1,7 @@
 import type {
   AnswerResult,
+  BonusAward,
+  ChallengeType,
   HintRequest,
   HintResult,
   SessionSummary,
@@ -13,13 +15,24 @@ import { SessionModel, type SessionDoc } from '../../models/Session';
 import { AnswerAttemptModel } from '../../models/AnswerAttempt';
 import type { ChallengeDoc } from '../../models/Challenge';
 import { AppError, conflict, isDuplicateKey, notFound } from '../../lib/errors';
-import { BONUS_XP, HINT_XP_DIVISOR, SESSION, XP_BY_DIFFICULTY } from '../../config/game';
+import { SESSION } from '../../config/game';
+import { localDateKey } from '../../lib/time';
 import { challengesRepo } from '../challenges/challenges.repository';
 import { answerCount, toPublicChallenge, toPublicStage } from '../challenges/challenges.projection';
 import { recordAnswer } from '../progress/topicProgress.service';
-import { awardXP } from '../progress/xp.service';
+import { trackRevisit } from '../progress/revisit.service';
+import { assessmentStatus } from '../progress/assessments.service';
+import { usersRepo } from '../users/users.repository';
 import { evaluate } from './sessions.evaluator';
-import { pickBaseline, pickIncident, pickPractice } from './sessions.selection';
+import {
+  pickBaseline,
+  pickCheckpoint,
+  pickIncident,
+  pickPractice,
+  type PickedItem,
+} from './sessions.selection';
+import { settleProgression } from './sessions.settle';
+import { answerXP, ownedXP } from './sessions.xp';
 import { buildSummary } from './sessions.summary';
 
 const shuffle = <T>(xs: T[]): T[] => {
@@ -39,10 +52,12 @@ function optionOrdersFor(c: ChallengeDoc): string[][] {
   return [shuffle(c.options.map((o) => o.id))];
 }
 
-/** Ledger key for a correct answer: one per challenge, or one per incident stage. */
-function xpSourceKey(c: ChallengeDoc, stageIndex: number): string {
-  const id = c._id.toString();
-  return c.type === 'INCIDENT' ? `challenge:${id}:${stageIndex}` : `challenge:${id}`;
+/** game-modes.md §2: an unfinished Kata expires at the end of the user's local day. */
+async function isKataExpired(userId: string, session: SessionDoc): Promise<boolean> {
+  const user = await usersRepo.findById(userId);
+  return Boolean(
+    session.dailyDate && session.dailyDate < localDateKey(new Date(), user?.timezone ?? 'UTC'),
+  );
 }
 
 async function findOwnSession(userId: string, sessionId: string): Promise<SessionDoc> {
@@ -51,19 +66,69 @@ async function findOwnSession(userId: string, sessionId: string): Promise<Sessio
   return session;
 }
 
+type NewSession = {
+  type: SessionType;
+  topicSlug?: TopicSlug | null;
+  dailyDate?: string | null;
+  picked: PickedItem[];
+};
+
+/**
+ * Inserts a session for the picked challenges. Returns null when a unique index says an equivalent
+ * open session (or today's Kata) already exists, so the caller can return that one instead.
+ */
+export async function createSession(userId: string, s: NewSession): Promise<SessionView | null> {
+  try {
+    const session = await SessionModel.create({
+      userId,
+      type: s.type,
+      topicSlug: s.topicSlug ?? null,
+      dailyDate: s.dailyDate ?? null,
+      items: s.picked.map(({ challenge: c, isRevisit }, order) => ({
+        challengeId: c._id,
+        order,
+        isRevisit,
+        optionOrders: optionOrdersFor(c),
+      })),
+      totalAnswers: s.picked.reduce((n, p) => n + answerCount(p.challenge), 0),
+    });
+    return buildView(
+      session,
+      s.picked.map((p) => p.challenge),
+    );
+  } catch (err) {
+    if (isDuplicateKey(err)) return null;
+    throw err;
+  }
+}
+
+async function pickFor(userId: string, input: StartSessionRequest): Promise<PickedItem[]> {
+  switch (input.type) {
+    case 'PRACTICE': {
+      const user = await usersRepo.findById(userId);
+      return pickPractice(userId, input.topicSlug, user?.timezone ?? 'UTC');
+    }
+    case 'INCIDENT':
+      return pickIncident(userId, input.challengeId);
+    case 'BASELINE':
+      return pickBaseline();
+    case 'CHECKPOINT':
+      return pickCheckpoint(userId);
+  }
+}
+
 export async function startSession(
   userId: string,
   input: StartSessionRequest,
 ): Promise<SessionView> {
   const topicSlug: TopicSlug | null = input.type === 'PRACTICE' ? input.topicSlug : null;
+  const findOpen = () =>
+    SessionModel.findOne({ userId, type: input.type, status: 'ACTIVE', topicSlug }).sort({
+      createdAt: -1,
+    });
 
   // A repeated tap on "Start" resumes the open session instead of creating a second one.
-  const open = await SessionModel.findOne({
-    userId,
-    type: input.type,
-    status: 'ACTIVE',
-    topicSlug,
-  }).sort({ createdAt: -1 });
+  const open = await findOpen();
   if (open && input.type !== 'INCIDENT') return getSession(userId, open._id.toString());
 
   if (
@@ -72,40 +137,20 @@ export async function startSession(
   ) {
     throw conflict('You have already taken the baseline');
   }
-
-  const picked =
-    input.type === 'PRACTICE'
-      ? await pickPractice(userId, input.topicSlug)
-      : input.type === 'INCIDENT'
-        ? await pickIncident(userId, input.challengeId)
-        : await pickBaseline();
-
-  let session: SessionDoc;
-  try {
-    session = await SessionModel.create({
-      userId,
-      type: input.type,
-      topicSlug,
-      items: picked.map((c, order) => ({
-        challengeId: c._id,
-        order,
-        optionOrders: optionOrdersFor(c),
-      })),
-      totalAnswers: picked.reduce((n, c) => n + answerCount(c), 0),
-    });
-  } catch (err) {
-    // A concurrent start won the race: return the session it created.
-    if (!isDuplicateKey(err)) throw err;
-    const winner = await SessionModel.findOne({
-      userId,
-      type: input.type,
-      status: 'ACTIVE',
-      topicSlug,
-    });
-    if (!winner) throw err;
-    return getSession(userId, winner._id.toString());
+  if (input.type === 'CHECKPOINT' && !(await assessmentStatus(userId)).checkpointAvailable) {
+    throw conflict('Your next Checkpoint unlocks after more Daily Katas');
   }
-  return buildView(session, picked);
+
+  const created = await createSession(userId, {
+    type: input.type,
+    topicSlug,
+    picked: await pickFor(userId, input),
+  });
+  if (created) return created;
+  // A concurrent start won the race: return the session it created.
+  const winner = await findOpen();
+  if (!winner) throw conflict('Could not start the session, please try again');
+  return getSession(userId, winner._id.toString());
 }
 
 export async function getSession(userId: string, sessionId: string): Promise<SessionView> {
@@ -160,15 +205,43 @@ async function loadAnswerContext(
 ) {
   const session = await findOwnSession(userId, sessionId);
   if (session.status !== 'ACTIVE') throw conflict('This session is already finished');
+  if (session.type === 'DAILY' && (await isKataExpired(userId, session))) {
+    throw conflict('This Kata ended at midnight. Today has a new one.');
+  }
   const item = session.items.find((i) => i.challengeId.toString() === challengeId);
   if (!item) throw notFound('Challenge in this session');
   const challenge = await challengesRepo.findById(challengeId);
   if (!challenge) throw notFound('Challenge');
   if (stageIndex >= answerCount(challenge)) throw new AppError('VALIDATION_ERROR', 'Invalid stage');
   const answered = await AnswerAttemptModel.countDocuments({ sessionId, challengeId });
-  if (stageIndex < answered) throw conflict('Already answered');
+  const alreadyAnswered = stageIndex < answered;
   if (stageIndex > answered) throw conflict('Answer the earlier stage first');
-  return { session, item, challenge };
+  return { session, item, challenge, alreadyAnswered };
+}
+
+/**
+ * A retry of an answer that is already recorded: re-run the XP award (the ledger makes it a no-op
+ * if it already happened) and make the attempt's `xpEarned` match the ledger, since the summary
+ * sums it. Progress and revisit writes are not replayed: D-015 accepts losing one progress update
+ * on a crash, and replaying them without a marker could double-count.
+ */
+async function repairAnsweredXP(
+  userId: string,
+  session: SessionDoc,
+  challenge: ChallengeDoc,
+  stageIndex: number,
+): Promise<void> {
+  const prior = await AnswerAttemptModel.findOne({
+    sessionId: session._id,
+    challengeId: challenge._id,
+    stageIndex,
+  }).lean();
+  if (!prior) return;
+  const ctx = { userId, session, challenge, stageIndex, attemptAt: prior.createdAt };
+  await answerXP({ ...ctx, isCorrect: prior.isCorrect, usedHint: prior.usedHint });
+  const owned = prior.isCorrect ? await ownedXP(ctx) : 0;
+  if (owned !== prior.xpEarned)
+    await AnswerAttemptModel.updateOne({ _id: prior._id }, { $set: { xpEarned: owned } });
 }
 
 export async function submitAnswer(
@@ -177,12 +250,16 @@ export async function submitAnswer(
   input: SubmitAnswerRequest,
 ): Promise<AnswerResult> {
   const { challengeId, stageIndex, answer } = input;
-  const { session, item, challenge } = await loadAnswerContext(
+  const { session, item, challenge, alreadyAnswered } = await loadAnswerContext(
     userId,
     sessionId,
     challengeId,
     stageIndex,
   );
+  if (alreadyAnswered) {
+    await repairAnsweredXP(userId, session, challenge, stageIndex);
+    throw conflict('Already answered');
+  }
   const result = evaluate(challenge, stageIndex, answer);
 
   // Server-measured time since the previous answer in this session (or the session start).
@@ -196,6 +273,7 @@ export async function submitAnswer(
 
   // 1) The attempt insert is the idempotency guard: a double submit stops here with a 409.
   let attemptId;
+  let attemptAt: Date;
   try {
     const attempt = await AnswerAttemptModel.create({
       userId,
@@ -211,16 +289,10 @@ export async function submitAnswer(
       difficulty: challenge.difficulty,
     });
     attemptId = attempt._id;
+    attemptAt = attempt.createdAt;
   } catch (err) {
     if (!isDuplicateKey(err)) throw err;
-    // A retry after a partial failure: re-run the XP award (the ledger makes it a no-op if it
-    // already happened), then report the duplicate.
-    const prior = await AnswerAttemptModel.findOne({ sessionId, challengeId, stageIndex }).lean();
-    if (prior?.isCorrect && session.type !== 'BASELINE') {
-      const base = XP_BY_DIFFICULTY[challenge.difficulty as 1 | 2 | 3];
-      const amount = prior.usedHint ? Math.floor(base / HINT_XP_DIVISOR) : base;
-      await awardXP(userId, xpSourceKey(challenge, stageIndex), amount);
-    }
+    await repairAnsweredXP(userId, session, challenge, stageIndex);
     throw conflict('Already answered');
   }
 
@@ -231,17 +303,28 @@ export async function submitAnswer(
     result.isCorrect,
     challenge.difficulty,
   );
+  const user = await usersRepo.findById(userId);
+  await trackRevisit(
+    userId,
+    {
+      id: challengeId,
+      topicSlug: challenge.topicSlug as TopicSlug,
+      type: challenge.type as ChallengeType,
+    },
+    result.isCorrect,
+    user?.timezone ?? 'UTC',
+  );
   const isIncident = challenge.type === 'INCIDENT';
   const isLastStage = stageIndex === answerCount(challenge) - 1;
-  let xpEarned = 0;
-  if (result.isCorrect && session.type !== 'BASELINE') {
-    const base = XP_BY_DIFFICULTY[challenge.difficulty as 1 | 2 | 3];
-    const amount = usedHint ? Math.floor(base / HINT_XP_DIVISOR) : base;
-    xpEarned += await awardXP(userId, xpSourceKey(challenge, stageIndex), amount);
-  }
-  if (isIncident && isLastStage && session.type !== 'BASELINE') {
-    xpEarned += await awardXP(userId, 'first-incident', BONUS_XP.firstIncident);
-  }
+  const xpEarned = await answerXP({
+    userId,
+    session,
+    challenge,
+    stageIndex,
+    isCorrect: result.isCorrect,
+    usedHint,
+    attemptAt,
+  });
   if (xpEarned > 0) await AnswerAttemptModel.updateOne({ _id: attemptId }, { $set: { xpEarned } });
 
   const answeredInSession = await AnswerAttemptModel.countDocuments({ sessionId });
@@ -266,12 +349,13 @@ export async function revealHint(
   sessionId: string,
   input: HintRequest,
 ): Promise<HintResult> {
-  const { challenge } = await loadAnswerContext(
+  const { challenge, alreadyAnswered } = await loadAnswerContext(
     userId,
     sessionId,
     input.challengeId,
     input.stageIndex,
   );
+  if (alreadyAnswered) throw conflict('Already answered');
   const hint =
     challenge.type === 'INCIDENT' ? challenge.stages[input.stageIndex]?.hint : challenge.hint;
   if (!hint) throw notFound('Hint');
@@ -285,15 +369,35 @@ export async function revealHint(
 /** Idempotent: only the first call completes the session; later calls return the stored summary. */
 export async function completeSession(userId: string, sessionId: string): Promise<SessionSummary> {
   const session = await findOwnSession(userId, sessionId);
-  if (session.status === 'COMPLETED' && session.summary) return session.summary as SessionSummary;
+  // Summaries stored before P4 have no `bonuses`; default it so clients can rely on the field.
+  if (session.status === 'COMPLETED' && session.summary) {
+    const stored = session.summary as Omit<SessionSummary, 'bonuses' | 'fixedMistakes'> & {
+      bonuses?: BonusAward[];
+      fixedMistakes?: number;
+    };
+    // A replay (reopening a finished Kata, a remount) must not re-fire the rank-up moment.
+    const { rankUp: _seen, ...rest } = stored;
+    void _seen;
+    return { ...rest, bonuses: stored.bonuses ?? [], fixedMistakes: stored.fixedMistakes ?? 0 };
+  }
 
   const attempts = await AnswerAttemptModel.find({ sessionId })
-    .select('topicSlug isCorrect timeTakenMs xpEarned')
+    .select('challengeId topicSlug isCorrect timeTakenMs xpEarned')
     .lean();
   if (attempts.length < session.totalAnswers)
     throw conflict('Answer every challenge before finishing');
 
-  const summary = buildSummary(sessionId, session.type as SessionType, attempts);
+  const revisitIds = new Set(
+    session.items.filter((i) => i.isRevisit).map((i) => i.challengeId.toString()),
+  );
+  const fixedMistakes = attempts.filter(
+    (a) => a.isCorrect && revisitIds.has(a.challengeId.toString()),
+  ).length;
+  const base = {
+    ...buildSummary(sessionId, session.type as SessionType, attempts),
+    fixedMistakes,
+  };
+  const summary = await settleProgression(userId, session, base);
   const updated = await SessionModel.findOneAndUpdate(
     { _id: sessionId, userId, status: 'ACTIVE' },
     { $set: { status: 'COMPLETED', completedAt: new Date(), summary } },

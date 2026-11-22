@@ -28,6 +28,24 @@ export const usersRepo = {
   },
   clearFailedLogins: (id: string) =>
     UserModel.updateOne({ _id: id }, { $set: { failedLogins: 0, lockedUntil: null } }),
+  /** Compare-and-set: moves the streak only if `lastDailyDate` is still what the caller read. */
+  setStreakIf: async (
+    id: string,
+    expectedLastDate: string | null,
+    next: { current: number; longest: number; lastDate: string | null },
+  ): Promise<boolean> => {
+    const res = await UserModel.updateOne(
+      { _id: id, lastDailyDate: expectedLastDate },
+      {
+        $set: {
+          currentStreak: next.current,
+          longestStreak: next.longest,
+          lastDailyDate: next.lastDate,
+        },
+      },
+    );
+    return res.modifiedCount === 1;
+  },
   addXP: (id: string, amount: number) =>
     UserModel.updateOne({ _id: id }, { $inc: { totalXP: amount } }),
 };

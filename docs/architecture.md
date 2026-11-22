@@ -257,9 +257,12 @@ scale with the `{weekKey, userId}` index. Later: a cached `weeklyXP` counter per
 ## 14. Infrastructure
 
 ### CD / deployment
-- **Render web service** (set up in P6): root `server/`, build `npm ci && npm run build`, start
-  `node dist/index.js`, health check `/api/v1/health`. Auto-deploys on push to `main`.
-  Env vars: `MONGODB_URI`, `JWT_SECRET`, `NODE_ENV=production`, `CORS_ORIGINS`.
+- **Render web service** (set up in P6): root directory = the **repo root** (not `server/`: the
+  server depends on the `shared` workspace and the lockfile lives at the root). Build
+  `npm ci --include=dev && npm run build -w server` (`--include=dev` because `NODE_ENV=production`
+  makes npm skip devDependencies, and `tsup` is one). Start `npm run start -w server`. Health check
+  `/api/v1/health`. Auto-deploys on push to `main`. Env vars: `NODE_ENV=production`, `MONGODB_URI`
+  (`luna_prod`), `JWT_SECRET` (a new one, not the dev secret), `LOG_LEVEL=info`. Render sets `PORT`.
 - **MongoDB Atlas M0:** one cluster, separate databases `luna_dev` and `luna_prod`.
   Network access: `0.0.0.0/0` (Render free tier has no static IPs). Protected by a strong DB user
   password. This trade-off is logged in D-006.

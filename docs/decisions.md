@@ -1351,3 +1351,41 @@ one; `INCIDENT` and unknown values are rejected as modes; the boss incident matc
 
 **Files.** `shared/src/domain.ts`, `shared/src/sessions.ts`, `server/src/models/Session.ts`,
 `server/src/modules/sessions/sessions.selection.ts`, `sessions.service.ts`.
+
+### D-042 — Duel formats, Sudden Death and player stats (P7 task 7)
+
+**Context.** The redesign gives duels three "blades" (D-039), and the Profile shows plain game counts instead of
+topic knowledge.
+
+**Decision.**
+- `DUEL_FORMATS` and `DUEL_FORMAT_RULES` live in `shared`, so the app's countdown and the server's timer read the
+  same numbers. Classic: 5 questions, 60 s, 5 s grace. Blitz: 10 questions, 10 s, 2 s grace. Sudden Death: up to
+  10 questions, 30 s, and the run ends at the first miss.
+- `POST /duels` takes an optional `{ format }` (default Classic). The duel stores it, and each duel session
+  copies it (`Session.duelFormat`), so an answer reads its timer without a second query. Old duels and sessions
+  have no field and read as Classic.
+- Selection walks a slot list per format: Classic keeps its fixed slots, and the ten-question formats cycle the
+  three kinds. A slot falls back to any unpicked single challenge when its kind runs out, rather than failing.
+- **Sudden Death.** A wrong answer or a timeout sets `endedEarly` with a conditional update, and the answer
+  reports `sessionReadyToComplete`. Answers after that return 409. Completion accepts fewer answers than the
+  total **only** when `endedEarly` is set. Two guards keep the score honest if a client fires answers
+  concurrently: answers must come strictly in order, and the summary counts only the run up to and including
+  the first miss. `compareResults` is unchanged (more correct, then less time). Per-question results stop at
+  the miss.
+- **Player stats.** `GET /users/me/progress` returns `stats: { katasCompleted, duelsWon, duelsLost, duelsDrawn }`
+  from four counts on indexed fields. There are no new writes or counters. Lost = decided minus won;
+  drawn = completed minus decided.
+
+**Alternatives rejected.** Reading the duel for every answer (an extra query on the hot path). Storing win/loss
+counters on the user (a second source of truth that can drift, for numbers four counts already give).
+Rejecting Sudden Death answers only through the flag (a narrow race lets an answer through, so the summary is
+the real guard).
+
+**Tests** (`.scratch/api-tests/formats.test.ts`): format sizes and the default; unknown formats rejected; the
+Blitz timeout at 12 s, but not at 11 s; Sudden Death order, early end, the 409 after the miss, an early
+completion and a winner on survival; a full ten-question run; a normal session still can't finish short;
+stats after a duel and a Kata.
+
+**Files.** `shared/src/competition.ts`, `sessions.ts`, `progress.ts`; `server/src/config/game.ts`;
+`models/Duel.ts`, `Session.ts`; `modules/duels/*`; `modules/sessions/sessions.service.ts`;
+`modules/progress/progress.service.ts`.

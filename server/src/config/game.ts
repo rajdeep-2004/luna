@@ -2,7 +2,13 @@
  * Game rules as data. Every number here comes from docs/product/ (approved 2026-11-22).
  * Change a rule here, not in services.
  */
-import { DUEL_TIMER_MS, type Difficulty, type SessionType } from '@luna/shared';
+import {
+  DUEL_TIMER_MS,
+  type ChallengeType,
+  type Difficulty,
+  type DuelFormat,
+  type SessionType,
+} from '@luna/shared';
 
 export const XP_BY_DIFFICULTY: Record<Difficulty, number> = { 1: 10, 2: 15, 3: 20 };
 /** scoring.md §2: a correct answer on content already earned, inside the Daily Kata only. */
@@ -125,8 +131,21 @@ export const BOARD = { maxRank: 50, defaultPageSize: 20, podium: 3 } as const;
 export const HISTORY = { defaultPageSize: 20 } as const;
 
 /** competition.md §2. Slot order is the play order, the same for both players. */
+/** `n` slots repeating `kinds` in order. */
+function cycleKinds(kinds: ChallengeType[], n: number): ChallengeType[] {
+  return Array.from({ length: n }, (_, i) => kinds[i % kinds.length]!);
+}
+
 export const DUEL = {
-  slots: ['TRACE', 'BUG_HUNT', 'ENGINEER_CHOICE', 'ENGINEER_CHOICE', 'ENGINEER_CHOICE'],
+  /**
+   * Preferred challenge kind per question, by format. Classic keeps its fixed slots. Blitz and
+   * Sudden Death cycle the kinds; a slot falls back to any single challenge when its kind runs out.
+   */
+  slotsByFormat: {
+    CLASSIC: ['TRACE', 'BUG_HUNT', 'ENGINEER_CHOICE', 'ENGINEER_CHOICE', 'ENGINEER_CHOICE'],
+    BLITZ: cycleKinds(['TRACE', 'BUG_HUNT', 'ENGINEER_CHOICE'], 10),
+    SUDDEN_DEATH: cycleKinds(['ENGINEER_CHOICE', 'TRACE', 'BUG_HUNT'], 10),
+  } satisfies Record<DuelFormat, readonly ChallengeType[]>,
   codeLength: 6,
   codeRetries: 5,
   timerMs: DUEL_TIMER_MS,

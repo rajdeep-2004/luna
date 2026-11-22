@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { PRACTICE_MODES, TOPIC_SLUGS } from './domain';
 import type { PracticeMode, SessionType, TopicSlug } from './domain';
 import type { PublicChallenge, PublicStage } from './challenges';
+import type { DuelFormat } from './competition';
 
 const ObjectId = z.string().regex(/^[a-f0-9]{24}$/, 'Invalid id');
 
@@ -62,6 +63,10 @@ export type SessionView = {
    * shows the real remaining seconds of the 60 s timer (no phone-clock skew).
    */
   stepElapsedMs?: number;
+  /** DUEL only: the duel's format, which sets the timer (DUEL_FORMAT_RULES). */
+  duelFormat?: DuelFormat;
+  /** Sudden Death only: the run ended at a miss, so the session is ready to complete early. */
+  endedEarly?: boolean;
 };
 
 export type AnswerResult = {

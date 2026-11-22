@@ -1,4 +1,5 @@
 import { Schema, model, type InferSchemaType, type HydratedDocument } from 'mongoose';
+import { DUEL_FORMATS } from '@luna/shared';
 
 /** One finished player's score, written once when their DUEL session completes. */
 const resultSchema = new Schema(
@@ -29,6 +30,8 @@ const duelSchema = new Schema(
     code: { type: String, required: true },
     creatorId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     opponentId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    /** Duels made before P7 have no field and read as CLASSIC. */
+    format: { type: String, enum: DUEL_FORMATS, default: 'CLASSIC' },
     items: { type: [itemSchema], required: true },
     status: {
       type: String,

@@ -1,7 +1,9 @@
-import type { ProgressView, TopicSlug } from '@luna/shared';
+import type { PlayerStats, ProgressView, TopicSlug } from '@luna/shared';
 import { LEVELS, levelForXP } from '../../config/game';
 import { notFound } from '../../lib/errors';
 import { localDateKey } from '../../lib/time';
+import { DuelModel } from '../../models/Duel';
+import { SessionModel } from '../../models/Session';
 import { UserTopicProgressModel } from '../../models/UserTopicProgress';
 import { usersRepo } from '../users/users.repository';
 import { masteryPhase, recentAccuracy, weakestTopic, type TopicStats } from './mastery';
@@ -30,14 +32,38 @@ export function getProgressStats(rows: ProgressRow[]): (TopicStats & { difficult
   }));
 }
 
+/**
+ * The Profile's counts (D-039): finished Katas and duel results. Four counts on indexed fields
+ * (sessions by user+type+status, duels by creator or opponent); no new writes or counters.
+ */
+export async function playerStats(userId: string): Promise<PlayerStats> {
+  const mine = {
+    $or: [{ creatorId: userId }, { opponentId: userId }],
+    status: 'COMPLETED' as const,
+  };
+  const [katasCompleted, duelsWon, duelsDecided, duelsPlayed] = await Promise.all([
+    SessionModel.countDocuments({ userId, type: 'DAILY', status: 'COMPLETED' }),
+    DuelModel.countDocuments({ ...mine, winnerId: userId }),
+    DuelModel.countDocuments({ ...mine, winnerId: { $ne: null } }),
+    DuelModel.countDocuments(mine),
+  ]);
+  return {
+    katasCompleted,
+    duelsWon,
+    duelsLost: duelsDecided - duelsWon,
+    duelsDrawn: duelsPlayed - duelsDecided,
+  };
+}
+
 /** Everything the Dojo home needs in one call: rank, lantern, moons and the weakest blade. */
 export async function getProgress(userId: string): Promise<ProgressView> {
   const user = await usersRepo.findById(userId);
   if (!user) throw notFound('User');
-  const [rows, queued, assessments] = await Promise.all([
+  const [rows, queued, assessments, stats$] = await Promise.all([
     UserTopicProgressModel.find({ userId }).lean(),
     revisitCount(userId),
     assessmentStatus(userId),
+    playerStats(userId),
   ]);
 
   const stats = getProgressStats(rows);
@@ -74,5 +100,6 @@ export async function getProgress(userId: string): Promise<ProgressView> {
     weakestTopic: weakestTopic(stats, user.preferredTopicSlugs as TopicSlug[]),
     revisitsQueued: queued,
     assessments,
+    stats: stats$,
   };
 }

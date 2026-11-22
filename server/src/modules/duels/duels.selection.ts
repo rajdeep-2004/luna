@@ -1,4 +1,4 @@
-import { TOPIC_SLUGS } from '@luna/shared';
+import { TOPIC_SLUGS, type DuelFormat } from '@luna/shared';
 import { ADAPTIVE, DUEL, PICK_WEIGHTS } from '../../config/game';
 import { AppError } from '../../lib/errors';
 import type { ChallengeDoc } from '../../models/Challenge';
@@ -14,17 +14,21 @@ export async function duelDifficulty(userId: string): Promise<number> {
 }
 
 /**
- * Five single challenges in slot order (1 Trace, 1 Bug Hunt, 3 Engineer's Choice), mixed across
- * the topics: closest to the target difficulty, a penalty for repeating a topic, random among
- * equals. Falls back to any difficulty when a pool is thin.
+ * Single challenges in the format's slot order (Classic: 1 Trace, 1 Bug Hunt, 3 Engineer's
+ * Choice), mixed across the topics: closest to the target difficulty, a penalty for repeating a
+ * topic, random among equals. Falls back to any difficulty, then to any kind, when a pool is thin.
  */
-export async function pickDuelChallenges(difficulty: number): Promise<ChallengeDoc[]> {
+export async function pickDuelChallenges(
+  difficulty: number,
+  format: DuelFormat = 'CLASSIC',
+): Promise<ChallengeDoc[]> {
   const pool = await challengesRepo.findActive({ type: { $ne: 'INCIDENT' } });
   const picked: ChallengeDoc[] = [];
   const usedTopics = new Map<string, number>(TOPIC_SLUGS.map((t) => [t, 0]));
-  for (const type of DUEL.slots) {
-    const best = pool
-      .filter((c) => c.type === type && !picked.includes(c))
+  for (const type of DUEL.slotsByFormat[format]) {
+    const unpicked = pool.filter((c) => !picked.includes(c));
+    const ofKind = unpicked.filter((c) => c.type === type);
+    const best = (ofKind.length ? ofKind : unpicked)
       .map((c) => ({
         c,
         score:

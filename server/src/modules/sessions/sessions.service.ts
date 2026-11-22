@@ -12,7 +12,7 @@ import type {
   TopicSlug,
   PracticeMode,
 } from '@luna/shared';
-import { DUEL_TIMEOUT_ANSWER } from '@luna/shared';
+import { DUEL_FORMAT_RULES, DUEL_TIMEOUT_ANSWER, type DuelFormat } from '@luna/shared';
 import { SessionModel, type SessionDoc } from '../../models/Session';
 import { AnswerAttemptModel } from '../../models/AnswerAttempt';
 import type { ChallengeDoc } from '../../models/Challenge';
@@ -68,6 +68,7 @@ type NewSession = {
   mode?: PracticeMode | null;
   dailyDate?: string | null;
   duelId?: string | null;
+  duelFormat?: DuelFormat | null;
   picked: PickedItem[];
 };
 
@@ -84,6 +85,7 @@ export async function createSession(userId: string, s: NewSession): Promise<Sess
       mode: s.mode ?? null,
       dailyDate: s.dailyDate ?? null,
       duelId: s.duelId ?? null,
+      duelFormat: s.duelFormat ?? null,
       items: s.picked.map(({ challenge: c, isRevisit, optionOrders }, order) => ({
         challengeId: c._id,
         order,
@@ -161,6 +163,10 @@ export async function getSession(userId: string, sessionId: string): Promise<Ses
   return buildView(session, challenges);
 }
 
+/** A duel session's format; sessions from before P7 have none and are Classic. */
+const duelFormatOf = (session: SessionDoc): DuelFormat =>
+  (session.duelFormat ?? 'CLASSIC') as DuelFormat;
+
 /** Time since the session's latest answer (or its start): the server clock for the current step. */
 function elapsedSince(session: SessionDoc, attempts: { createdAt: Date }[]): number {
   const last = attempts.reduce((t, a) => (a.createdAt > t ? a.createdAt : t), session.startedAt);
@@ -198,6 +204,8 @@ async function buildView(session: SessionDoc, challenges: ChallengeDoc[]): Promi
     id: session._id.toString(),
     type: session.type as SessionType,
     ...(session.mode ? { mode: session.mode as PracticeMode } : {}),
+    ...(session.type === 'DUEL' ? { duelFormat: duelFormatOf(session) } : {}),
+    ...(session.endedEarly ? { endedEarly: true } : {}),
     status: session.status as SessionView['status'],
     startedAt: session.startedAt.toISOString(),
     totalAnswers: session.totalAnswers,
@@ -271,6 +279,17 @@ export async function submitAnswer(
     await repairAnsweredXP(userId, session, challenge, stageIndex);
     throw conflict('Already answered');
   }
+  if (session.endedEarly) throw conflict('This run has ended');
+  if (session.type === 'DUEL' && DUEL_FORMAT_RULES[duelFormatOf(session)].endsOnMiss) {
+    // Sudden Death is strictly in order: only the first unanswered question may be answered.
+    const done = await AnswerAttemptModel.distinct('challengeId', { sessionId });
+    const doneIds = new Set(done.map(String));
+    const firstOpen = [...session.items]
+      .sort((a, b) => a.order - b.order)
+      .find((i) => !doneIds.has(i.challengeId.toString()));
+    if (firstOpen?.challengeId.toString() !== challengeId)
+      throw conflict('Answer the questions in order');
+  }
   // Server-measured time since the previous answer in this session (or the session start).
   const last = await AnswerAttemptModel.findOne({ sessionId })
     .sort({ createdAt: -1 })
@@ -278,17 +297,19 @@ export async function submitAnswer(
     .lean();
   const since = last?.createdAt ?? session.startedAt;
   const elapsedMs = Date.now() - since.getTime();
-  // Duels: 60 s per challenge on the server's clock. A late answer is a timeout whatever the
-  // client sends, and a timeout records exactly 60 s (scoring.md §6).
+  // Duels: the format's timer per challenge on the server's clock (60 s Classic, 10 s Blitz,
+  // 30 s Sudden Death). A late answer is a timeout whatever the client sends, and a timeout
+  // records exactly the timer (scoring.md §6).
   const isDuel = session.type === 'DUEL';
+  const rules = isDuel ? DUEL_FORMAT_RULES[duelFormatOf(session)] : null;
   const isTimeout =
-    isDuel && (answer === DUEL_TIMEOUT_ANSWER || elapsedMs > DUEL.timerMs + DUEL.timerGraceMs);
+    !!rules && (answer === DUEL_TIMEOUT_ANSWER || elapsedMs > rules.timerMs + rules.graceMs);
   const result = isTimeout
     ? timeoutEvaluation(challenge, stageIndex)
     : evaluate(challenge, stageIndex, answer);
   const timeTakenMs = isTimeout
-    ? DUEL.timerMs
-    : Math.min(elapsedMs, isDuel ? DUEL.timerMs : SESSION.maxAnswerTimeMs);
+    ? rules!.timerMs
+    : Math.min(elapsedMs, rules ? rules.timerMs : SESSION.maxAnswerTimeMs);
   const usedHint = item.hintsUsed.includes(stageIndex);
 
   // 1) The attempt insert is the idempotency guard: a double submit stops here with a 409.
@@ -348,6 +369,14 @@ export async function submitAnswer(
   });
   if (xpEarned > 0) await AnswerAttemptModel.updateOne({ _id: attemptId }, { $set: { xpEarned } });
 
+  // Sudden Death: the first miss (or timeout) ends the run. A conditional update, so a retry
+  // can't flip it twice; the flag lets completion accept fewer answers than the total.
+  const endsRun = !!rules?.endsOnMiss && !result.isCorrect;
+  if (endsRun)
+    await SessionModel.updateOne(
+      { _id: sessionId, endedEarly: false },
+      { $set: { endedEarly: true } },
+    );
   const answeredInSession = await AnswerAttemptModel.countDocuments({ sessionId });
   const nextStage =
     isIncident && !isLastStage
@@ -361,7 +390,7 @@ export async function submitAnswer(
     ...(nextStage ? { nextStage } : {}),
     ...(isIncident && isLastStage && challenge.rootCause ? { rootCause: challenge.rootCause } : {}),
     challengeComplete: !isIncident || isLastStage,
-    sessionReadyToComplete: answeredInSession >= session.totalAnswers,
+    sessionReadyToComplete: endsRun || answeredInSession >= session.totalAnswers,
   };
 }
 
@@ -388,6 +417,27 @@ export async function revealHint(
   return { hint };
 }
 
+/**
+ * Sudden Death scores only the run up to and including the first miss, in question order. The
+ * order check in submitAnswer already stops later answers; this makes the score right even if a
+ * concurrent submit slipped in before the run was marked as ended.
+ */
+function runUpToFirstMiss<T extends { challengeId: unknown; isCorrect: boolean }>(
+  session: SessionDoc,
+  attempts: T[],
+): T[] {
+  if (session.type !== 'DUEL' || !DUEL_FORMAT_RULES[duelFormatOf(session)].endsOnMiss)
+    return attempts;
+  const kept: T[] = [];
+  for (const item of [...session.items].sort((a, b) => a.order - b.order)) {
+    const a = attempts.find((x) => String(x.challengeId) === item.challengeId.toString());
+    if (!a) break;
+    kept.push(a);
+    if (!a.isCorrect) break;
+  }
+  return kept;
+}
+
 /** Idempotent: only the first call completes the session; later calls return the stored summary. */
 export async function completeSession(userId: string, sessionId: string): Promise<SessionSummary> {
   const session = await findOwnSession(userId, sessionId);
@@ -403,10 +453,12 @@ export async function completeSession(userId: string, sessionId: string): Promis
     return { ...rest, bonuses: stored.bonuses ?? [], fixedMistakes: stored.fixedMistakes ?? 0 };
   }
 
-  const attempts = await AnswerAttemptModel.find({ sessionId })
+  const all = await AnswerAttemptModel.find({ sessionId })
     .select('challengeId topicSlug isCorrect timeTakenMs xpEarned')
     .lean();
-  if (attempts.length < session.totalAnswers)
+  const attempts = runUpToFirstMiss(session, all);
+  // Only a Sudden Death run that ended at a miss may finish short (D-039).
+  if (attempts.length < session.totalAnswers && !session.endedEarly)
     throw conflict('Answer every challenge before finishing');
 
   const revisitIds = new Set(

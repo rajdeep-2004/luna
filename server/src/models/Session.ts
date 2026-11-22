@@ -1,5 +1,5 @@
 import { Schema, model, Types, type InferSchemaType, type HydratedDocument } from 'mongoose';
-import { PRACTICE_MODES, SESSION_TYPES, TOPIC_SLUGS } from '@luna/shared';
+import { DUEL_FORMATS, PRACTICE_MODES, SESSION_TYPES, TOPIC_SLUGS } from '@luna/shared';
 
 const itemSchema = new Schema(
   {
@@ -25,6 +25,10 @@ const sessionSchema = new Schema(
     dailyDate: { type: String, default: null },
     /** DUEL only: the duel this session plays. */
     duelId: { type: Schema.Types.ObjectId, ref: 'Duel', default: null },
+    /** DUEL only: copied from the duel so every answer can read its timer without a second query. */
+    duelFormat: { type: String, enum: [...DUEL_FORMATS, null], default: null },
+    /** Sudden Death only: set by the first miss; the session may then complete with fewer answers. */
+    endedEarly: { type: Boolean, default: false },
     status: { type: String, enum: ['ACTIVE', 'COMPLETED'], default: 'ACTIVE' },
     startedAt: { type: Date, default: () => new Date() },
     completedAt: { type: Date, default: null },

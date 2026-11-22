@@ -10,7 +10,9 @@ Confirmed in chat on 2026-11-22 (see `decisions.md` D-002, D-005, D-006).
   `.scratch/api-tests/`, which is **gitignored and never pushed**. There is no TDD requirement and
   no coverage target. The frontend is tested by hand (Rajdeep, using a checklist).
 - **Deployment:** backend on **Render** (free web service), database on **MongoDB Atlas** (free M0).
-  The mobile app runs through **Expo Go**. No store builds.
+  The mobile app runs through **Expo Go** in development. For V1 an installable Android **APK** is
+  built by **EAS Build** (profile `apk` in `app/eas.json`, pointed at the production API) and attached
+  to a GitHub Release (D-044). No Play Store or App Store builds.
 - **Docker:** none.
 - **CI:** none. **CD:** Render's git integration auto-deploys `server/` from `main`.
 - **Always on, locally, before every commit:** ESLint + `tsc --noEmit` for every workspace.

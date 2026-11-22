@@ -2,116 +2,182 @@
 
 <img src="app/assets/icon.png" alt="Luna app icon" width="112" />
 
-# Luna
+# Luna 月
 
-**Train your engineering intuition, one five-minute kata at a time.**
+### The samurai of code.
 
-A mobile game for computer science students: predict what code prints, find the buggy line, pick
-the better engineering trade-off, and work through a simulated production incident. You get
-explained feedback after every answer.
+**A pocket dojo for engineers.** Five-minute fights with real code: predict what it prints, slay the
+buggy line, pick the better trade-off, and survive a production incident. Climb from _Deshi 弟子_ to
+_Shogun 将軍_, keep the lantern lit, and duel your friends.
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![Expo](https://img.shields.io/badge/Expo-SDK%2058-000020?logo=expo&logoColor=white)
 ![React Native](https://img.shields.io/badge/React%20Native-0.88-61DAFB?logo=react&logoColor=black)
+![Reanimated](https://img.shields.io/badge/Reanimated-4-6E4AFF)
 ![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?logo=mongodb&logoColor=white)
 ![Zod](https://img.shields.io/badge/Zod-4-3E67B1?logo=zod&logoColor=white)
+![API tests](https://img.shields.io/badge/API%20tests-66%20passing-F2A93B)
+![Status](https://img.shields.io/badge/V1-live%20on%20Render-D9442B)
 
-[Why Luna](#why-luna) · [Features](#features) · [How it works](#how-it-works) ·
-[Getting started](#getting-started) · [API](#api-reference) · [Engineering notes](#engineering-notes) ·
-[Docs](#documentation)
+[The dojo](#道-the-idea) · [Play](#遊-how-you-play) · [Duels](#刀-duels) · [Ranks](#侍-ranks-and-progress) ·
+[Design](#紙-the-look-kiri-e-den) · [Architecture](#築-how-it-works) · [Run it](#始-run-it-yourself) ·
+[API](#api-reference) · [Engineering](#守-engineering-notes) · [Docs](#書-documentation)
 
 </div>
 
 ---
 
-## Why Luna
+## 道 The idea
 
-CS students meet the event loop, SQL indexes and cache invalidation across many courses and
-videos, but they rarely practise _applying_ them. Video courses are passive. LeetCode-style
-problems need long sessions. Nothing lets a student spend five minutes on engineering judgement,
-such as _"which line is the bug?"_ or _"latency just spiked, what do you check first?"_, and get
-an explanation right away.
+It's 11 pm. You've shipped code all day, and your thumb is drifting towards reels. Luna is the other
+thing you could open: a quiet, lamplit dojo where the master rests after work and plays a few rounds of
+engineering judgement. It feels like a game, not homework, and you still walk away a little sharper.
 
-Luna fills that gap with short sessions that work like a game, and it keeps track of what you're
-weak at.
+CS students and early-career engineers meet the event loop, SQL indexes and cache invalidation in a
+dozen courses, but rarely practise _applying_ them. Videos are passive, and LeetCode-style problems need
+an hour. Luna fits engineering judgement into five minutes, such as _"which line is the bug?"_ or
+_"p99 just spiked after a deploy: what do you check first?"_, and explains every answer.
 
-|                      |                                                                                                                                 |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **Who it's for**     | CS students (18–24) first; early-career developers refreshing fundamentals second                                               |
-| **Session length**   | 4–6 minutes. The Daily Kata is 5 challenges (7 answers)                                                                         |
-| **What it measures** | Effort as **XP and samurai ranks**, skill as **moon-phase mastery** per topic. The two never mix                                |
-| **Theme**            | A night dojo: calm, dark, one moon-gold accent. The theme lives in names and visuals; the questions stay plain, precise English |
-
----
-
-## Features
-
-### Four game modes
-
-| Mode                     | What you do                                                                                    | Example                                            |
-| ------------------------ | ---------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| 🧠 **Trace the Stack**   | Predict the output of code, a query or an HTTP exchange                                        | `setTimeout` vs `Promise.then`: which logs first?  |
-| 🐞 **Bug Hunt**          | Tap the line that holds the bug                                                                | The `forEach(async …)` that never awaits           |
-| ⚖️ **Engineer's Choice** | Pick the better option in a scenario; every wrong option explains why it's worse               | Cache-aside vs write-through for a read-heavy feed |
-| 🚨 **Incident Room**     | A 3-stage investigation (alert → investigation → resolution); each answer reveals new evidence | p99 latency spike after a deploy                   |
-
-The question bank has **58 hand-written items**: 13 Trace, 13 Bug Hunt, 24 Engineer's Choice and
-8 Incident Rooms. They cover five topics (JavaScript & Async, HTTP & APIs, Databases,
-Caching & Queues, Debugging & Production) at three difficulty levels. The content is validated
-against a schema when it is seeded.
-
-### Daily practice and progression
-
-- **Daily Kata.** Each player gets one per local day: 1 Trace, 1 Bug Hunt, 2 Engineer's Choice and
-  1 Incident. It favours unseen questions at your level, leans towards your weak and preferred
-  topics, and mixes in up to 2 questions you missed before. Reopening it gives the same set.
-- **XP and ranks.** 10 / 15 / 20 XP for a first correct answer, by difficulty. A hint halves it.
-  Repeats inside the Kata earn 2 XP of review. There are bonuses for finishing the Kata, a perfect
-  Kata, your first incident and streak milestones (3 / 7 / 30 days). Ten samurai ranks run from
-  _Deshi 弟子_ to _Shogun 将軍_, with a full-screen rank-up moment.
-- **Streaks.** The lantern stays lit while you finish a Kata every calendar day in your own time zone.
-- **Moon-phase mastery.** Each topic moves 🌑 → 🌒 → 🌓 → 🌕, based on accuracy over your last 10 answers.
-- **Adaptive difficulty.** Per topic: 4–5 correct out of 5 moves you up, 2 or fewer moves you down.
-- **Mistake revisits.** A missed question comes back after at least 3 other answers. Fixing it is called out.
-- **Baseline and Checkpoint.** An optional 5-question baseline during onboarding sets your starting
-  level. Every 7 Katas, a Checkpoint of 5 unseen intermediate questions shows how far you've come.
-
-### Competition (asynchronous, so nobody needs to be online at the same time)
-
-- **Dojo Board.** A weekly leaderboard of XP earned _this week_, so a newcomer can top it. It resets
-  Monday 00:00 UTC. Last week's top 3 wear 🥇🥈🥉, your own row is always pinned, and it pages
-  through the top 50.
-- **Friend Duels.** Create a duel and share a 6-character code (`KX7P2M`, no ambiguous `0/O/1/I`).
-  Your friend plays the same 5 questions in the same option order, with **60 seconds each and no
-  hints**. Most correct wins, then the lower total time. Duels expire after 48 h. A win pays
-  +10 XP, at most 3 times a day. The result screen shows the clash animation and ✓/✗ per question.
-- **Achievements.** _First Strike ⚔️, Bug Slayer 🐞, Seven Katas 🏮, Incident Commander 🚨,
-  Kanpeki 🌕._ Each is awarded once, with a one-time toast. Locked ones show their condition on
-  the Profile.
-
-### The app, screen by screen
-
-| Tab / screen    | What's on it                                                                                                                |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| **Dojo** (home) | Rank and lantern, the Daily Kata (one primary button), your weakest topic, your weekly rank, the Checkpoint when it's ready |
-| **Explore**     | Five topic moons, topic practice, a solo Incident Room                                                                      |
-| **Duel**        | Start and share a duel, join by code, the _Your turn · Waiting · Finished_ lists                                            |
-| **Profile**     | Rank, XP, streaks, per-topic mastery, achievements, paginated history, log out                                              |
-| Pushed screens  | Challenge (all 4 modes), feedback sheet, summary and incident report, Dojo Board, Duel Result                               |
-
-Accessibility: every control has a role and label, Dynamic Type works up to 1.3×, Reduce Motion
-replaces animations with fades, touch targets are at least 44 pt, and the text and accent colours
-are designed for at least 4.5:1 contrast.
+|                  |                                                                                                       |
+| ---------------- | ----------------------------------------------------------------------------------------------------- |
+| **Who it's for** | CS students (18–24) first; early-career developers keeping their fundamentals sharp second            |
+| **A session**    | 2–6 minutes. A mode round is 5 questions; the Daily Kata is 5 challenges (7 answers)                  |
+| **The loop**     | Open the dojo → play today's kata → stamp → XP → rank up → duel a friend → come back tomorrow         |
+| **The feel**     | Cut-paper Japanese den at night: lantern amber, vermilion seals, brush kanji, everything is an object |
 
 ---
 
-## How it works
+## 遊 How you play
+
+### The Dojo is the home screen
+
+There's no dashboard. Home is a room, and **the objects in it are the buttons**:
+
+| Object                 | It is…                                                      | Tap it to…                              |
+| ---------------------- | ----------------------------------------------------------- | --------------------------------------- |
+| 🏮 Paper lantern       | Your streak: lit when today's kata is done, out when broken | See your profile                        |
+| 📜 Hanging rank scroll | Your rank kanji, with an ensō that closes as XP fills       | See your profile                        |
+| 📜 Sealed kata scroll  | Today's Daily Kata, on the low table                        | Break the seal and play                 |
+| 🪧 Ema plaque          | Your place on this week's Dojo Board                        | Open the board                          |
+| ✉️ Letter              | Appears under the shoji when a Checkpoint is ready          | Take the Checkpoint                     |
+| 👺 Resting mask        | You: the yokai mask you picked                              | See your profile                        |
+| 🌙 Moon                | Moves across the window through the day                     | (Just look: it's the time to the reset) |
+
+Every time you return to the room, it comes alive: the scroll unrolls, the lantern drops on its cord and
+swings, the ema sways, and the mask rises onto its stand.
+
+### Four ways to fight
+
+| Mode                  | What you do                                                                                                    | Example                                            |
+| --------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| **Trace the Stack**   | Predict the output of code, a query or an HTTP exchange                                                        | `setTimeout` vs `Promise.then`: which logs first?  |
+| **Bug Hunt**          | Tap the line that holds the bug                                                                                | The `forEach(async …)` that never awaits           |
+| **Engineer's Choice** | Pick the better option in a scenario; every wrong option explains why it's worse                               | Cache-aside vs write-through for a read-heavy feed |
+| **Incident Room**     | The boss fight: a 3-stage investigation (alert → investigation → resolution); each answer reveals new evidence | p99 latency spike after a deploy                   |
+
+**Explore** shows the five topics as hanging nobori banners: JavaScript & Async, HTTP & APIs, Databases,
+Caching & Queues, and Debugging & Production. Pick a banner, then pick how to play: a Trace round, a Bug
+Hunt round, an Engineer's Choice round, or that topic's **boss incident**. A mode round is five
+questions of that kind from the topic, topped up from other topics when the topic runs thin.
+
+### Every answer is a strike
+
+- **Right:** an ink slash cuts across the screen, **見事** (_migoto_, "splendid") is brushed in, a red
+  **正** seal strikes, and the XP counts up. There's no lecture, but _Why it works_ is one tap away.
+- **Wrong:** a grey **誤** seal, then a sheet of shoji paper with the right answer, the explanation, the
+  common trap and why the other options are worse.
+- **End of round:** a grade seal (_Kanpeki · Sugoi · Yoshi · Mada mada_), the XP count-up, the lantern
+  relighting if the streak grew, and your weak topics as _Train again_ buttons.
+
+The question bank holds **58 hand-written items** (13 Trace, 13 Bug Hunt, 24 Engineer's Choice and
+8 Incident Rooms) across 5 topics × 3 difficulties. Each one is validated against a schema when it's
+seeded.
+
+---
+
+## 刀 Duels
+
+Asynchronous friend duels: nobody needs to be online at the same time. You create a duel, share a
+6-character code (`KX7P2M`, with no ambiguous `0/O/1/I`), and your friend types it into six cells. You
+both play the **same questions in the same option order**. Choose your blade:
+
+| Blade            | Kanji | Rules                                                        |
+| ---------------- | :---: | ------------------------------------------------------------ |
+| **Classic**      |  刀   | 5 questions × 60 s                                           |
+| **Blitz**        |  雷   | 10 questions × 10 s                                          |
+| **Sudden Death** |  一   | Up to 10 questions × 30 s. **Your first miss ends the run.** |
+
+Most correct wins, then the lower total time (compared in whole seconds), else a draw. There are no
+hints. Duels expire after 48 h, and a no-show loses by default. A win pays **+10 XP**, at most 3 times a
+day. The result is a face-off: both masks slide in and clash, the winner gets the **勝** seal, and each
+answer is stamped 正 or 誤.
+
+---
+
+## 侍 Ranks and progress
+
+| Lvl | Rank         | Kanji |  XP |     | Lvl | Rank         | Kanji |    XP |
+| --: | ------------ | :---: | --: | --- | --: | ------------ | :---: | ----: |
+|   1 | **Deshi**    | 弟子  |   0 |     |   6 | **Hatamoto** | 旗本  |   750 |
+|   2 | **Ashigaru** | 足軽  |  50 |     |   7 | **Kenshi**   | 剣士  | 1 050 |
+|   3 | **Ronin**    | 浪人  | 150 |     |   8 | **Sensei**   | 先生  | 1 400 |
+|   4 | **Bushi**    | 武士  | 300 |     |   9 | **Daimyo**   | 大名  | 1 800 |
+|   5 | **Samurai**  |  侍   | 500 |     |  10 | **Shogun**   | 将軍  | 2 300 |
+
+Ranking up stops everything: a katana draws across the screen, then your new kanji is brushed in inside
+a closing ensō.
+
+- **XP:** 10 / 15 / 20 for a _first_ correct answer, by difficulty. A hint halves it. Repeats inside the
+  Kata earn 2 XP of review. There are bonuses for finishing the Kata, a perfect Kata, your first incident,
+  duel wins and streak milestones (3 / 7 / 30 days).
+- **Streak, the lantern:** stays lit while you finish a Kata every calendar day in _your_ time zone.
+- **Daily Kata:** one per player per day: 1 Trace, 1 Bug Hunt, 2 Engineer's Choice and 1 Incident. It
+  favours unseen questions at your level, leans towards your weak topics, and mixes in up to 2 you
+  missed before. Reopening it gives the same set.
+- **Adaptive difficulty:** per topic, 4–5 correct of the last 5 moves you up, and 2 or fewer moves you
+  down.
+- **Mistake revisits:** a missed question comes back after at least 3 other answers.
+- **Baseline and Checkpoint:** an optional 5-question baseline sets your starting level. Every 7 Katas, a
+  letter arrives with a Checkpoint of 5 unseen questions that shows how far you've come.
+- **Dojo Board:** a weekly XP leaderboard (so a newcomer can top it) that resets Monday 00:00 UTC. Last
+  week's top 3 wear medals, and your own row is always pinned.
+- **Crests:** _First Strike · Bug Slayer · Seven Katas · Incident Commander · Kanpeki_. Each is earned
+  once. Locked crests show as dashed outlines with their condition.
+- **Profile, the warrior sheet:** your mask on a banner, the rank kanji in its ensō, and four trophies:
+  streak, duel record, katas, and weekly place. Below that are your crests and recent runs, stamped like a
+  scroll.
+
+---
+
+## 紙 The look: Kiri-e Den
+
+Luna's design system is **Kiri-e Den** ("cut-paper den"), defined in [`DESIGN.md`](DESIGN.md), with a
+clickable reference in [`docs/design/kirie-preview.html`](docs/design/kirie-preview.html).
+
+- **Flat cut-paper scenes**, drawn as `react-native-svg` components on one 390-wide grid that scales to
+  any phone. There are no cards and no progress bars: progress is an ensō or brush marks.
+- **One action colour.** Lantern amber `#F2A93B` means "go". Vermilion `#D9442B` is for seals and shapes
+  only, never for text. Kakishibu brown `#3B2418` is the ground, and washi `#F3E6CC` is the text (11.7:1).
+- **Three voices:** _Dela Gothic One_ for the game (titles, numbers, ranks), _Source Sans 3_ for reading,
+  _JetBrains Mono_ for code.
+- **Brush kanji without shipping a brush font.** A dev-only script reads the Yuji Boku font and bakes the
+  ~30 glyphs Luna uses into typed SVG path data. The app never carries the 8.6 MB font.
+- **Authored motion:** coming home (the shoji slide apart), the hanko strike, the lantern relight, the
+  rank-up katana, the duel clash, the room's entrance and the correct-answer cut. Every one has a Reduce
+  Motion fallback, and haptics stay on.
+- **Accessible by default:** every scene object has a role and label (_"Streak: 4 days. Lantern."_),
+  Dynamic Type works up to 1.3×, touch targets are at least 44 pt, and every press sinks 2 pt with a
+  haptic, with no grey ripple anywhere.
+
+---
+
+## 築 How it works
 
 ```mermaid
 flowchart LR
   subgraph Phone["📱 Expo app (React Native)"]
-    UI["Screens"] --> Q["TanStack Query"] --> C["fetch client<br/>timeout · GET retry · envelope"]
+    UI["Scenes + screens<br/>art kit · Reanimated"] --> Q["TanStack Query"] --> C["fetch client<br/>timeout · GET retry · envelope"]
     S["Zustand + SecureStore<br/>(JWT)"] -.-> C
   end
   C -- "HTTPS / JSON<br/>/api/v1" --> API
@@ -120,17 +186,17 @@ flowchart LR
     SVC --> M["Mongoose models"]
   end
   M --> DB[("MongoDB Atlas")]
-  SH["shared/<br/>Zod schemas + types"] -.-> UI
+  SH["shared/<br/>Zod schemas · types · duel rules"] -.-> UI
   SH -.-> API
 ```
 
-- **Thin client, authoritative server.** The app renders and collects input. Answer evaluation,
-  XP, streaks, mastery, difficulty, leaderboard ranking and duel results all happen on the server.
-- **One contract.** `shared/` holds the Zod schemas and TypeScript types for every request and
-  response. The API validates input with them, and the app is typed against them, so a breaking
-  contract change fails `tsc` in both places.
-- **The server holds the position.** A session is stored server-side, answer by answer, so closing
-  the app mid-kata and reopening it resumes on the exact question.
+- **Thin client, authoritative server.** The app draws the dojo and collects taps. Evaluation, XP,
+  streaks, mastery, difficulty, rankings, duel timers and results all happen on the server.
+- **One contract.** `shared/` holds the Zod schemas, the TypeScript types and the duel format rules. The
+  API validates with them and the app is typed against them, so a breaking change fails `tsc` on both
+  sides.
+- **The server holds the position.** A session is stored answer by answer, so closing the app mid-kata
+  and reopening it resumes on the exact question.
 
 ### Answering a question
 
@@ -141,43 +207,43 @@ sequenceDiagram
   participant DB as MongoDB
   App->>API: POST /sessions/:id/answers {challengeId, stageIndex, answer}
   API->>DB: insert AnswerAttempt (unique: session + challenge + stage)
-  Note over API,DB: a double tap hits the unique index → 409 → app re-syncs
+  Note over API,DB: a double tap hits the unique index → 409 → the app re-syncs
   API->>DB: $inc topic progress, rolling window, adaptive difficulty (one atomic update)
   API->>DB: insert XpEvent "challenge:<id>" (unique per user)
   Note over API,DB: duplicate key = already earned → 0 XP, never twice
-  API-->>App: verdict, explanation, misconception, XP, next incident stage
+  API-->>App: verdict, explanation, trap, XP, next incident stage
 ```
 
 ---
 
 ## Tech stack
 
-| Layer        | Choice                                              | Why                                                                            |
-| ------------ | --------------------------------------------------- | ------------------------------------------------------------------------------ |
-| App          | **Expo SDK 58**, React Native 0.88, TypeScript      | One codebase for iOS and Android, runs on a real phone through Expo Go         |
-| Navigation   | React Navigation 7 (native stack + bottom tabs)     | Explicit, typed route params; no file-based routing to learn                   |
-| Server state | TanStack Query 5                                    | Caching, refetch on focus, infinite lists                                      |
-| Client state | Zustand + expo-secure-store                         | Tiny stores; the JWT is kept in the OS keychain                                |
-| Motion       | Reanimated 4, react-native-svg                      | Moon phases, stamps, the rank-up and duel clash; Reduce Motion aware           |
-| API          | **Node 20, Express 5**, TypeScript                  | Async errors handled natively, small surface                                   |
-| Validation   | **Zod 4** (shared package)                          | One schema per request, used by both server and app                            |
-| Database     | **MongoDB Atlas** + Mongoose 9                      | Flexible challenge documents; unique and partial indexes do the integrity work |
-| Auth         | JWT (HS256, 7 days) + bcrypt (cost 12)              | Stateless, simple for a mobile client                                          |
-| Security     | helmet, CORS allow-list, express-rate-limit         | Baseline hardening                                                             |
-| Logging      | pino + pino-http                                    | Structured JSON logs; secrets and answer keys are redacted                     |
-| Tests        | Vitest, Supertest, mongodb-memory-server            | Real HTTP against a real in-memory MongoDB                                     |
-| Tooling      | npm workspaces, ESLint 10, Prettier, `tsc --noEmit` | No extra monorepo tool                                                         |
+| Layer        | Choice                                            | Why                                                                            |
+| ------------ | ------------------------------------------------- | ------------------------------------------------------------------------------ |
+| App          | **Expo SDK 58**, React Native 0.88, TypeScript    | One codebase for iOS and Android, played on a real phone through Expo Go       |
+| Art & motion | react-native-svg, **Reanimated 4**, expo-haptics  | Cut-paper scenes as components; animated SVG props; every press is felt        |
+| Navigation   | React Navigation 7 (native stack, custom tab bar) | Typed route params; a hand-drawn tab bar with hanko marks                      |
+| Server state | TanStack Query 5                                  | Caching, refetch on focus, infinite lists                                      |
+| Client state | Zustand + expo-secure-store                       | Tiny stores; the JWT lives in the OS keychain                                  |
+| API          | **Node 20, Express 5**, TypeScript                | Async errors handled natively, small surface                                   |
+| Validation   | **Zod 4** (shared package)                        | One schema per request, used by both server and app                            |
+| Database     | **MongoDB Atlas** + Mongoose 9                    | Flexible challenge documents; unique and partial indexes do the integrity work |
+| Auth         | JWT (HS256, 7 days) + bcrypt (cost 12)            | Stateless and simple for a mobile client                                       |
+| Security     | helmet, CORS allow-list, express-rate-limit       | Baseline hardening, plus per-account login lockout                             |
+| Logging      | pino + pino-http                                  | Structured JSON logs; secrets and answer keys redacted                         |
+| Tests        | Vitest, Supertest, mongodb-memory-server          | Real HTTP against a real in-memory MongoDB                                     |
+| Tooling      | npm workspaces, ESLint, Prettier, `tsc --noEmit`  | No extra monorepo tool                                                         |
 
 ---
 
-## Getting started
+## 始 Run it yourself
 
 ### Prerequisites
 
 - **Node.js 20+** and npm 10+
-- A **MongoDB** connection string: a free [Atlas M0](https://www.mongodb.com/atlas) cluster, or a
-  local `mongod`
-- The **Expo Go** app on your phone (iOS or Android), on the same Wi-Fi network as your computer
+- A **MongoDB** connection string: a free [Atlas M0](https://www.mongodb.com/atlas) cluster, or a local
+  `mongod`
+- **Expo Go** on your phone (iOS or Android), on the same Wi-Fi network as your computer
 
 ### 1. Install
 
@@ -201,11 +267,12 @@ MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/luna_dev
 JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))")
 ```
 
-In `app/.env`, set `EXPO_PUBLIC_API_URL` to your computer's **LAN IP**, not `localhost`. On the
-phone, `localhost` means the phone itself:
+In `app/.env`, point the app at your computer's **LAN IP**, not `localhost` (on the phone, `localhost`
+is the phone itself), or at the live API:
 
 ```bash
-EXPO_PUBLIC_API_URL=http://192.168.1.5:8080/api/v1   # macOS: ipconfig getifaddr en0
+EXPO_PUBLIC_API_URL=http://192.168.1.5:8080/api/v1      # macOS: ipconfig getifaddr en0
+# EXPO_PUBLIC_API_URL=https://luna-kloi.onrender.com/api/v1
 ```
 
 ### 3. Seed the question bank
@@ -214,43 +281,65 @@ EXPO_PUBLIC_API_URL=http://192.168.1.5:8080/api/v1   # macOS: ipconfig getifaddr
 npm run seed -w server
 ```
 
-The seed validates every challenge against the content schema, upserts the topics and challenges,
-and syncs every collection's indexes. Re-run it after pulling schema changes; it is safe to run
-again.
+The seed validates every challenge against the content schema, upserts the topics and challenges, and
+**syncs every collection's indexes**. Re-run it after pulling schema changes; it is safe to run again.
 
-### 4. Run
+### 4. Enter the dojo
 
 ```bash
 npm run dev -w server     # API on http://localhost:8080 (tsx watch)
 npm run start -w app      # Expo dev server: scan the QR code with Expo Go
 ```
 
-Check the API is alive with `curl http://localhost:8080/api/v1/health`.
-
-> **Tip:** to try duels and the Dojo Board alone, register two accounts on two phones (or log out
-> and back in on one) and play against yourself.
+Check the API with `curl http://localhost:8080/api/v1/health` → `{"data":{"status":"ok","db":true}}`.
 
 ### Scripts
 
-| Command                   | What it does                                            |
-| ------------------------- | ------------------------------------------------------- |
-| `npm install`             | Install all workspaces                                  |
-| `npm run dev -w server`   | API with hot reload, reading `server/.env`              |
-| `npm run seed -w server`  | Load the question bank and sync indexes                 |
-| `npm run build -w server` | Bundle the API and seed script to `server/dist/` (tsup) |
-| `npm run start -w server` | Run the built API                                       |
-| `npm run start -w app`    | Expo dev server                                         |
-| `npm run lint`            | ESLint across the repo                                  |
-| `npm run typecheck`       | `tsc --noEmit` in every workspace                       |
-| `npm run format`          | Prettier                                                |
+| Command                           | What it does                                                              |
+| --------------------------------- | ------------------------------------------------------------------------- |
+| `npm run dev -w server`           | API with hot reload, reading `server/.env`                                |
+| `npm run seed -w server`          | Load the question bank and sync indexes                                   |
+| `npm run build -w server`         | Bundle the API and seed script to `server/dist/` (tsup)                   |
+| `npm run start -w server`         | Run the built API                                                         |
+| `npm run start -w app`            | Expo dev server                                                           |
+| `node app/scripts/bake-kanji.mjs` | Re-bake brush kanji into `app/src/art/kanjiPaths.ts` after adding a glyph |
+| `npm run lint`                    | ESLint across the repo                                                    |
+| `npm run typecheck`               | `tsc --noEmit` in every workspace                                         |
+| `npm run format`                  | Prettier                                                                  |
+
+---
+
+## 🎬 Demo script (5 minutes, two phones)
+
+A walk-through that touches every V1 feature. Use two accounts: **A** on one phone and **B** on the
+other.
+
+1. **Welcome (A).** The shoji slide open on a lit lantern. _Enter the dojo_ → register → pick a mask
+   from the wooden rack → topics → level → take the 5-question baseline.
+2. **The Dojo.** Point out that the room is the UI: lantern = streak, scroll = rank with its ensō,
+   ema = weekly place. Leave the tab and come back to watch the room's entrance.
+3. **Daily Kata.** Tap the sealed scroll. Answer one right (the ink slash, 見事 and the 正 seal), then
+   tap _Why it works_. Answer one wrong (誤 and the shoji sheet with the right answer and the trap).
+   Play the incident stage by stage.
+4. **Summary.** The grade seal, the XP count-up and the lantern relighting (day 1). If you cross 50 XP,
+   the rank-up katana plays: Deshi → Ashigaru.
+5. **Explore.** Tap the _Databases_ banner → _Bug Hunt_ round. Show the boss stage: Incident Room.
+6. **Duel.** On A: pick **Sudden Death** → _Challenge a friend_ → share the code. On B: type the code
+   into the six cells → play until the first miss (_"Run over"_). On A: play. Open the result: the
+   masks clash, the 勝 seal goes to the winner, and each answer is stamped.
+7. **Dojo Board.** Tap the ema: both players are ranked by this week's XP, and your own row is on shoji.
+8. **Profile.** The banner and rank kanji, the four trophies (now including a duel record), a crest
+   earned (_First Strike_), and recent runs stamped.
+9. **Resilience.** Kill the app mid-round and reopen it: it resumes on the same question. Turn on
+   airplane mode: you see an error with _Try again_ instead of a crash.
 
 ---
 
 ## Configuration
 
-Every variable is documented in the `.env.example` files. Only `server/src/config` reads
-`process.env` on the server, and only `app/src/config/env.ts` reads it in the app. The server
-validates its environment with Zod at startup and refuses to boot when something is missing.
+Every variable is documented in the `.env.example` files. Only `server/src/config` reads `process.env`
+on the server, and only `app/src/config/env.ts` reads it in the app. The server validates its
+environment with Zod at startup and refuses to boot when something is missing.
 
 | Variable              | Where  | Required | Default  | Purpose                                                    |
 | --------------------- | ------ | :------: | -------- | ---------------------------------------------------------- |
@@ -263,11 +352,12 @@ validates its environment with Zod at startup and refuses to boot when something
 | `LOG_LEVEL`           | server |          | `info`   | pino log level                                             |
 | `EXPO_PUBLIC_API_URL` | app    |    ✓     | —        | API base URL including `/api/v1`                           |
 
-**Game rules are data.** Every number in the game (XP table, bonuses and caps, rank thresholds,
-mastery and adaptivity windows, Kata and duel composition, the duel timer, expiry and limits)
-lives in [`server/src/config/game.ts`](server/src/config/game.ts). Auth and rate limits live in
-[`server/src/config/security.ts`](server/src/config/security.ts). Change a rule there, not in a
-service.
+**Game rules are data.** Every number in the game (the XP table, bonuses and caps, rank thresholds,
+mastery and adaptivity windows, Kata composition, duel slots, expiry and limits) lives in
+[`server/src/config/game.ts`](server/src/config/game.ts). The duel formats' sizes and timers live in
+[`shared/src/competition.ts`](shared/src/competition.ts) (`DUEL_FORMAT_RULES`), so the app's countdown
+and the server's clock read the same numbers. Auth and rate limits live in
+[`server/src/config/security.ts`](server/src/config/security.ts).
 
 ---
 
@@ -275,13 +365,16 @@ service.
 
 ```
 luna/
-├── app/                      Expo app: UI only, no game rules
+├── app/                      Expo app: draws the dojo, holds no game rules
+│   ├── scripts/              bake-kanji.mjs (dev-only: font glyphs → SVG paths)
 │   └── src/
+│       ├── art/              cut-paper art kit: DojoScene, Lantern, RankScroll, Enso, KataScroll,
+│       │                     EmaPlaque, YokaiMask, HankoStamp, TopicBanner, ModeArt, FaceOff, Crest…
 │       ├── screens/          auth · onboarding · dojo · explore · game · duel · board · profile
-│       ├── navigation/       Root → Auth / Onboarding / App stack → tabs
+│       ├── components/       interaction kit: PressableSink, Button, OptionRow, CodeBlock, CodeCells…
+│       ├── navigation/       Root → Auth / Onboarding / App stack → custom tab bar
 │       ├── api/              fetch client, endpoints, query client
-│       ├── components/       design system: Button, Card, MoonPhase, YokaiAvatar, Stamp…
-│       ├── store/            auth, onboarding, connection (Zustand)
+│       ├── store/            auth, onboarding, dojo moments, connection (Zustand)
 │       ├── lib/ · theme/ · config/
 ├── server/                   Express API
 │   └── src/
@@ -293,179 +386,195 @@ luna/
 │       ├── middleware/       requireAuth, validate, rateLimit, errorHandler
 │       ├── lib/ · db/
 │       └── seed/             question bank + content schema
-├── shared/                   Zod schemas + types: the API contract
-└── docs/                     PRD, architecture, decisions, game design
+├── shared/                   Zod schemas, types and duel rules: the API contract
+├── docs/                     PRD, architecture, decisions, game design, design preview, V1 audit
+└── DESIGN.md                 the Kiri-e Den design system
 ```
 
-The server is layered **routes → services → models**. Route handlers only authenticate, validate
-and call one service. Services hold the rules and never touch `req`/`res`. Files stay small and
-focused: a typical one is under 250 lines.
+The server is layered **routes → services → models**. Route handlers only authenticate, validate and
+call one service. Services hold the rules and never touch `req`/`res`.
 
 ---
 
 ## API reference
 
-Base URL `/api/v1`. All endpoints except health, register and login need
+Base URL `/api/v1`. Every endpoint except health, register and login needs
 `Authorization: Bearer <token>`.
 
-**Envelope.** Success is `{ "data": … }`. Errors are
-`{ "error": { "code", "message", "details"? } }` with codes `VALIDATION_ERROR` 400 ·
-`UNAUTHORIZED` 401 · `NOT_FOUND` 404 · `CONFLICT` 409 · `RATE_LIMITED` 429 · `INTERNAL` 500 ·
-`DB_UNAVAILABLE` 503. Error responses never include stack traces.
+**Envelope.** Success is `{ "data": … }`. Errors are `{ "error": { "code", "message", "details"? } }`
+with codes `VALIDATION_ERROR` 400 · `UNAUTHORIZED` 401 · `NOT_FOUND` 404 · `CONFLICT` 409 ·
+`RATE_LIMITED` 429 · `INTERNAL` 500 · `DB_UNAVAILABLE` 503. Error responses never include stack traces.
 
-| Method          | Endpoint                         | Purpose                                                                    |
-| --------------- | -------------------------------- | -------------------------------------------------------------------------- |
-| `GET`           | `/health`                        | Liveness and DB ping                                                       |
-| `POST`          | `/auth/register` · `/auth/login` | Create an account or log in → token + user (rate-limited, account lockout) |
-| `GET` · `PATCH` | `/users/me`                      | Profile; onboarding fields (avatar, topics, level, timezone)               |
-| `GET`           | `/users/me/progress`             | Level, streak, per-topic mastery, weakest topic, assessments               |
-| `GET`           | `/users/me/sessions`             | Session history (keyset cursor)                                            |
-| `GET`           | `/users/me/achievements`         | All five, earned and locked                                                |
-| `GET`           | `/topics`                        | The five topics                                                            |
-| `POST`          | `/sessions`                      | Start or resume `PRACTICE`, `INCIDENT`, `BASELINE` or `CHECKPOINT`         |
-| `GET`           | `/sessions/:id`                  | Resume a session (no answer keys, ever)                                    |
-| `POST`          | `/sessions/:id/answers`          | Submit an answer → verdict, explanation, XP, next stage                    |
-| `POST`          | `/sessions/:id/hint`             | Reveal the hint (halves that answer's XP; none in duels)                   |
-| `POST`          | `/sessions/:id/complete`         | Finish → summary with bonuses, streak, rank-up, achievements (idempotent)  |
-| `GET`           | `/daily`                         | Today's Daily Kata (built once per user per local day)                     |
-| `GET`           | `/leaderboard/weekly`            | `?cursor&limit` weekly ranking + your own row                              |
-| `GET` · `POST`  | `/duels`                         | Your duel lists · create a duel                                            |
-| `POST`          | `/duels/join`                    | `{ code }` → join (atomic, rate-limited)                                   |
-| `GET`           | `/duels/:id`                     | Status, and the result with per-question breakdown (participants only)     |
-| `POST`          | `/duels/:id/play`                | Start or resume your duel session                                          |
+| Method          | Endpoint                         | Purpose                                                                                                         |
+| --------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `GET`           | `/health`                        | Liveness and DB ping                                                                                            |
+| `POST`          | `/auth/register` · `/auth/login` | Create an account or log in → token + user (rate-limited, account lockout)                                      |
+| `GET` · `PATCH` | `/users/me`                      | Profile; onboarding fields (mask, topics, level, timezone)                                                      |
+| `GET`           | `/users/me/progress`             | Rank, streak, topic mastery, assessments, and `stats` (katas, duels won / lost / drawn)                         |
+| `GET`           | `/users/me/sessions`             | Run history (keyset cursor)                                                                                     |
+| `GET`           | `/users/me/achievements`         | All five crests, earned and locked                                                                              |
+| `GET`           | `/topics`                        | The five topics                                                                                                 |
+| `POST`          | `/sessions`                      | Start or resume: `PRACTICE {topicSlug, mode?}`, `INCIDENT {topicSlug?, challengeId?}`, `BASELINE`, `CHECKPOINT` |
+| `GET`           | `/sessions/:id`                  | Resume a session (no answer keys, ever; duels carry `duelFormat` and a server-measured `stepElapsedMs`)         |
+| `POST`          | `/sessions/:id/answers`          | Submit an answer → verdict, explanation, XP, next stage                                                         |
+| `POST`          | `/sessions/:id/hint`             | Reveal the hint (halves that answer's XP; none in duels)                                                        |
+| `POST`          | `/sessions/:id/complete`         | Finish → summary with bonuses, streak, rank-up, new crests (idempotent)                                         |
+| `GET`           | `/daily`                         | Today's Daily Kata (built once per player per local day)                                                        |
+| `GET`           | `/leaderboard/weekly`            | `?cursor&limit` weekly ranking + your own row                                                                   |
+| `GET` · `POST`  | `/duels`                         | Your duel lists · create a duel `{ format?: CLASSIC \| BLITZ \| SUDDEN_DEATH }`                                 |
+| `POST`          | `/duels/join`                    | `{ code }` → join (atomic, rate-limited)                                                                        |
+| `GET`           | `/duels/:id`                     | Status, and the result with the per-question breakdown (participants only)                                      |
+| `POST`          | `/duels/:id/play`                | Start or resume your duel session                                                                               |
 
 ---
 
-## Engineering notes
+## 守 Engineering notes
 
-These are the parts that make the game hard to cheat or break.
+The parts that make the game hard to cheat or break.
 
 ### Integrity by construction
 
-- **Answer keys never leave the server.** Challenges go out through one public projection;
-  tests assert that no response contains `answerKey`, `explanation` or `rootCause` before you
-  answer.
-- **XP is a ledger.** Every award is a row with a unique `sourceKey` (`challenge:<id>`,
-  `daily:<date>`, `streak7:<runStart>`…). "First correct only" and "bonus once" are enforced by a
-  unique index, not by `if` statements. A retry or a double tap can never pay twice.
-- **Idempotent writes everywhere.** A double-submitted answer hits a unique index and gets a 409,
-  which the app treats as "already answered" and re-syncs. Completing a session is a conditional
-  `ACTIVE → COMPLETED` update, and repeats return the stored summary. A partial unique index means
-  two simultaneous "Start" taps make one session, and two first opens of the day make one Kata.
+- **Answer keys never leave the server.** Challenges go out through one public projection, and tests
+  assert that no response contains `answerKey`, `explanation` or `rootCause` before you answer.
+- **XP is a ledger.** Every award is a row with a unique `sourceKey` (`challenge:<id>`, `daily:<date>`,
+  `streak7:<runStart>`…). "First correct only" and "bonus once" are enforced by a unique index, not by
+  `if` statements, so a retry or a double tap can never pay twice.
+- **Idempotent writes everywhere.** A double-submitted answer hits a unique index and gets a 409, which
+  the app treats as "already answered". Completing a session is a conditional `ACTIVE → COMPLETED`
+  update. Partial unique indexes make two simultaneous "Start" taps one session, and two first opens of
+  the day one Kata.
 - **Time is the server's.** Answer times are measured on the server. Streaks use the player's local
-  calendar day, compared as date strings, so a time-zone change can't farm a streak. The
-  leaderboard week is the same UTC week for everyone.
+  calendar day, compared as date strings, so a time-zone change can't farm a streak.
 
 ### Duels without race conditions
 
-- **One opponent, guaranteed.** Joining is a single conditional update (`OPEN`, no opponent, not
-  the creator, not expired), so when two people race for one code exactly one gets in.
-- **A timer that can't be paused from the client.** The countdown on screen is only a display. The
-  server marks any answer more than 60 s (+5 s network grace) after the previous one as a timeout.
-  The session view carries a server-measured `stepElapsedMs`, so a resumed duel shows the real time
-  left without trusting the phone's clock.
-- **Lazy, guarded expiry.** There's no cron job. Every read of a duel settles it if it's due, and
-  each transition is a guarded compare-and-set, so a late finish can never flip a result.
-- **A daily cap the database enforces.** The 3-wins-per-day bonus uses three ledger slots per day
-  (`duelwin:<date>:1..3`). Two wins settling at the same instant can't pay a fourth.
+- **One opponent, guaranteed.** Joining is a single conditional update (`OPEN`, no opponent, not the
+  creator, not expired), so exactly one person wins a race for one code.
+- **A timer the client can't pause.** The on-screen countdown is only a display. The server marks any
+  answer later than the format's timer plus its grace (5 s, or 2 s for Blitz) as a timeout and records
+  exactly the timer. A resumed duel shows the real time left, measured on the server.
+- **Sudden Death that can't be gamed.** Answers must come in order. The first miss ends the run, and the
+  score counts only the run up to that miss, even if a concurrent request slipped in. "Run over" is
+  derived from the saved answers as well as a flag, so a crash between the two can't strand a run.
+- **Lazy, guarded expiry.** There's no cron. Every read of a duel settles it if it's due, and each
+  transition is a compare-and-set, so a late finish never flips a result.
+- **A daily cap the database enforces.** The 3-wins-a-day bonus uses three ledger slots per day
+  (`duelwin:<date>:1..3`).
 
 ### Security
 
-- bcrypt (cost 12) with a 72-byte password limit. Per-IP rate limits on auth and duel join.
-  Per-account lockout after 5 failed logins.
-- AuthZ per resource: every session, attempt and progress query is scoped to the caller. Duels
-  return 404 to anyone but the two participants, so ids don't leak.
-- Zod validation at every boundary (body, params, query). ObjectId params are checked before they
-  reach a query.
-- helmet headers, a CORS allow-list, a 100 kB body limit, no stack traces in responses, and pino
-  redaction of credentials.
+- bcrypt (cost 12) with a 72-byte password limit. Per-IP rate limits on auth and duel join, and
+  per-account lockout after 5 failed logins.
+- Authorisation per resource: every session, attempt and progress query is scoped to the caller. Duels
+  return 404 to anyone but the two players, so ids don't leak.
+- Zod validation at every boundary (body, params, query). ObjectId params are checked before a query.
+- helmet headers, a CORS allow-list, a 100 kB body limit, no stack traces, and pino redaction of
+  credentials.
 
 ### Performance and scale
 
-- The server is stateless (JWT, no sessions in memory), so it scales horizontally behind a load
-  balancer.
-- Every list is bounded and paginated. Indexes match the access patterns (`{weekKey, userId}` for
-  the board, `{userId, status, completedAt, _id}` for history, and others). Duel lists batch their
-  reads to avoid N+1 queries.
-- **First bottleneck:** the Dojo Board aggregates the week's ledger on each request. That's fine at
-  capstone scale. The next step is a cached weekly counter per user (tracked in `TODOS.md`).
-- **Cold starts:** a free Render instance sleeps when idle. The client shows _"Waking the server"_
-  after 4 s, times out each request at 15 s, and retries GETs (never POSTs) with backoff.
+- The server is stateless (JWT, nothing in memory), so it scales horizontally.
+- Every list is bounded and paginated, indexes match the access patterns, and duel lists batch their
+  reads (no N+1). Profile stats are four indexed counts, with no counters to drift.
+- **First bottleneck:** the Dojo Board aggregates the week's ledger per request. That's fine at this
+  scale; the next step is a cached weekly counter (`TODOS.md`).
+- **Cold starts:** the free Render instance sleeps when idle. After 4 s the app shows _"Waking the
+  dojo…"_ with a breathing lantern, times out each request at 15 s, and retries GETs (never POSTs) with
+  backoff.
+- **Small art budget:** scenes are static SVG paths with a few animated transforms, and the brush kanji
+  are baked paths instead of an 8.6 MB font.
 
 ---
 
 ## Testing
 
-| Layer           | What                                                                                                                                                                                                                                                                  | How                                        |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| API smoke tests | 55 tests over real HTTP against an in-memory MongoDB: auth, answer-key leakage, double submits, XP once, streak rules, Daily Kata once under concurrency, mastery and adaptivity, the board, achievements, the duel join race, timer, tie-break, expiry and bonus cap | Vitest + Supertest + mongodb-memory-server |
-| Static          | Lint and strict typecheck of all three workspaces                                                                                                                                                                                                                     | `npm run lint && npm run typecheck`        |
-| App             | A click-through checklist per phase, played on a real phone in Expo Go                                                                                                                                                                                                | Manual                                     |
+| Layer           | What                                                                                                                                                                                                                                                                                                                                                                           | How                                        |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ |
+| API smoke tests | **66 tests** over real HTTP against an in-memory MongoDB: auth and lockout, answer-key leakage, double submits, XP once, streak rules, Daily Kata once under concurrency, mastery and adaptivity, revisits, the board, crests, mode rounds and boss incidents, the duel join race, timers per format, Sudden Death (including crash recovery), tie-break, expiry and bonus cap | Vitest + Supertest + mongodb-memory-server |
+| Static          | Lint and a strict typecheck of all three workspaces                                                                                                                                                                                                                                                                                                                            | `npm run lint && npm run typecheck`        |
+| App             | A click-through checklist per phase on a real phone, judged for feel against the design preview                                                                                                                                                                                                                                                                                | Manual, in Expo Go                         |
 
-> The API test suite lives in `.scratch/api-tests/`, which is **intentionally gitignored**. This was
-> a project decision (D-002, D-005): the pushed repository holds product code only, and the suite is
-> run locally before every commit with `cd .scratch/api-tests && npx vitest run`.
+> The API suite lives in `.scratch/api-tests/`, which is **intentionally gitignored** (D-002, D-005):
+> the pushed repo holds product code only, and the suite runs locally before every commit with
+> `cd .scratch/api-tests && npx vitest run`.
+
+The latest end-to-end check of V1 against its acceptance criteria is in
+[`docs/v1-audit.md`](docs/v1-audit.md).
 
 ---
 
 ## Deployment
 
-Planned for the final phase and **not live yet**:
+**Live.** The API runs at `https://luna-kloi.onrender.com/api/v1` (health: `/api/v1/health`).
 
-- **API:** a Render web service from `server/` (`npm ci && npm run build`, start
-  `node dist/index.js`, health check `/api/v1/health`) that auto-deploys from `main`.
-- **Database:** MongoDB Atlas M0 with separate `luna_dev` and `luna_prod` databases.
-- **App:** Expo Go, with `EXPO_PUBLIC_API_URL` pointing at the Render URL. There are no store builds in V1.
+- **API:** a Render web service from `server/` (`npm ci && npm run build`, start `node dist/index.js`,
+  health check `/api/v1/health`) that auto-deploys from `main`.
+- **Database:** MongoDB Atlas M0, with separate `luna_dev` and `luna_prod` databases.
+- **After a deploy that changes indexes,** run the seed once against production so `syncIndexes`
+  applies them: `MONGODB_URI=<production URI> npm run seed -w server`.
+- **App:** Expo Go, with `EXPO_PUBLIC_API_URL` pointing at the Render URL. There are no store builds in
+  V1.
 
 ---
 
-## Documentation
+## 書 Documentation
 
-The repo is the source of truth. Everything below is written to be read.
+The repo is the source of truth, and everything below is written to be read.
 
-| Document                                       | What's inside                                                                                |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| [`docs/prd.md`](docs/prd.md)                   | Problem, users, goals, non-goals, features with acceptance criteria, success metrics, phases |
-| [`docs/product/`](docs/product/README.md)      | Game design: players, modes, scoring, progression, competition, benchmarks, UI design system |
-| [`docs/architecture.md`](docs/architecture.md) | Delivery setup, stack, layout, data model, key flows and failure handling                    |
-| [`docs/decisions.md`](docs/decisions.md)       | Every product and technical decision: context, options rejected, why                         |
-| [`docs/build-plan.md`](docs/build-plan.md)     | Phase task lists and the API surface                                                         |
-| [`TODOS.md`](TODOS.md)                         | Backlog, deferred ideas and known debt                                                       |
+| Document                                                           | What's inside                                                                        |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| [`DESIGN.md`](DESIGN.md)                                           | Kiri-e Den: palette, type, layout, components, the authored motions                  |
+| [`docs/design/kirie-preview.html`](docs/design/kirie-preview.html) | The approved visual reference (open it in a browser)                                 |
+| [`docs/prd.md`](docs/prd.md)                                       | Problem, users, goals, non-goals, features with acceptance criteria, metrics, phases |
+| [`docs/product/`](docs/product/README.md)                          | Game design: players, modes, scoring, progression, competition, benchmarks           |
+| [`docs/architecture.md`](docs/architecture.md)                     | Delivery setup, stack, layout, data model, key flows and failure handling            |
+| [`docs/decisions.md`](docs/decisions.md)                           | Every product and technical decision (D-001 → D-043): context, options rejected, why |
+| [`docs/build-plan.md`](docs/build-plan.md)                         | Phase task lists and the API surface                                                 |
+| [`docs/v1-audit.md`](docs/v1-audit.md)                             | V1 checked against its 12 acceptance criteria, with evidence and open items          |
+| [`TODOS.md`](TODOS.md)                                             | Backlog, deferred ideas and known debt                                               |
 
 ### Product decisions worth a look
 
-- **Two separate measures of progress.** Rank shows effort (XP) and the moon shows skill (accuracy),
-  so grinding easy questions can't fake mastery.
-- **A weekly board, not all-time.** It ranks this week's XP, so a newcomer can win. Leagues and a
-  daily board were cut because they feel empty with fewer than about 30 active players per group.
-- **Asynchronous duels.** Friends don't need to be online together. A default win pays no bonus, so
-  an idle second account can't farm it.
-- **Explanations over scores.** Every answer, right or wrong, shows why, plus the most common
-  misconception.
+- **A game, not a study app (D-037).** The first UI was correct but read like a report card, so P7
+  rebuilt it as a place: the room is the menu, every answer is a strike, and topic statistics left the
+  screen (the server still uses them to pick your questions).
+- **Two measures that never mix.** Rank shows effort (XP), and mastery shows skill (accuracy), so
+  grinding easy questions can't fake skill.
+- **A weekly board, not all-time,** so a newcomer can win. Leagues were cut because they feel empty
+  below about 30 active players per group.
+- **Asynchronous duels with blades.** Friends don't need to be online together, and Blitz and Sudden
+  Death give the same questions a different tension. A default win pays no bonus, so an idle second
+  account can't farm it.
+- **Explanations on demand.** A miss always shows why. A hit celebrates first, and the reason is one tap
+  away.
 
 ---
 
 ## Roadmap
 
-| Status | Phase                                                                      |
-| :----: | -------------------------------------------------------------------------- |
-|   ✅   | **P0** Product design and plan                                             |
-|   ✅   | **P1** Backend core: auth, content, challenge engine                       |
-|   ✅   | **P2** App foundation, design system, auth and onboarding                  |
-|   ✅   | **P3** Game UI: four modes, feedback, summary, Explore                     |
-|   ✅   | **P4** Progression: XP, ranks, streaks, Daily Kata, adaptivity, Checkpoint |
-|   ✅   | **P5** Competition and profile: Dojo Board, duels, achievements, history   |
-|   🔨   | **P6** Polish, deploy and demo prep                                        |
+| Status | Phase                                                                                    |
+| :----: | ---------------------------------------------------------------------------------------- |
+|   ✅   | **P0** Product design and plan                                                           |
+|   ✅   | **P1** Backend core: auth, content, challenge engine                                     |
+|   ✅   | **P2** App foundation, auth and onboarding                                               |
+|   ✅   | **P3** Game UI: four modes, feedback, summary, Explore                                   |
+|   ✅   | **P4** Progression: XP, ranks, streaks, Daily Kata, adaptivity, Checkpoint               |
+|   ✅   | **P5** Competition and profile: Dojo Board, duels, achievements, history                 |
+|   🔨   | **P6** Polish, deploy and demo prep: deployed; network pass and acceptance run remaining |
+|   ✅   | **P7** Game redesign: Kiri-e Den, the Dojo room, mode rounds, Blitz and Sudden Death     |
+|   ⏳   | **P8** New mini-games for Explore                                                        |
 
-**After V1:** a bigger question bank (the first priority), a streak freeze, a visual polish pass,
-public duel matchmaking, and leagues once there are enough players. Real-time duels, an AI tutor
-and new tracks (DSA, DevOps, system design) are parked in [`TODOS.md`](TODOS.md).
+**After V1:** a bigger question bank (the first priority), a streak freeze, public duel matchmaking, and
+leagues once there are enough players. Real-time duels, an AI sparring partner and new tracks (DSA,
+DevOps, system design) are parked in [`TODOS.md`](TODOS.md).
 
 ---
 
 <div align="center">
 
-Built as a university capstone by **Rajdeep**. It's a product exercise as much as an engineering
-one: every feature traces back to a user problem in the PRD.
+**Luna 月** · built as a university capstone by **Rajdeep**.
+A product exercise as much as an engineering one: every feature traces back to a user problem in the PRD.
+
+_Bow in. Keep the lantern lit._
 
 </div>

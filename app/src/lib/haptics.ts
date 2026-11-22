@@ -8,4 +8,5 @@ export const haptic = {
   success: () => safe(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)),
   error: () => safe(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error)),
   light: () => safe(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)),
+  heavy: () => safe(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)),
 };

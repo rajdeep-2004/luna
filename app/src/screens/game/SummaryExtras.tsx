@@ -11,6 +11,24 @@ const BONUS_LABEL: Record<BonusAward['kind'], (b: BonusAward) => string> = {
   DUEL_WIN: () => 'Duel won',
 };
 
+/** progression.md §7: "Achievement unlocked", shown once, on the completion that earned it. */
+export function AchievementsCard({ summary }: { summary: SessionSummary }) {
+  const unlocked = summary.newAchievements ?? [];
+  if (!unlocked.length) return null;
+  return (
+    <Card style={styles.card}>
+      <AppText variant="label" color="moon" accessibilityRole="alert">
+        Achievement unlocked
+      </AppText>
+      {unlocked.map((a) => (
+        <AppText key={a.key} variant="title">
+          {a.icon} {a.name}
+        </AppText>
+      ))}
+    </Card>
+  );
+}
+
 /** Bonuses, the lantern and fixed mistakes: what this session did for progress. */
 export function ProgressCard({ summary }: { summary: SessionSummary }) {
   const { bonuses, streak, fixedMistakes } = summary;

@@ -1,15 +1,12 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { DojoScreen } from '../screens/dojo/DojoScreen';
 import { ExploreScreen } from '../screens/explore/ExploreScreen';
-import { PlaceholderScreen, ProfilePlaceholder } from '../screens/tabs/PlaceholderScreen';
+import { DuelScreen } from '../screens/duel/DuelScreen';
+import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { colors, fontFamily } from '../theme';
 import type { MainTabParams } from './types';
 
 const Tab = createBottomTabNavigator<MainTabParams>();
-
-const Duel = () => (
-  <PlaceholderScreen title="Duel" message="Challenge a friend. Coming in a later phase." />
-);
 
 export function MainTabs() {
   return (
@@ -26,8 +23,8 @@ export function MainTabs() {
     >
       <Tab.Screen name="Dojo" component={DojoScreen} />
       <Tab.Screen name="Explore" component={ExploreScreen} />
-      <Tab.Screen name="Duel" component={Duel} />
-      <Tab.Screen name="Profile" component={ProfilePlaceholder} />
+      <Tab.Screen name="Duel" component={DuelScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }

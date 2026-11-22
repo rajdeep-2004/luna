@@ -23,6 +23,7 @@ import { colors, spacing } from '../../theme';
 import { useStartSession } from '../explore/useStartSession';
 import { FloatingMoon } from './FloatingMoon';
 import { WeakestBlade } from './WeakestBlade';
+import { BoardPreview } from './BoardPreview';
 import { useBeginKata } from './useBeginKata';
 
 /**
@@ -112,6 +113,8 @@ export function DojoScreen() {
               }
             />
             {practice.error ? <Alert text={practice.error} /> : null}
+
+            <BoardPreview />
 
             {p.assessments.checkpointAvailable ? (
               <CheckpointCard

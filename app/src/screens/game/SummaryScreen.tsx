@@ -27,8 +27,9 @@ import type { AppStackParams } from '../../navigation/types';
 import { useAuthStore } from '../../store/auth';
 import { colors, spacing } from '../../theme';
 import { useStartSession } from '../explore/useStartSession';
+import { DUELS_KEY } from '../duel/useDuelActions';
 import { RankUpOverlay } from './RankUpOverlay';
-import { CheckpointComparison, ProgressCard } from './SummaryExtras';
+import { AchievementsCard, CheckpointComparison, ProgressCard } from './SummaryExtras';
 
 type Props = NativeStackScreenProps<AppStackParams, 'Summary'>;
 
@@ -44,6 +45,7 @@ const HEADING: Partial<Record<SessionSummary['type'], string>> = {
   DAILY: 'Daily Kata complete',
   BASELINE: 'Baseline complete',
   CHECKPOINT: 'Checkpoint complete',
+  DUEL: 'Duel played',
 };
 
 const formatTime = (ms: number) => {
@@ -78,6 +80,7 @@ export function SummaryScreen({ route, navigation }: Props) {
   useEffect(() => {
     if (!summary) return;
     void queryClient.invalidateQueries({ queryKey: PROGRESS_KEY });
+    if (summary.duelId) void queryClient.invalidateQueries({ queryKey: DUELS_KEY });
     usersApi
       .me()
       .then(setUser)
@@ -131,6 +134,7 @@ export function SummaryScreen({ route, navigation }: Props) {
           <Stat label="Time" value={formatTime(summary.totalTimeMs)} />
         </View>
 
+        <AchievementsCard summary={summary} />
         <ProgressCard summary={summary} />
         {summary.type === 'CHECKPOINT' ? (
           <CheckpointComparison
@@ -198,7 +202,17 @@ export function SummaryScreen({ route, navigation }: Props) {
         ) : null}
       </ScrollView>
       <View style={styles.actions}>
-        <Button label="Back to the dojo" onPress={done} />
+        {summary.duelId ? (
+          <Button
+            label="See the duel"
+            onPress={() => navigation.replace('DuelResult', { duelId: summary.duelId! })}
+          />
+        ) : null}
+        <Button
+          label="Back to the dojo"
+          variant={summary.duelId ? 'ghost' : 'primary'}
+          onPress={done}
+        />
       </View>
       {summary.rankUp && !rankUpSeen ? (
         <RankUpOverlay rankUp={summary.rankUp} onDone={() => setRankUpSeen(true)} />
@@ -243,5 +257,5 @@ const styles = StyleSheet.create({
   stat: { alignItems: 'center', gap: spacing.xs },
   topicRow: { gap: spacing.sm },
   topicHead: { flexDirection: 'row', justifyContent: 'space-between' },
-  actions: { paddingBottom: spacing.lg },
+  actions: { gap: spacing.sm, paddingBottom: spacing.lg },
 });

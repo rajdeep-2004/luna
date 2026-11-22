@@ -503,3 +503,29 @@ wrapper). None hardcodes a colour, size or font: they read `src/theme`. `AppText
 "calm night, one moon" design. Bitmap avatars: heavier and blurry when scaled.
 
 **Revisit if** the masks need to be redrawn by a designer. Each is one entry in `YokaiAvatar.tsx`.
+
+### D-021 — API client, auth store and the cold-start notice
+- **Date:** 2026-11-22 · **Step:** P2 task 3 · **Status:** Active · **Type:** technical
+
+**Decision.** `app/src/api/client.ts` is a thin wrapper over `fetch`. It sets a 15 s timeout,
+unwraps the `{ data }` / `{ error }` envelope into either a value or an `ApiError`, and retries
+**GET requests only**, twice, with 500 ms then 1 s backoff, and only for transient failures (network,
+timeout, 503, 5xx gateway). POSTs and PATCHes are never replayed automatically, as `architecture.md` §9
+says. A 401 on an authenticated call signs the user out.
+
+**Cold start.** Render's free tier sleeps and wakes in about 30 s. If a request is still pending after
+4 s, a small Zustand store flips `waking` to true and the UI shows the `WakingServer` notice, so the
+user sees an explanation instead of a frozen screen. A counter handles several slow requests at once.
+
+**Auth store.** Zustand holds `status`, `token` and `user`. The token is saved with `expo-secure-store`
+(the phone's keychain), never AsyncStorage. On launch `hydrate()` reads the token and calls
+`GET /users/me`: a 401 signs out; a network failure sets `error` and offers Retry instead of logging
+the user out because their train had no signal. The client and store connect through `configureApi`, which
+avoids a circular import. Logout also clears the React Query cache so the next user never sees old data.
+
+**Config.** `src/config/env.ts` is the only file that reads `process.env`, mirroring the server's rule.
+It fails fast with a clear message when `EXPO_PUBLIC_API_URL` is missing. `.env.example` documents it.
+
+**Alternatives rejected.** Axios (extra dependency for what `fetch` does). Retrying POSTs (risks
+duplicates; server idempotency exists but the user should choose). Storing the token in AsyncStorage (unencrypted).
+**Revisit if** the JWT expiry (7 days, no refresh token) annoys testers; then add refresh tokens.

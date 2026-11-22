@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="app/assets/icon.png" alt="Luna app icon" width="112" />
+<img src="docs/media/hero.svg" alt="Luna: a cut-paper dojo at night. The moon drifts past a shoji window, a paper lantern swings, and the kanji 月 is brushed in." width="100%" />
 
 # Luna 月
 
@@ -23,6 +23,17 @@ _Shogun 将軍_, keep the lantern lit, and duel your friends.
 [The dojo](#道-the-idea) · [Play](#遊-how-you-play) · [Duels](#刀-duels) · [Ranks](#侍-ranks-and-progress) ·
 [Design](#紙-the-look-kiri-e-den) · [Architecture](#築-how-it-works) · [Run it](#始-run-it-yourself) ·
 [API](#api-reference) · [Engineering](#守-engineering-notes) · [Docs](#書-documentation)
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/media/screen-dojo.png" alt="The Dojo: a room whose objects are the controls. A rank scroll with 侍, a lantern with the streak 4, a fox mask resting on a stand, an ema plaque for the weekly place, and the sealed kata scroll on a low table." width="200" /><br /><sub><b>Dojo</b> · the room is the menu</sub></td>
+    <td align="center"><img src="docs/media/screen-explore.png" alt="Explore: five topic banners, three game modes with their own art, and the Incident Room boss stage." width="200" /><br /><sub><b>Explore</b> · pick a banner, pick a game</sub></td>
+    <td align="center"><img src="docs/media/screen-duel.png" alt="Duel: your fox mask faces a dashed question mark across a vermilion slash; Classic, Blitz and Sudden Death blades; six code cells." width="200" /><br /><sub><b>Duel</b> · choose your blade</sub></td>
+    <td align="center"><img src="docs/media/screen-profile.png" alt="Profile: the mask on a vermilion banner, the rank kanji in an ensō, four trophies, crests and stamped recent runs." width="200" /><br /><sub><b>Profile</b> · the warrior sheet</sub></td>
+  </tr>
+</table>
+
+<sub>Screens from the approved Kiri-e Den design reference (<a href="docs/design/kirie-preview.html"><code>docs/design/kirie-preview.html</code></a>), which the app is built to match.</sub>
 
 </div>
 
@@ -82,6 +93,10 @@ Hunt round, an Engineer's Choice round, or that topic's **boss incident**. A mod
 questions of that kind from the topic, topped up from other topics when the topic runs thin.
 
 ### Every answer is a strike
+
+<p align="center">
+  <img src="docs/media/the-cut.svg" alt="A correct answer: an ink slash cuts across the screen, 見事 (splendid) is brushed in, a red 正 seal strikes and +15 XP appears." width="560" />
+</p>
 
 - **Right:** an ink slash cuts across the screen, **見事** (_migoto_, "splendid") is brushed in, a red
   **正** seal strikes, and the XP counts up. There's no lecture, but _Why it works_ is one tap away.

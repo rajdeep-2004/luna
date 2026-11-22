@@ -473,7 +473,7 @@ power the motion in `ui-design.md` §6 (used from P3). `expo-haptics` gives the 
 `expo-secure-store` keeps the login token in the phone's keychain, not in plain storage.
 `@react-navigation/*` with `react-native-screens` and `react-native-safe-area-context` is the
 navigation stack chosen in D-003. `@tanstack/react-query` handles server state and `zustand` the
-small auth store. `expo-localization` supplies the device timezone for the streak logic.
+small auth store. The device timezone for the streak logic comes from the built-in `Intl` API, so no extra package is needed.
 
 **Alternatives rejected.** Expo Router (already rejected in D-003). A bare React Native project
 (needs native build tooling; Expo Go avoids it). A custom `babel.config.js`: SDK 58's default preset
@@ -529,3 +529,37 @@ It fails fast with a clear message when `EXPO_PUBLIC_API_URL` is missing. `.env.
 **Alternatives rejected.** Axios (extra dependency for what `fetch` does). Retrying POSTs (risks
 duplicates; server idempotency exists but the user should choose). Storing the token in AsyncStorage (unencrypted).
 **Revisit if** the JWT expiry (7 days, no refresh token) annoys testers; then add refresh tokens.
+
+### D-022 — Navigation, auth and onboarding screens
+- **Date:** 2026-11-22 · **Step:** P2 tasks 4–5 · **Status:** Active · **Type:** product + technical
+
+**Decision.** `RootNavigator` chooses what to show from the auth store: a spinner while the saved
+token is checked, an `ErrorState` with Retry if the server was unreachable, `AuthStack` (Welcome,
+Register, Login) when signed out, `OnboardingStack` (Avatar, Topics, Level) when signed in but
+`onboarded` is false, and `MainTabs` (Dojo, Explore, Duel, Profile) otherwise. The stack is *swapped*
+rather than pushed, so a finished user cannot press Back into onboarding, and logging out drops them
+straight onto Welcome. Onboarding is "resumable" for free: if the app is closed halfway, `onboarded` is
+still false on the server and the user lands on the same flow.
+
+**Product deviation: no separate username step.** `build-plan.md` lists username as an onboarding step, but
+the register endpoint already requires a username (and validates it is unique), so asking again would be
+redundant friction. The username is collected on Register, and onboarding has three steps: avatar, topics,
+level. Fewer steps before the first challenge supports the activation goal in `prd.md`.
+
+**How the forms work.** Inputs are validated on the device with the same Zod schemas the server uses
+(`RegisterRequest`, `LoginRequest` from `shared/`), so error text is identical and never drifts. Server
+errors (wrong password, email taken, locked account, rate limit) show in one message above the button. The
+submit button shows a spinner and ignores taps while the request is in flight. The three onboarding answers
+are kept in a small Zustand draft store and sent in one `PATCH /users/me` on the last step, with the
+device timezone and `completeOnboarding: true`. Success updates the auth store, and the root navigator
+swaps to the tabs by itself.
+
+**Tabs.** Dojo, Explore and Duel are `EmptyState` placeholders that show the user's avatar, name and
+lantern so P2 auth can be checked by eye. Profile has a Log out button. Tab icons are left out on purpose
+(labels only) to avoid an icon dependency; they can be added when the real screens land.
+
+**Alternatives rejected.** Collecting onboarding answers across separate API calls (a half-finished profile
+would be possible). Expo Router (D-003).
+**Files.** `app/App.tsx`, `app/src/navigation/*`, `app/src/screens/*`, `app/src/store/onboarding.ts`, `app/src/lib/*`.
+**Concepts.** Conditional navigators (auth flow pattern in React Navigation); controlled inputs; schema reuse across client and server.
+**Revisit if** testers want to change avatar or topics later; that belongs in the Profile screen (P5).

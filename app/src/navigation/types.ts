@@ -12,4 +12,6 @@ export type AppStackParams = {
   Session: { sessionId: string };
   Summary: { sessionId: string; rootCause?: string };
   BaselineIntro: undefined;
+  DojoBoard: undefined;
+  DuelResult: { duelId: string };
 };

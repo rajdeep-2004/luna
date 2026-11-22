@@ -11,11 +11,12 @@ import type {
   SubmitAnswerRequest,
   TopicSlug,
 } from '@luna/shared';
+import { DUEL_TIMEOUT_ANSWER } from '@luna/shared';
 import { SessionModel, type SessionDoc } from '../../models/Session';
 import { AnswerAttemptModel } from '../../models/AnswerAttempt';
 import type { ChallengeDoc } from '../../models/Challenge';
 import { AppError, conflict, isDuplicateKey, notFound } from '../../lib/errors';
-import { SESSION } from '../../config/game';
+import { DUEL, SESSION } from '../../config/game';
 import { localDateKey } from '../../lib/time';
 import { challengesRepo } from '../challenges/challenges.repository';
 import { answerCount, toPublicChallenge, toPublicStage } from '../challenges/challenges.projection';
@@ -23,7 +24,8 @@ import { recordAnswer } from '../progress/topicProgress.service';
 import { trackRevisit } from '../progress/revisit.service';
 import { assessmentStatus } from '../progress/assessments.service';
 import { usersRepo } from '../users/users.repository';
-import { evaluate } from './sessions.evaluator';
+import { evaluate, timeoutEvaluation } from './sessions.evaluator';
+import { assertDuelPlayable } from '../duels/duels.settle';
 import {
   pickBaseline,
   pickCheckpoint,
@@ -34,6 +36,7 @@ import {
 import { settleProgression } from './sessions.settle';
 import { answerXP, ownedXP } from './sessions.xp';
 import { buildSummary } from './sessions.summary';
+import { evaluateAchievements } from '../achievements/achievements.service';
 
 const shuffle = <T>(xs: T[]): T[] => {
   const a = [...xs];
@@ -70,6 +73,7 @@ type NewSession = {
   type: SessionType;
   topicSlug?: TopicSlug | null;
   dailyDate?: string | null;
+  duelId?: string | null;
   picked: PickedItem[];
 };
 
@@ -84,11 +88,12 @@ export async function createSession(userId: string, s: NewSession): Promise<Sess
       type: s.type,
       topicSlug: s.topicSlug ?? null,
       dailyDate: s.dailyDate ?? null,
-      items: s.picked.map(({ challenge: c, isRevisit }, order) => ({
+      duelId: s.duelId ?? null,
+      items: s.picked.map(({ challenge: c, isRevisit, optionOrders }, order) => ({
         challengeId: c._id,
         order,
         isRevisit,
-        optionOrders: optionOrdersFor(c),
+        optionOrders: optionOrders ?? optionOrdersFor(c),
       })),
       totalAnswers: s.picked.reduce((n, p) => n + answerCount(p.challenge), 0),
     });
@@ -159,10 +164,16 @@ export async function getSession(userId: string, sessionId: string): Promise<Ses
   return buildView(session, challenges);
 }
 
+/** Time since the session's latest answer (or its start): the server clock for the current step. */
+function elapsedSince(session: SessionDoc, attempts: { createdAt: Date }[]): number {
+  const last = attempts.reduce((t, a) => (a.createdAt > t ? a.createdAt : t), session.startedAt);
+  return Math.max(0, Date.now() - last.getTime());
+}
+
 async function buildView(session: SessionDoc, challenges: ChallengeDoc[]): Promise<SessionView> {
   const byId = new Map(challenges.map((c) => [c._id.toString(), c]));
   const attempts = await AnswerAttemptModel.find({ sessionId: session._id })
-    .select('challengeId stageIndex answer isCorrect')
+    .select('challengeId stageIndex answer isCorrect createdAt')
     .sort({ stageIndex: 1 })
     .lean();
   const items = session.items.flatMap((item) => {
@@ -193,6 +204,7 @@ async function buildView(session: SessionDoc, challenges: ChallengeDoc[]): Promi
     startedAt: session.startedAt.toISOString(),
     totalAnswers: session.totalAnswers,
     items: items.sort((a, b) => a.order - b.order),
+    ...(session.type === 'DUEL' ? { stepElapsedMs: elapsedSince(session, attempts) } : {}),
   };
 }
 
@@ -208,6 +220,7 @@ async function loadAnswerContext(
   if (session.type === 'DAILY' && (await isKataExpired(userId, session))) {
     throw conflict('This Kata ended at midnight. Today has a new one.');
   }
+  if (session.type === 'DUEL') await assertDuelPlayable(session.duelId);
   const item = session.items.find((i) => i.challengeId.toString() === challengeId);
   if (!item) throw notFound('Challenge in this session');
   const challenge = await challengesRepo.findById(challengeId);
@@ -260,15 +273,24 @@ export async function submitAnswer(
     await repairAnsweredXP(userId, session, challenge, stageIndex);
     throw conflict('Already answered');
   }
-  const result = evaluate(challenge, stageIndex, answer);
-
   // Server-measured time since the previous answer in this session (or the session start).
   const last = await AnswerAttemptModel.findOne({ sessionId })
     .sort({ createdAt: -1 })
     .select('createdAt')
     .lean();
   const since = last?.createdAt ?? session.startedAt;
-  const timeTakenMs = Math.min(Date.now() - since.getTime(), SESSION.maxAnswerTimeMs);
+  const elapsedMs = Date.now() - since.getTime();
+  // Duels: 60 s per challenge on the server's clock. A late answer is a timeout whatever the
+  // client sends, and a timeout records exactly 60 s (scoring.md §6).
+  const isDuel = session.type === 'DUEL';
+  const isTimeout =
+    isDuel && (answer === DUEL_TIMEOUT_ANSWER || elapsedMs > DUEL.timerMs + DUEL.timerGraceMs);
+  const result = isTimeout
+    ? timeoutEvaluation(challenge, stageIndex)
+    : evaluate(challenge, stageIndex, answer);
+  const timeTakenMs = isTimeout
+    ? DUEL.timerMs
+    : Math.min(elapsedMs, isDuel ? DUEL.timerMs : SESSION.maxAnswerTimeMs);
   const usedHint = item.hintsUsed.includes(stageIndex);
 
   // 1) The attempt insert is the idempotency guard: a double submit stops here with a 409.
@@ -283,6 +305,7 @@ export async function submitAnswer(
       answer,
       isCorrect: result.isCorrect,
       usedHint,
+      isTimeout,
       timeTakenMs,
       topicSlug: challenge.topicSlug,
       type: challenge.type,
@@ -349,13 +372,14 @@ export async function revealHint(
   sessionId: string,
   input: HintRequest,
 ): Promise<HintResult> {
-  const { challenge, alreadyAnswered } = await loadAnswerContext(
+  const { session, challenge, alreadyAnswered } = await loadAnswerContext(
     userId,
     sessionId,
     input.challengeId,
     input.stageIndex,
   );
   if (alreadyAnswered) throw conflict('Already answered');
+  if (session.type === 'DUEL') throw conflict('There are no hints in duels');
   const hint =
     challenge.type === 'INCIDENT' ? challenge.stages[input.stageIndex]?.hint : challenge.hint;
   if (!hint) throw notFound('Hint');
@@ -403,7 +427,16 @@ export async function completeSession(userId: string, sessionId: string): Promis
     { $set: { status: 'COMPLETED', completedAt: new Date(), summary } },
     { returnDocument: 'after' },
   );
-  if (updated) return summary;
+  if (updated) {
+    // After the flip, so this session counts. Not stored: like rankUp, the toast shows once.
+    const unlocked = await evaluateAchievements(userId);
+    return unlocked.length
+      ? {
+          ...summary,
+          newAchievements: unlocked.map(({ key, name, icon }) => ({ key, name, icon })),
+        }
+      : summary;
+  }
   // Lost a race with a parallel completion: return what that call stored.
   const stored = await SessionModel.findById(sessionId).select('summary').lean();
   return (stored?.summary as SessionSummary) ?? summary;

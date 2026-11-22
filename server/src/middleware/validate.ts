@@ -30,3 +30,16 @@ export function validateObjectIdParam(name: string): RequestHandler {
     next();
   };
 }
+
+/**
+ * Parses a query string with a schema. Express 5's `req.query` is read-only, so handlers call
+ * this and use the returned value instead of a middleware that rewrites it.
+ */
+export function parseQuery<T>(schema: ZodType<T>, query: unknown): T {
+  const result = schema.safeParse(query ?? {});
+  if (!result.success) {
+    const message = result.error.issues[0]?.message ?? 'Invalid query';
+    throw new AppError('VALIDATION_ERROR', message);
+  }
+  return result.data;
+}

@@ -25,3 +25,13 @@ export const globalLimiter = rateLimit({
   legacyHeaders: false,
   handler: (_req, _res, next) => next(limited),
 });
+
+/** Duel codes are guessable in principle (32^6): 30 join tries per 15 minutes per IP. */
+export const duelJoinLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  handler: (_req, _res, next) => next(limited),
+  skip: () => env.NODE_ENV === 'test',
+});

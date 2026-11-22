@@ -1,10 +1,12 @@
 import mongoose from 'mongoose';
 import '../models/AnswerAttempt';
 import '../models/Challenge';
+import '../models/Duel';
 import '../models/RevisitItem';
 import '../models/Session';
 import '../models/Topic';
 import '../models/User';
+import '../models/UserAchievement';
 import '../models/UserTopicProgress';
 import '../models/XpEvent';
 

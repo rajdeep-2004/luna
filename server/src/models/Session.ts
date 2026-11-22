@@ -21,6 +21,8 @@ const sessionSchema = new Schema(
     topicSlug: { type: String, enum: [...TOPIC_SLUGS, null], default: null },
     /** DAILY only: the user's local date (`YYYY-MM-DD`) the Kata belongs to; keys its bonuses. */
     dailyDate: { type: String, default: null },
+    /** DUEL only: the duel this session plays. */
+    duelId: { type: Schema.Types.ObjectId, ref: 'Duel', default: null },
     status: { type: String, enum: ['ACTIVE', 'COMPLETED'], default: 'ACTIVE' },
     startedAt: { type: Date, default: () => new Date() },
     completedAt: { type: Date, default: null },
@@ -51,6 +53,14 @@ sessionSchema.index(
   { userId: 1, dailyDate: 1 },
   { unique: true, partialFilterExpression: { type: 'DAILY' } },
 );
+
+// One DUEL session per player per duel: a double tap on "Play" can't start two.
+sessionSchema.index(
+  { duelId: 1, userId: 1 },
+  { unique: true, partialFilterExpression: { type: 'DUEL' } },
+);
+// Profile history: a user's finished sessions, newest first, keyset-paginated on (completedAt, _id).
+sessionSchema.index({ userId: 1, status: 1, completedAt: -1, _id: -1 });
 
 export type Session = InferSchemaType<typeof sessionSchema>;
 export type SessionDoc = HydratedDocument<Session>;

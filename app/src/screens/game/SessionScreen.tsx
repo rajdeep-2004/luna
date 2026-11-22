@@ -5,11 +5,19 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-na
 import { sessionsApi, userMessage } from '../../api';
 import { AppText, Button, Card, ErrorState, Screen } from '../../components';
 import { haptic } from '../../lib/haptics';
-import { answeredCount, findStep, progressOf } from '../../lib/session';
+import {
+  answeredCount,
+  DUEL_TIMER_MS,
+  DUEL_VERDICT_MS,
+  findStep,
+  progressOf,
+} from '../../lib/session';
 import type { AppStackParams } from '../../navigation/types';
 import { colors, spacing } from '../../theme';
 import { BugHuntBody } from './BugHuntBody';
 import { ChoiceBody } from './ChoiceBody';
+import { DuelCountdown } from './DuelCountdown';
+import { DuelVerdict } from './DuelVerdict';
 import { ElapsedClock } from './ElapsedClock';
 import { FeedbackSheet } from './FeedbackSheet';
 import { IncidentBody } from './IncidentBody';
@@ -36,6 +44,7 @@ export function SessionScreen({ route, navigation }: Props) {
   const [advancing, setAdvancing] = useState(false);
   const rootCause = useRef<string | undefined>(undefined);
 
+  const isDuel = session?.type === 'DUEL';
   const allDone = !!session && session.items.length > 0 && session.items.every((i) => i.isComplete);
   const goToSummary = () =>
     navigation.replace('Summary', { sessionId, rootCause: rootCause.current });
@@ -58,6 +67,18 @@ export function SessionScreen({ route, navigation }: Props) {
       setAdvancing(false);
     }
   }
+
+  // Duels have no feedback sheet: the server's clock runs from the last answer, so reading time
+  // would eat the next 60 s. Show the verdict briefly, then move on by itself.
+  const nextRef = useRef(next);
+  useEffect(() => {
+    nextRef.current = next;
+  });
+  useEffect(() => {
+    if (!isDuel || !flow.result) return;
+    const t = setTimeout(() => void nextRef.current(), DUEL_VERDICT_MS);
+    return () => clearTimeout(t);
+  }, [isDuel, flow.result]);
 
   function confirmHint() {
     Alert.alert('Use a hint?', 'Using a hint halves the XP for this question.', [
@@ -101,7 +122,18 @@ export function SessionScreen({ route, navigation }: Props) {
         position={answeredCount(session) + 1}
         total={session.totalAnswers}
         onLeave={() => navigation.goBack()}
-        clock={<ElapsedClock key={stepKey} />}
+        clock={
+          isDuel ? (
+            <DuelCountdown
+              key={stepKey}
+              remainingMs={DUEL_TIMER_MS - (session.stepElapsedMs ?? 0)}
+              paused={flow.submitting || !!flow.result}
+              onExpire={() => void flow.submitTimeout()}
+            />
+          ) : (
+            <ElapsedClock key={stepKey} />
+          )
+        }
       />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {type === 'BUG_HUNT' ? (
@@ -127,7 +159,8 @@ export function SessionScreen({ route, navigation }: Props) {
             {flow.error}
           </AppText>
         ) : null}
-        {step.hasHint && !flow.hint ? (
+        {isDuel && flow.result ? <DuelVerdict result={flow.result} /> : null}
+        {step.hasHint && !flow.hint && !isDuel ? (
           <Button label="Need a hint?" variant="ghost" onPress={confirmHint} />
         ) : null}
         <Button
@@ -138,7 +171,7 @@ export function SessionScreen({ route, navigation }: Props) {
         />
       </View>
 
-      {flow.result ? (
+      {flow.result && !isDuel ? (
         <FeedbackSheet
           result={flow.result}
           options={step.options}

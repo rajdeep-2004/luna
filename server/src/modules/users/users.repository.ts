@@ -2,6 +2,11 @@ import { UserModel, type UserDoc } from '../../models/User';
 
 export const usersRepo = {
   findById: (id: string) => UserModel.findById(id),
+  /** Public fields only, for leaderboard rows and duel rivals. */
+  findPlayers: (ids: (string | { toString(): string })[]) =>
+    UserModel.find({ _id: { $in: ids } })
+      .select('username avatarId totalXP')
+      .lean(),
   findByEmailWithPassword: (email: string) =>
     UserModel.findOne({ email }).select('+passwordHash +failedLogins +lockedUntil'),
   create: (data: { email: string; username: string; passwordHash: string }) =>

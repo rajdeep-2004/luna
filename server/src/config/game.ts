@@ -117,3 +117,65 @@ export function levelForXP(totalXP: number) {
   for (const l of LEVELS) if (totalXP >= l.minXP) current = l;
   return current;
 }
+
+/** competition.md §1: the Dojo Board shows the top 50 of the UTC week, paginated. */
+export const BOARD = { maxRank: 50, defaultPageSize: 20, podium: 3 } as const;
+
+/** Profile session history page size (`GET /users/me/sessions`). */
+export const HISTORY = { defaultPageSize: 20 } as const;
+
+/** competition.md §2. Slot order is the play order, the same for both players. */
+export const DUEL = {
+  slots: ['TRACE', 'BUG_HUNT', 'ENGINEER_CHOICE', 'ENGINEER_CHOICE', 'ENGINEER_CHOICE'],
+  codeLength: 6,
+  codeRetries: 5,
+  timerMs: 60_000,
+  /** Network allowance on top of the timer before a late answer counts as a timeout. */
+  timerGraceMs: 5_000,
+  expiryMs: 48 * 60 * 60 * 1000,
+  maxOpenPerUser: 5,
+  winBonusXP: 10,
+  winBonusesPerDay: 3,
+  finishedListSize: 20,
+  /** Bounds the "your turn" and "waiting" lists; a user has at most 5 open duels as creator. */
+  activeListMax: 50,
+} as const;
+
+/** progression.md §7. Awarded once each; no XP. `target` is the count the condition needs. */
+export const ACHIEVEMENTS = [
+  {
+    key: 'FIRST_COMMIT',
+    name: 'First Strike',
+    condition: 'Complete your first challenge',
+    icon: '⚔️',
+    target: 1,
+  },
+  {
+    key: 'BUG_HUNTER',
+    name: 'Bug Slayer',
+    condition: '10 Bug Hunt answers correct',
+    icon: '🐞',
+    target: 10,
+  },
+  {
+    key: 'DAILY_GRINDER',
+    name: 'Seven Katas',
+    condition: 'Complete 7 Daily Katas',
+    icon: '🏮',
+    target: 7,
+  },
+  {
+    key: 'INCIDENT_COMMANDER',
+    name: 'Incident Commander',
+    condition: 'Complete 5 Incident Rooms',
+    icon: '🚨',
+    target: 5,
+  },
+  {
+    key: 'PERFECT_RUN',
+    name: 'Kanpeki',
+    condition: 'A Daily Kata with every answer correct',
+    icon: '🌕',
+    target: 1,
+  },
+] as const;

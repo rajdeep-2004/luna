@@ -12,6 +12,8 @@ import { usersRouter } from './modules/users/users.routes';
 import { topicsRouter } from './modules/topics/topics.routes';
 import { sessionsRouter } from './modules/sessions/sessions.routes';
 import { dailyRouter } from './modules/daily/daily.routes';
+import { leaderboardRouter } from './modules/leaderboard/leaderboard.routes';
+import { duelsRouter } from './modules/duels/duels.routes';
 
 /** Builds the Express app without listening, so tests can mount it directly. */
 export function createApp() {
@@ -33,6 +35,8 @@ export function createApp() {
   v1.use('/topics', topicsRouter);
   v1.use('/sessions', sessionsRouter);
   v1.use('/daily', dailyRouter);
+  v1.use('/leaderboard', leaderboardRouter);
+  v1.use('/duels', duelsRouter);
   app.use('/api/v1', v1);
 
   app.use(notFoundHandler);

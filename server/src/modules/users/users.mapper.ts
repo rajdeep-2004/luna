@@ -1,4 +1,4 @@
-import type { PublicUser } from '@luna/shared';
+import type { PlayerView, PublicUser } from '@luna/shared';
 import type { UserDoc } from '../../models/User';
 import { levelForXP } from '../../config/game';
 import { localDateKey } from '../../lib/time';
@@ -26,5 +26,22 @@ export function toPublicUser(u: UserDoc): PublicUser {
     rankName: lvl.name,
     currentStreak: streak.current,
     longestStreak: u.longestStreak,
+  };
+}
+
+type PlayerSource = {
+  _id: { toString(): string };
+  username: string;
+  avatarId: string;
+  totalXP: number;
+};
+
+/** What other players may see of a user (leaderboard rows, duel rivals). */
+export function toPlayerView(u: PlayerSource): PlayerView {
+  return {
+    id: u._id.toString(),
+    username: u.username,
+    avatarId: u.avatarId as PlayerView['avatarId'],
+    rankName: levelForXP(u.totalXP).name,
   };
 }

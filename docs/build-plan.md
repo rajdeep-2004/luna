@@ -39,14 +39,17 @@
 | GET | `/users/me/sessions` | ✓ | P5 | paginated session history |
 | GET | `/users/me/achievements` | ✓ | P5 | earned and locked achievements |
 | GET | `/leaderboard/weekly` | ✓ | P5 | `?cursor=&limit=` ranking + `me` row |
-| POST | `/duels` | ✓ | P5 | create duel → code + creator session |
-| POST | `/duels/:code/join` | ✓ | P5 | join → opponent session |
-| GET | `/duels/:id` | ✓ | P5 | status (participants only) |
-| GET | `/duels/:id/result` | ✓ | P5 | scores + winner once both are done |
+| GET | `/duels` | ✓ | P5 | the Duel screen's tabs: `yourTurn`, `waiting`, `finished` (last 20) |
+| POST | `/duels` | ✓ | P5 | create duel → code (max 5 live per creator) |
+| POST | `/duels/join` | ✓ | P5 | `{ code }` → join atomically (rate-limited per IP) |
+| GET | `/duels/:id` | ✓ | P5 | status, and the result with per-question ✓/✗ once ended (participants only) |
+| POST | `/duels/:id/play` | ✓ | P5 | start or resume my DUEL session on the shared set |
 
 Changes from the brainstorm: endpoints are versioned under `/api/v1`. `POST /sessions/:id/answer`
 became `/answers`. `GET /challenges/daily` became `GET /daily`, because it returns a circuit plus a
-session, not a challenge. `PATCH /users/me` was added for onboarding. See D-009.
+session, not a challenge. `PATCH /users/me` was added for onboarding. See D-009. P5 changed the
+duel endpoints (code in the body, a separate `play` step, the result folded into `GET /duels/:id`,
+and a list endpoint); see D-032.
 
 ---
 

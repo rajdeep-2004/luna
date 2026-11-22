@@ -45,6 +45,11 @@ export type SessionView = {
   startedAt: string;
   totalAnswers: number;
   items: SessionItemView[];
+  /**
+   * DUEL only: server-measured time already spent on the current question, so a resumed duel
+   * shows the real remaining seconds of the 60 s timer (no phone-clock skew).
+   */
+  stepElapsedMs?: number;
 };
 
 export type AnswerResult = {
@@ -68,7 +73,8 @@ export type HintResult = { hint: string };
 
 export type TopicResult = { topicSlug: TopicSlug; correct: number; total: number };
 
-export type BonusKind = 'DAILY_KATA' | 'PERFECT_KATA' | 'FIRST_INCIDENT' | 'STREAK_MILESTONE';
+export type BonusKind =
+  'DAILY_KATA' | 'PERFECT_KATA' | 'FIRST_INCIDENT' | 'STREAK_MILESTONE' | 'DUEL_WIN';
 export type BonusAward = {
   kind: BonusKind;
   xp: number;
@@ -94,6 +100,10 @@ export type SessionSummary = {
   streak?: { current: number; longest: number; extended: boolean };
   /** Set when this session's XP crossed a level threshold. */
   rankUp?: { level: number; rankName: string; kanji: string };
+  /** Achievements this completion unlocked (first completion call only, like rankUp). */
+  newAchievements?: { key: string; name: string; icon: string }[];
+  /** DUEL sessions: the duel this session belongs to, so the app can open its result. */
+  duelId?: string;
 };
 
 /** `GET /daily`: today's Kata (built once per local day) and, once finished, its summary. */

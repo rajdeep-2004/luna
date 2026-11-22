@@ -44,3 +44,9 @@ export function evaluate(c: ChallengeDoc, stageIndex: number, answer: string): E
     ...(feedback ? { optionFeedback: feedback } : {}),
   };
 }
+
+/** A duel answer that ran out of time: wrong, with the usual explanation (game-modes.md §3). */
+export function timeoutEvaluation(c: ChallengeDoc, stageIndex: number): Evaluation {
+  const key = c.type === 'INCIDENT' ? c.stages[stageIndex]?.answerKey : c.answerKey;
+  return { ...evaluate(c, stageIndex, key ?? ''), isCorrect: false };
+}

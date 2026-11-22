@@ -25,6 +25,8 @@ entry and mark the old one `Superseded by D-###`.
 | D-013 | 2026-11-22 | P0 planning | Product design spec written before development (docs/product/) | Active (approved) |
 | D-014 | 2026-11-22 | P0 design | UI direction: calm night, one moon accent | Active |
 | D-015 | 2026-11-22 | P0 design | Lean backend, UI first; phases merged from 7 to 6 | Active |
+| D-016 | 2026-11-22 | P1 | Backend build choices: bundling, bcryptjs, slugs, computed levels, hint endpoint | Active |
+| D-017 | 2026-11-22 | P1 | Question bank V1: 50 challenges + 8 incidents, validated at seed time | Active |
 
 ---
 
@@ -347,5 +349,75 @@ UI and experience matter most.
 (it needs a replica-set test DB), for a failure that's very unlikely at demo scale.
 
 **Revisit if** the app is used beyond the capstone. Add transactions around the answer flow then.
+
+---
+
+### D-016 — Backend build choices: bundling, bcryptjs, slugs, computed levels, hint endpoint
+- **Date:** 2026-11-22 · **Step:** P1 — Backend core · **Status:** Active · **Type:** tooling / architecture
+
+**Decisions and why.**
+- **`shared/` stays TypeScript source; the server build bundles it with tsup.** In dev, `tsx`
+  runs TS directly, including the workspace import. For production, `tsup` produces one
+  `dist/index.js` with `@luna/shared` inlined (`noExternal`), so Render runs plain Node with no TS
+  toolchain. *Rejected:* compiling `shared` to `dist/` and publishing it (an extra build step to
+  keep in sync), and `.js`-extension NodeNext imports everywhere (noisy).
+- **bcryptjs instead of bcrypt.** It's pure JavaScript, so there's no native compile step on Render
+  or on a laptop, and it ships its own types. It's slower than native bcrypt, which is acceptable
+  at cost 12 for login traffic at this scale.
+- **Challenges reference topics by slug** (`databases`), not by ObjectId. Slugs are fixed in
+  `shared/domain.ts`, so no lookup or join is needed and the seed is simpler.
+- **Level and rank are computed from `totalXP`** (`levelForXP` in `config/game.ts`), not stored.
+  One source of truth: changing the thresholds never needs a data migration.
+- **A separate `POST /sessions/:id/hint` endpoint** (new, not in the brainstorm). The server must
+  know a hint was used to halve the XP, so the hint is revealed through the server and recorded
+  on the session item. It is never sent with the challenge.
+- **Starting a session resumes an open one of the same kind.** A double tap on "Start practice"
+  returns the same session instead of creating two.
+- **Server time per answer** = time since the previous answer in the session (or the session
+  start), capped at 10 minutes so an idle phone doesn't skew stats.
+- **Rate limiting:** `/auth/*` 10 per 15 min per IP (skipped when `NODE_ENV=test`, because the
+  local smoke tests register many users), plus a global 300/min.
+
+**How answer submission works** (`sessions.service.ts → submitAnswer`):
+1. Load the session (it must be the user's own and ACTIVE), the item and the challenge.
+2. Check that the stage is the next unanswered one: earlier → 409 "Already answered", later →
+   409 "Answer the earlier stage first".
+3. Evaluate on the server (`sessions.evaluator.ts`): option id, Bug Hunt line number, or incident
+   stage option.
+4. Insert the attempt. The unique index turns a double tap into a 409.
+5. Update topic progress with one atomic `$inc`/`$push` + `$slice`.
+6. If the answer is correct (and not the baseline), award XP through the ledger:
+   `challenge:<id>` or `challenge:<id>:<stage>`. A duplicate key means "already earned", so 0 XP.
+7. Return the evaluation, XP, the next incident stage (if any), and the root cause after the last stage.
+
+**Concepts worth learning.**
+- *Allow-list projection:* `toPublicChallenge` copies only named safe fields, so a new secret
+  field added to the model can't leak by accident.
+- *Timing-equalised login:* comparing against a dummy hash when the email doesn't exist makes
+  "wrong email" and "wrong password" take the same time, so attackers can't probe which emails
+  have accounts.
+
+**Files:** `server/src/**`, `shared/src/**`, `server/tsup.config.ts`.
+
+---
+
+### D-017 — Question bank V1: 50 challenges + 8 incidents, validated at seed time
+- **Date:** 2026-11-22 · **Step:** P1 — Backend core · **Status:** Active · **Type:** content
+
+**Decision.** The bank in `server/src/seed/content/` matches `docs/product/game-modes.md` §5
+exactly. Each topic has 10 single challenges with 4 beginner, 4 intermediate and 2 advanced, and
+the type mix per topic follows the plan. On top of that there are 8 three-stage incidents. Every
+item is checked by a Zod schema at seed time. An `answerKey` must match an option. A Bug Hunt
+line must be inside the snippet. An incident must have 3 stages. Slugs must be unique. One bad
+item fails the whole seed, so the bank never half-loads.
+
+**Seeding is idempotent:** items are upserted by `slug`, and items removed from the files are
+deactivated rather than deleted, so past attempts still point at real challenges.
+
+**Quality rules followed:** one concept per item; wrong options are plausible misconceptions
+(the brainstorm's "Replace HTTP with WebSocket" option was replaced); explanations of 2–4
+sentences plus one misconception line; hints on intermediate and advanced items.
+
+**Revisit if** usability testers report confusing items. Edit the file and re-run `npm run seed -w server`.
 
 ---

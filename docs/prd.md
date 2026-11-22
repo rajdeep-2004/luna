@@ -28,7 +28,7 @@ V1 optimises for the CS student.
 
 ## 3. Goals
 
-- A new user can register, onboard and finish their first Daily Circuit without help (8/10 testers).
+- A new user can register, onboard and finish their first Daily Kata without help (8/10 testers).
 - Every answer teaches: users can explain why an answer was right or wrong after seeing feedback.
 - Users can find their weakest topic from the home screen.
 - Two users can create, join and finish a Friend Duel using an invite code.
@@ -55,7 +55,7 @@ V1 optimises for the CS student.
 |---|---|---|
 | F-01 | Register / login | Email + password signup and login. Username unique. Token stored in SecureStore. Logout clears it. Wrong credentials show a clear error. Login is rate-limited. |
 | F-02 | Onboarding | Pick username, preset avatar, preferred topics and experience level. Optional 5-question baseline assessment sets the starting difficulty per topic. |
-| F-03 | Home dashboard | Shows greeting, avatar, XP, level, streak, Daily Circuit card (primary CTA), topic progress, weakest topic, recommended practice and weekly rank preview. |
+| F-03 | Home dashboard | Shows greeting, avatar, XP, level, streak, Daily Kata card (primary CTA), topic progress, weakest topic, recommended practice and weekly rank preview. |
 | F-04 | Explore / skill tree | Five topic cards with completed count and mastery label. Any topic can be practised (no forced linear path). |
 | F-05 | Challenge engine | One reusable game screen renders all challenge types from structured data. **The answer key never reaches the client before an answer is submitted.** |
 | F-06 | Trace the Stack | Multiple choice: predict the output of code, a query or an HTTP exchange. |
@@ -66,7 +66,7 @@ V1 optimises for the CS student.
 | F-11 | Answer feedback | Correct/incorrect, correct answer, explanation, main misconception, XP earned, Next button. |
 | F-12 | Session summary | Questions, correct, accuracy, time, XP, streak, per-topic performance, weak areas. |
 | F-13 | XP and levels | 10/15/20 XP per correct answer, first-correct only. A hint halves the XP. 2 review XP inside the Daily Kata. Capped bonuses (`product/scoring.md`). 10 samurai ranks, Deshi → Shogun (`product/progression.md`). |
-| F-14 | Streaks | +1 when a Daily Circuit is completed on a new calendar day in the user's timezone. A missed day resets it to 1. Current and longest streak stored. Milestone bonuses at 3, 7 and 30 days. |
+| F-14 | Streaks | +1 when a Daily Kata is completed on a new calendar day in the user's timezone. A missed day resets it to 1. Current and longest streak stored. Milestone bonuses at 3, 7 and 30 days. |
 | F-15 | Persistent progress | All attempts, XP, streaks and topic progress are stored server-side and survive reinstall and new devices. |
 | F-16 | Question bank | 50–60 hand-written challenges across 5 topics × 3 difficulties, plus at least 4 Incident Room scenarios, loaded by a seed script. |
 
@@ -119,7 +119,7 @@ V1 optimises for the CS student.
 ## 8. Success metrics
 
 Prototype evaluation targets, not claims:
-- **Activation:** % of registered users who finish onboarding and their first Daily Circuit.
+- **Activation:** % of registered users who finish onboarding and their first Daily Kata.
 - **Engagement:** Daily Circuit completion rate, challenges per session, active days per user.
 - **Learning:** accuracy by topic, accuracy on revisited (previously missed) questions.
 - **Competition:** duels created, duel completion rate.

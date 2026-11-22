@@ -95,7 +95,7 @@ luna/
 | challenges | challenge repo, public projection (no answer key) | — | send `answerKey` / `stages[].answerKey` |
 | sessions | start session, submit answer, complete session | challenges, progress, daily, achievements | trust client time or correctness |
 | progress | XP ledger, levels, streaks, topic progress, mastery, adaptivity | — | award XP twice for the same source |
-| daily | build or return today's Daily Circuit per user | challenges, progress | build two circuits for the same user and day |
+| daily | build or return today's Daily Kata per user | challenges, progress | build two circuits for the same user and day |
 | leaderboard | weekly ranking aggregation | progress (XP ledger) | scan unbounded results |
 | duels | create, join, result | sessions | let a user join their own duel |
 | achievements | evaluate and award badges after session events | progress | award the same badge twice |
@@ -201,7 +201,7 @@ active challenge of that type if a pool is empty.
 
 **Streak** (local calendar day in `users.timezone`): same day → no change; yesterday → +1;
 otherwise → 1. `longestStreak = max(...)`. A timezone change can't be used to farm streaks,
-because the streak only moves when a Daily Circuit completes and `lastDailyDate` is compared as a date string.
+because the streak only moves when a Daily Kata completes and `lastDailyDate` is compared as a date string.
 
 **Duel:** create → random 6-character code from an unambiguous alphabet (no 0/O/1/I), retry on unique
 collision (up to 5 times). Join → atomic `findOneAndUpdate({code, status: OPEN, opponentId: null,

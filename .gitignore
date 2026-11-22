@@ -1,0 +1,27 @@
+# deps / build
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# expo
+.expo/
+web-build/
+expo-env.d.ts
+ios/
+android/
+
+# env (keep the example)
+.env
+.env.*
+!.env.example
+
+# local-only tests and scratch work (never pushed, see docs/decisions.md D-005)
+.scratch/
+
+# os / editor
+.DS_Store
+*.log
+.vscode/
+.idea/
+coverage/

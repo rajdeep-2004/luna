@@ -29,9 +29,10 @@
 | GET | `/users/me` | ✓ | P1 | current profile |
 | PATCH | `/users/me` | ✓ | P1 | onboarding: username, avatarId, preferredTopicIds, experienceLevel, timezone |
 | GET | `/topics` | ✓ | P1 | topic list |
-| POST | `/sessions` | ✓ | P1 | start PRACTICE (`topicId`) or BASELINE session → challenges without answer keys |
+| POST | `/sessions` | ✓ | P1 | start PRACTICE (`topicSlug`), INCIDENT (`challengeId?`) or BASELINE → challenges without answer keys. Resumes an open session of the same kind |
 | GET | `/sessions/:id` | ✓ | P1 | resume a session (items, answered state) |
 | POST | `/sessions/:id/answers` | ✓ | P1 | submit an answer (`challengeId`, `stageIndex?`, `answer`) → evaluation + next stage |
+| POST | `/sessions/:id/hint` | ✓ | P1 | reveal the hint for the current challenge/stage (halves its XP) |
 | POST | `/sessions/:id/complete` | ✓ | P1 | finish → summary (idempotent) |
 | GET | `/daily` | ✓ | P4 | today's circuit (creates it once) + its session |
 | GET | `/users/me/progress` | ✓ | P4 | XP, level, streaks, per-topic mastery, weakest topic, recommendation |

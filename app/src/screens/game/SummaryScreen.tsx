@@ -1,13 +1,212 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { AppText, Button, Screen } from '../../components';
+import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+import type { SessionSummary } from '@luna/shared';
+import { sessionsApi, usersApi, userMessage } from '../../api';
+import {
+  AppText,
+  Button,
+  Card,
+  ErrorState,
+  MoonPhase,
+  ProgressLine,
+  Screen,
+  type MoonPhaseName,
+} from '../../components';
+import { haptic } from '../../lib/haptics';
+import { useTopicNames } from '../../lib/useTopicNames';
 import type { AppStackParams } from '../../navigation/types';
+import { useAuthStore } from '../../store/auth';
+import { colors, spacing } from '../../theme';
+import { useStartSession } from '../explore/useStartSession';
 
-/** Stub: replaced by the real summary in the next commit. */
-export function SummaryScreen({ navigation }: NativeStackScreenProps<AppStackParams, 'Summary'>) {
+type Props = NativeStackScreenProps<AppStackParams, 'Summary'>;
+
+const GRADES: Record<SessionSummary['grade'], { word: string; phase: MoonPhaseName }> = {
+  KANPEKI: { word: 'Kanpeki', phase: 'full' },
+  SUGOI: { word: 'Sugoi', phase: 'gibbous' },
+  YOSHI: { word: 'Yoshi', phase: 'half' },
+  MADA_MADA: { word: 'Mada mada', phase: 'crescent' },
+};
+
+const formatTime = (ms: number) => {
+  const total = Math.round(ms / 1000);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+};
+
+export function SummaryScreen({ route, navigation }: Props) {
+  const { sessionId, rootCause } = route.params;
+  const setUser = useAuthStore((s) => s.setUser);
+  const topicName = useTopicNames();
+  const startPractice = useStartSession(true);
+
+  // Completing is idempotent on the server (a second call returns the stored summary), so a remount is safe.
+  const query = useQuery({
+    queryKey: ['summary', sessionId],
+    queryFn: () => sessionsApi.complete(sessionId),
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+  const summary = query.data;
+
+  // Pull the new XP / streak into the header. Best effort: a failure here must not hide the summary.
+  useEffect(() => {
+    if (summary)
+      usersApi
+        .me()
+        .then(setUser)
+        .catch(() => undefined);
+  }, [summary, setUser]);
+
+  const done = () => navigation.popToTop();
+
+  if (query.isPending)
+    return (
+      <Screen>
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.moon} />
+        </View>
+      </Screen>
+    );
+  if (query.isError || !summary)
+    return (
+      <Screen>
+        <View style={styles.center}>
+          <ErrorState
+            message={userMessage(query.error)}
+            onRetry={() => void query.refetch()}
+            retrying={query.isFetching}
+          />
+          <Button label="Back to the dojo" variant="ghost" onPress={done} />
+        </View>
+      </Screen>
+    );
+
+  const isIncident = summary.type === 'INCIDENT';
+  const grade = GRADES[summary.grade];
+
   return (
     <Screen>
-      <AppText>Session complete</AppText>
-      <Button label="Done" onPress={() => navigation.popToTop()} />
+      <ScrollView contentContainerStyle={styles.content}>
+        <GradeMoon phase={grade.phase} />
+        <AppText variant="label" color="textMuted" style={styles.centerText}>
+          {isIncident ? 'Incident report' : 'Session complete'}
+        </AppText>
+        <AppText variant="display" style={styles.centerText}>
+          {grade.word}
+        </AppText>
+
+        <View style={styles.stats}>
+          <Stat
+            label={isIncident ? 'Stages correct' : 'Correct'}
+            value={`${summary.correctAnswers} / ${summary.totalAnswers}`}
+          />
+          <Stat label="XP" value={`+${summary.xpEarned}`} />
+          <Stat label="Time" value={formatTime(summary.totalTimeMs)} />
+        </View>
+
+        {isIncident && rootCause ? (
+          <Card>
+            <AppText variant="label" color="moon">
+              Root cause
+            </AppText>
+            <AppText>{rootCause}</AppText>
+          </Card>
+        ) : null}
+
+        {!isIncident && summary.perTopic.length > 0 ? (
+          <Card>
+            <AppText variant="label" color="textMuted">
+              By topic
+            </AppText>
+            {summary.perTopic.map((t) => (
+              <View key={t.topicSlug} style={styles.topicRow}>
+                <View style={styles.topicHead}>
+                  <AppText color="textSoft">{topicName(t.topicSlug)}</AppText>
+                  <AppText color="textMuted">
+                    {t.correct} / {t.total}
+                  </AppText>
+                </View>
+                <ProgressLine value={t.total > 0 ? t.correct / t.total : 0} />
+              </View>
+            ))}
+          </Card>
+        ) : null}
+
+        {summary.weakTopics.length > 0 ? (
+          <Card>
+            <AppText variant="label" color="emberSoft">
+              Worth another look
+            </AppText>
+            {summary.weakTopics.map((slug) => (
+              <Button
+                key={slug}
+                label={`Practise ${topicName(slug)}`}
+                variant="ghost"
+                pending={startPractice.pendingKey === slug}
+                disabled={startPractice.pendingKey !== null}
+                onPress={() =>
+                  void startPractice.start(slug, { type: 'PRACTICE', topicSlug: slug })
+                }
+              />
+            ))}
+            {startPractice.error ? (
+              <AppText color="emberSoft" accessibilityRole="alert">
+                {startPractice.error}
+              </AppText>
+            ) : null}
+          </Card>
+        ) : null}
+      </ScrollView>
+      <View style={styles.actions}>
+        <Button label="Back to the dojo" onPress={done} />
+      </View>
     </Screen>
   );
 }
+
+/** The grade moon grows from a smaller size on arrival (700 ms). With Reduce Motion it appears at full size. */
+function GradeMoon({ phase }: { phase: MoonPhaseName }) {
+  const reduce = useReducedMotion();
+  const scale = useSharedValue(reduce ? 1 : 0.6);
+  useEffect(() => {
+    if (!reduce) scale.value = withTiming(1, { duration: 700 });
+    haptic.success();
+  }, [reduce, scale]);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return (
+    <Animated.View style={[styles.moon, style]}>
+      <MoonPhase phase={phase} size={112} />
+    </Animated.View>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.stat} accessible accessibilityLabel={`${label}: ${value}`}>
+      <AppText variant="title">{value}</AppText>
+      <AppText variant="label" color="textMuted">
+        {label}
+      </AppText>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  content: { gap: spacing.lg, paddingVertical: spacing.xxl },
+  center: { flex: 1, justifyContent: 'center', gap: spacing.md, textAlign: 'center' },
+  centerText: { textAlign: 'center' },
+  moon: { alignItems: 'center' },
+  stats: { flexDirection: 'row', justifyContent: 'space-around' },
+  stat: { alignItems: 'center', gap: spacing.xs },
+  topicRow: { gap: spacing.sm },
+  topicHead: { flexDirection: 'row', justifyContent: 'space-between' },
+  actions: { paddingBottom: spacing.lg },
+});

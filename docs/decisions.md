@@ -572,3 +572,52 @@ app showed "Cannot reach the server" because the API was not reachable on the co
 the port setting was corrected, register and onboarding worked. This was setup, not a code bug.
 Native Expo Go requests send no `Origin` header, so CORS only matters for Expo web. As P2 is frontend-only,
 no automated review ran, following the project rules. P2 is marked `shipped` in `prd.md` and merged into `main`.
+
+### D-024 — Game UI: server-driven session screen, feedback sheet, summary
+- **Date:** 2026-11-22 · **Step:** P3 tasks 1–5 · **Status:** Active · **Type:** product + technical
+
+**Context.** P3 turns the finished backend (P1) into the playable loop: pick a topic, answer, get
+feedback, see a summary. The risk with game screens is the app and server disagreeing about where the
+player is, so the main design question was who owns the position inside a session.
+
+**Decision: the server owns the position, the app derives it.** `SessionScreen` loads `GET /sessions/:id`
+and `lib/session.ts#findStep` picks the first unfinished item and, for an Incident, the first unanswered
+stage. After each answer, "Next" refetches the session instead of the app counting forward by itself. That
+makes resume free (close the app, reopen the session, land on the right question), and a duplicate answer
+(HTTP 409 after a lost response) is handled by resyncing rather than showing an error. The leave button only
+navigates away; the session stays open on the server.
+
+**One screen, four modes.** Trace and Engineer's Choice share `ChoiceBody`; Bug Hunt uses tappable
+`CodeLine`s and sends the 1-based line number as the answer; the Incident Room shows earlier stages as a muted
+timeline, the current stage's evidence in a card, then its question and options. All four use the same
+header, the same "Strike" button, and the same feedback sheet, so the interaction feels consistent.
+
+**Feedback.** After a verdict a sheet rises (500 ms) with a 正/誤 stamp, an XP count-up, the explanation,
+the misconception, and for Engineer's Choice a line on why each wrong option is worse. Correct and wrong are
+never colour alone: correct is a gold filled circle with ✓, wrong an ember outline with ✕. Haptics: `selection`
+on tap, `success` / `error` on the verdict. **Reduce Motion** (the OS setting) turns off the spring, the shake,
+the count-up and the slide, replacing them with a short fade.
+
+**Hints.** The "Need a hint?" button asks for confirmation ("Using a hint halves the XP for this question")
+before calling the hint endpoint, as `game-modes.md` §3 requires. The hint text is kept only in local state.
+
+**Summary.** `SummaryScreen` calls `POST /sessions/:id/complete`. The server makes that idempotent, so
+reopening is safe, and the Incident Report (stages correct, grade, time, XP, root cause) is the same screen with
+different labels. The root cause arrives with the last stage's answer and is passed to the summary as a route
+param, because the summary payload doesn't carry it. If the app is killed before the summary, the root cause is
+not shown on resume; the score still is. After completing, the app refreshes `/users/me` so XP and streak are
+current. "Worth another look" buttons start a practice session on the weakest topics.
+
+**Assumptions I made.** The username/avatar header from P2 stays on the placeholder tabs. Topic cards show a
+new moon for every topic because mastery phases arrive in P4. The petals and the rank-up banner in `ui-design.md`
+§6 are left for P4 (rank-up) and P6 (polish).
+
+**Alternatives rejected.** Client-side counting of the question index (breaks resume). Putting the feedback in a
+`Modal` (focus and animation quirks on Android; an absolutely positioned view is simpler and keeps our own dimming).
+
+**Files.** `app/src/screens/{explore,game}/*`, `app/src/lib/{session,haptics,useCountUp,useTopicNames}.ts`,
+`app/src/components/{OptionRow,CodeBlock,Marker,Stamp}.tsx`, `app/src/navigation/AppStack.tsx`.
+**Concepts.** Server-driven UI state; idempotent endpoints; accessibility state (`radio`, `checked`, live regions);
+the OS Reduce Motion setting.
+**Revisit if** the first-correct-XP rule makes repeat practice feel unrewarding, or testers lose their Incident
+root cause on resume.

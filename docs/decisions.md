@@ -1084,3 +1084,37 @@ before the demo if a clean user list matters.
 **Why this order.** The API went live from `main` (P5) before the P6 branch was merged. The P6 changes are a
 refactor, docs and two small UI fixes, so the live API behaves the same; they reach Render automatically when
 P6 is merged.
+
+---
+
+### D-037 — Change of direction: Luna becomes a brain game for engineers
+- **Date:** 2026-11-22 · **Step:** P7 — product direction · **Status:** Active · **Type:** product
+
+**Context.** After using the deployed app, Rajdeep judged the UI "full AI slop": too much text, too much
+empty space, no icons on the tab bar (they were hidden in `MainTabs.tsx`), an unstyled tap ripple, almost no
+motion, and no feeling of a game. The Profile read like a report card (topic accuracy), and Explore led
+straight into a quiz with no choice of how to play.
+
+**Decision (Rajdeep, in chat).**
+1. **Positioning: full shift to a game.** Luna is a gamified brain game that engineers play to pass time, like
+   Elevate or Peak but for engineering. Players still learn from the explanations, but nothing should look or
+   feel like studying. The Profile shows the player (rank, XP, streak, achievements, duel record), not topic
+   accuracy. The PRD will be updated to match.
+2. **Explore, in two steps.** Now (P7): picking a topic opens a choice of game modes (Trace, Bug Hunt,
+   Engineer's Choice, Incident Room), each presented as a game with its own identity. Next (P8): new mini-games
+   such as a 60-second blitz or a swipe true/false round, which need new content.
+3. **Duel formats now.** Duels get several formats instead of one (for example Classic, Blitz and Sudden Death).
+   This needs new server rules and UI.
+4. **Design system first.** Before any screen is rebuilt, a design consultation locks a Japanese-dojo visual
+   system (icons, illustration, motion, text density) with previews Rajdeep approves.
+
+**Rejected.** A hybrid that keeps a skills view; keeping the learning focus; one improved duel with formats
+parked; rebuilding screens without a design step. The last one was rejected because it is how the current
+UI ended up text-heavy.
+
+**What this changes.** New phases: P7 (game redesign, building) and P8 (new mini-games, todo). P6's remaining
+tasks (demo and metrics scripts, acceptance run) move to after P7, since the demo should show the new design.
+
+**Lesson worth keeping.** A game spec is not enough. The earlier phases checked behaviour ("does it work")
+against a checklist but never checked feel ("does it look and play like a game"). From P7 on, every screen is
+judged against the approved design previews, not only against a functional checklist.

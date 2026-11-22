@@ -48,8 +48,8 @@ of it, so these are presentation changes, not lost functionality:
 | F-21 Weak-topic recommendations | Shown on Home                                                 | Computed by the API (`weakestTopic`) and used by the Daily Kata selection; surfaced as "Train again" after a round  |
 | F-24 Topic statistics           | Per-topic accuracy and moons on the Profile                   | Removed from the Profile (warrior sheet instead); still in `GET /users/me/progress`                                 |
 
-**Decision needed (Rajdeep):** should the PRD rows above be reworded to match what is built? The PRD's scope
-only changes with your approval, so they are left as written for now.
+**Resolved 2026-11-23:** Rajdeep approved rewording these PRD rows (and F-18 for the duel formats) to match what
+is built.
 
 ## Open items before V1 is called done
 

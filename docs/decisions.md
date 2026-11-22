@@ -1461,3 +1461,11 @@ first). Sideloading needs "install unknown apps" on the phone. A free Render col
 first open.
 
 **Revisit** for a Play Store release (switch to an `.aab` build and a production profile).
+
+### D-045 — PRD synced to the game redesign
+
+**Context.** The V1 audit (`docs/v1-audit.md`) found five PRD rows describing the pre-P7, study-style UI. **Decision
+(approved by Rajdeep, 2026-11-23):** reword F-03 (the Dojo room), F-04 (banners, mode rounds, boss), F-12 (the
+summary without per-topic tables), F-21 (weak topic used for selection and "Train again", not shown as a number) and
+F-24 (topic statistics served by the API, not shown on the Profile). F-18 also gains the three duel formats. Scope
+is unchanged: every capability still exists, and only where it shows up changed.

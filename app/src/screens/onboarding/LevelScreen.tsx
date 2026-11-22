@@ -18,7 +18,7 @@ const COPY: Record<ExperienceLevel, { title: string; description: string }> = {
 export function LevelScreen({
   navigation,
 }: NativeStackScreenProps<OnboardingStackParams, 'Level'>) {
-  const { avatarId, topics, level, setLevel, reset } = useOnboardingStore();
+  const { avatarId, topics, level, setLevel, reset, setOfferBaseline } = useOnboardingStore();
   const setUser = useAuthStore((s) => s.setUser);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +36,7 @@ export function LevelScreen({
         completeOnboarding: true,
       });
       reset();
+      setOfferBaseline(true);
       setUser(user); // `onboarded` is now true, so the root navigator swaps to the main tabs.
     } catch (e) {
       setError(userMessage(e));

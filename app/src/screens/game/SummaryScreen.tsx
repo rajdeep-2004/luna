@@ -1,6 +1,6 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useQuery } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -10,6 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import type { SessionSummary } from '@luna/shared';
 import { sessionsApi, usersApi, userMessage } from '../../api';
+import { PROGRESS_KEY } from '../../lib/useProgress';
 import {
   AppText,
   Button,
@@ -26,6 +27,8 @@ import type { AppStackParams } from '../../navigation/types';
 import { useAuthStore } from '../../store/auth';
 import { colors, spacing } from '../../theme';
 import { useStartSession } from '../explore/useStartSession';
+import { RankUpOverlay } from './RankUpOverlay';
+import { CheckpointComparison, ProgressCard } from './SummaryExtras';
 
 type Props = NativeStackScreenProps<AppStackParams, 'Summary'>;
 
@@ -34,6 +37,13 @@ const GRADES: Record<SessionSummary['grade'], { word: string; phase: MoonPhaseNa
   SUGOI: { word: 'Sugoi', phase: 'gibbous' },
   YOSHI: { word: 'Yoshi', phase: 'half' },
   MADA_MADA: { word: 'Mada mada', phase: 'crescent' },
+};
+
+const HEADING: Partial<Record<SessionSummary['type'], string>> = {
+  INCIDENT: 'Incident report',
+  DAILY: 'Daily Kata complete',
+  BASELINE: 'Baseline complete',
+  CHECKPOINT: 'Checkpoint complete',
 };
 
 const formatTime = (ms: number) => {
@@ -55,15 +65,24 @@ export function SummaryScreen({ route, navigation }: Props) {
     gcTime: Infinity,
   });
   const summary = query.data;
+  const queryClient = useQueryClient();
+  const [rankUpSeen, setRankUpSeen] = useState(false);
+  // The Checkpoint compares against the baseline score, which lives in the progress view.
+  const progress = useQuery({
+    queryKey: PROGRESS_KEY,
+    queryFn: usersApi.progress,
+    enabled: summary?.type === 'CHECKPOINT',
+  });
 
-  // Pull the new XP / streak into the header. Best effort: a failure here must not hide the summary.
+  // Pull the new XP / streak into the header and the Dojo. Best effort: a failure here must not hide the summary.
   useEffect(() => {
-    if (summary)
-      usersApi
-        .me()
-        .then(setUser)
-        .catch(() => undefined);
-  }, [summary, setUser]);
+    if (!summary) return;
+    void queryClient.invalidateQueries({ queryKey: PROGRESS_KEY });
+    usersApi
+      .me()
+      .then(setUser)
+      .catch(() => undefined);
+  }, [summary, setUser, queryClient]);
 
   const done = () => navigation.popToTop();
 
@@ -97,7 +116,7 @@ export function SummaryScreen({ route, navigation }: Props) {
       <ScrollView contentContainerStyle={styles.content}>
         <GradeMoon phase={grade.phase} />
         <AppText variant="label" color="textMuted" style={styles.centerText}>
-          {isIncident ? 'Incident report' : 'Session complete'}
+          {HEADING[summary.type] ?? 'Session complete'}
         </AppText>
         <AppText variant="display" style={styles.centerText}>
           {grade.word}
@@ -111,6 +130,19 @@ export function SummaryScreen({ route, navigation }: Props) {
           <Stat label="XP" value={`+${summary.xpEarned}`} />
           <Stat label="Time" value={formatTime(summary.totalTimeMs)} />
         </View>
+
+        <ProgressCard summary={summary} />
+        {summary.type === 'CHECKPOINT' ? (
+          <CheckpointComparison
+            baseline={progress.data?.assessments.baseline ?? null}
+            summary={summary}
+          />
+        ) : null}
+        {summary.type === 'BASELINE' ? (
+          <AppText color="textSoft" style={styles.centerText}>
+            Your starting difficulty is set for each topic. It keeps adapting as you play.
+          </AppText>
+        ) : null}
 
         {isIncident && rootCause ? (
           <Card>
@@ -168,6 +200,9 @@ export function SummaryScreen({ route, navigation }: Props) {
       <View style={styles.actions}>
         <Button label="Back to the dojo" onPress={done} />
       </View>
+      {summary.rankUp && !rankUpSeen ? (
+        <RankUpOverlay rankUp={summary.rankUp} onDone={() => setRankUpSeen(true)} />
+      ) : null}
     </Screen>
   );
 }

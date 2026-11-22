@@ -10,6 +10,9 @@ type Draft = {
   toggleTopic: (slug: TopicSlug) => void;
   setLevel: (level: ExperienceLevel) => void;
   reset: () => void;
+  /** Set when onboarding finishes, so the Dojo offers the baseline once. Not part of the draft. */
+  offerBaseline: boolean;
+  setOfferBaseline: (v: boolean) => void;
 };
 
 const initial = { avatarId: 'kitsune' as AvatarId, topics: [] as TopicSlug[], level: null };
@@ -23,4 +26,6 @@ export const useOnboardingStore = create<Draft>((set) => ({
     })),
   setLevel: (level) => set({ level }),
   reset: () => set(initial),
+  offerBaseline: false,
+  setOfferBaseline: (offerBaseline) => set({ offerBaseline }),
 }));

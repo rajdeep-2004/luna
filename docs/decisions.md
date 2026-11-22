@@ -786,3 +786,52 @@ day (a practice-only day would count, which isn't what a checkpoint window means
 counters; timestamp-ordered idempotency.
 **Revisit if** the bank grows enough that the scoring weights need tuning, or testers ask to finish
 yesterday's Kata.
+
+### D-029 — Dojo home, rank-up moment, baseline offer, Checkpoint card
+- **Date:** 2026-11-22 · **Step:** P4 task 4 · **Status:** Active · **Type:** product + technical
+
+**Dojo home.** Follows `ui-design.md` §1.3: three things only. The header holds the avatar, rank (name,
+kanji, level), the lantern, and a thin XP line to the next rank. The centre is the Daily Kata: a floating
+moon (±4 px float and a breathing halo, both off under Reduce Motion), the serif title (the screen's one
+serif element), and the one primary button, *Begin kata*. Below it is the weakest blade card, with the five
+topic moons in a row underneath, because `progression.md` §2 calls that row "the clearest possible weakest
+topic display". When a Checkpoint is ready, a quiet card appears; otherwise nothing, so the screen stays
+calm.
+
+**The Kata is built on tap, not on view.** `GET /daily` creates today's Kata. Home doesn't call it on load;
+it reads `doneToday` from the progress view and only calls `/daily` when the user taps. Otherwise simply
+opening the app would count as "started a Kata" and make the completion-rate benchmark (≥ 85%) look worse
+than it is. Once done, the button becomes the ghost *See today's result*.
+
+**The lantern is kind.** When the server reports `wentOut`, Home says "Your lantern went out. Light it
+again today." (`progression.md` §6) and shows 0, never the stale number.
+
+**Rank-up moment.** When the summary carries `rankUp`, a full-screen layer covers the summary: full moon,
+the rank's kanji, "You are now Ronin", and *Continue*, which reveals the summary underneath. It pops with a
+spring (fades only under Reduce Motion) and fires the success haptic. The summary also lists the bonuses
+earned, the lantern line ("Lantern lit: 3 days · your longest yet"), and "You fixed a past mistake" for
+revisits.
+
+**Baseline offer.** Onboarding sets a one-time in-memory flag. The Dojo sees it and pushes the
+*One quick check?* screen over the tabs, with *Take the baseline* and *Skip for now*. It's pushed over the
+tabs (not the first screen of a new stack) so that after the baseline's summary, *Back to the dojo* lands
+on the Dojo. The flag isn't persisted: if the app is killed at that exact moment, the offer is lost.
+That's acceptable for an optional step. The baseline summary says the starting difficulty is set; the
+Checkpoint summary shows "Baseline 2/5 → Checkpoint 4/5".
+
+**Explore** now shows each topic's real moon phase. If the progress call fails, topics still render as
+new moons: the moons are extra information there, not the content.
+
+**Freshness.** Progress is a React Query key refetched whenever the Dojo or Explore regains focus, and
+invalidated when a summary loads, so XP, rank and the lantern are current after every session.
+
+**Left out (parked for P6 polish):** the petals on the summary, a dedicated Checkpoint intro screen, and
+any countdown to the next Checkpoint on Home.
+
+**Files.** `app/src/screens/dojo/*`, `app/src/screens/game/{RankUpOverlay,SummaryExtras,SummaryScreen}.tsx`,
+`app/src/screens/onboarding/{BaselineIntroScreen,LevelScreen}.tsx`, `app/src/screens/explore/ExploreScreen.tsx`,
+`app/src/lib/{moon,useProgress}.ts`, `app/src/navigation/*`, `app/src/store/onboarding.ts`, `app/src/api/endpoints.ts`.
+**Concepts.** Measuring intent (create on action, not on view); focus-based refetching; overlay vs route for
+a one-off moment.
+**Revisit if** testers miss the baseline because the flag was lost, or if Home feels empty before the first
+Checkpoint.

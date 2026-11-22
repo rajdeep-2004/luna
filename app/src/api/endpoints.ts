@@ -1,9 +1,11 @@
 import type {
   AnswerResult,
   AuthResponse,
+  DailyView,
   HintRequest,
   HintResult,
   LoginRequest,
+  ProgressView,
   PublicUser,
   RegisterRequest,
   SessionSummary,
@@ -24,6 +26,12 @@ export const authApi = {
 export const usersApi = {
   me: () => api.get<PublicUser>('/users/me'),
   updateMe: (body: UpdateMeRequest) => api.patch<PublicUser>('/users/me', body),
+  progress: () => api.get<ProgressView>('/users/me/progress'),
+};
+
+export const dailyApi = {
+  /** Builds today's Kata on the first call of the day; later calls resume it or return its result. */
+  today: () => api.get<DailyView>('/daily'),
 };
 
 export const topicsApi = {

@@ -90,14 +90,14 @@ V1 optimises for the CS student.
 
 ## 6. Core user flows
 
-### Flow 1: First Daily Circuit
+### Flow 1: First Daily Kata
 1. User registers → onboarding (username, avatar, topics, level) → optional baseline assessment.
-2. Home dashboard → taps **Start Daily Circuit**.
+2. Home dashboard → taps **Start Daily Kata**.
 3. Plays 5 challenges. After each answer, the feedback screen explains it.
 4. Session summary → XP, streak and topic mastery update → back to home.
 
 ### Flow 2: Incident Room
-1. User opens an incident (from the Daily Circuit or Explore).
+1. User opens an incident (from the Daily Kata or Explore).
 2. Stage 1 alert with metrics → picks what to investigate → feedback plus new evidence.
 3. Stage 2 → Stage 3 the same way → incident report.
 
@@ -120,7 +120,7 @@ V1 optimises for the CS student.
 
 Prototype evaluation targets, not claims:
 - **Activation:** % of registered users who finish onboarding and their first Daily Kata.
-- **Engagement:** Daily Circuit completion rate, challenges per session, active days per user.
+- **Engagement:** Daily Kata completion rate, challenges per session, active days per user.
 - **Learning:** accuracy by topic, accuracy on revisited (previously missed) questions.
 - **Competition:** duels created, duel completion rate.
 - **Usability test (8–10 CS students):** at least 8/10 finish the first circuit unaided, can find their

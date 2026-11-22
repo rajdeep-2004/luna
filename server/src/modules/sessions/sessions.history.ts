@@ -1,5 +1,12 @@
 import { Types } from 'mongoose';
-import type { Page, PageQuery, SessionHistoryItem, SessionSummary, SessionType, TopicSlug } from '@luna/shared';
+import type {
+  Page,
+  PageQuery,
+  SessionHistoryItem,
+  SessionSummary,
+  SessionType,
+  TopicSlug,
+} from '@luna/shared';
 import { HISTORY } from '../../config/game';
 import { AppError } from '../../lib/errors';
 import { SessionModel } from '../../models/Session';

@@ -13,6 +13,7 @@ import {
 } from '../progress/progression.service';
 import { setDifficulty } from '../progress/topicProgress.service';
 import { usersRepo } from '../users/users.repository';
+import { recordDuelResult } from '../duels/duels.settle';
 
 async function ledgerTotal(userId: string): Promise<number> {
   const [row] = await XpEventModel.aggregate<{ total: number }>([
@@ -63,6 +64,8 @@ export async function settleProgression(
     if (challenges.some((c) => c.type === 'INCIDENT')) candidates.push(firstIncidentCandidate());
   }
   const bonuses = await payBonuses(userId, candidates, session.startedAt);
+  if (type === 'DUEL' && session.duelId)
+    bonuses.push(...(await recordDuelResult(userId, session.duelId, summary)));
   const xpEarned = summary.xpEarned + bonuses.reduce((n, b) => n + b.xp, 0);
 
   // Ledger total, not users.totalXP: a parallel completion may have inserted a ledger row but not
@@ -80,5 +83,6 @@ export async function settleProgression(
     bonuses,
     ...(streak ? { streak } : {}),
     ...(rankUp ? { rankUp } : {}),
+    ...(session.duelId ? { duelId: session.duelId.toString() } : {}),
   };
 }

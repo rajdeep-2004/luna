@@ -69,11 +69,7 @@ export type HintResult = { hint: string };
 export type TopicResult = { topicSlug: TopicSlug; correct: number; total: number };
 
 export type BonusKind =
-  | 'DAILY_KATA'
-  | 'PERFECT_KATA'
-  | 'FIRST_INCIDENT'
-  | 'STREAK_MILESTONE'
-  | 'DUEL_WIN';
+  'DAILY_KATA' | 'PERFECT_KATA' | 'FIRST_INCIDENT' | 'STREAK_MILESTONE' | 'DUEL_WIN';
 export type BonusAward = {
   kind: BonusKind;
   xp: number;

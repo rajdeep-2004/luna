@@ -143,9 +143,39 @@ export const DUEL = {
 
 /** progression.md §7. Awarded once each; no XP. `target` is the count the condition needs. */
 export const ACHIEVEMENTS = [
-  { key: 'FIRST_COMMIT', name: 'First Strike', condition: 'Complete your first challenge', icon: '⚔️', target: 1 },
-  { key: 'BUG_HUNTER', name: 'Bug Slayer', condition: '10 Bug Hunt answers correct', icon: '🐞', target: 10 },
-  { key: 'DAILY_GRINDER', name: 'Seven Katas', condition: 'Complete 7 Daily Katas', icon: '🏮', target: 7 },
-  { key: 'INCIDENT_COMMANDER', name: 'Incident Commander', condition: 'Complete 5 Incident Rooms', icon: '🚨', target: 5 },
-  { key: 'PERFECT_RUN', name: 'Kanpeki', condition: 'A Daily Kata with every answer correct', icon: '🌕', target: 1 },
+  {
+    key: 'FIRST_COMMIT',
+    name: 'First Strike',
+    condition: 'Complete your first challenge',
+    icon: '⚔️',
+    target: 1,
+  },
+  {
+    key: 'BUG_HUNTER',
+    name: 'Bug Slayer',
+    condition: '10 Bug Hunt answers correct',
+    icon: '🐞',
+    target: 10,
+  },
+  {
+    key: 'DAILY_GRINDER',
+    name: 'Seven Katas',
+    condition: 'Complete 7 Daily Katas',
+    icon: '🏮',
+    target: 7,
+  },
+  {
+    key: 'INCIDENT_COMMANDER',
+    name: 'Incident Commander',
+    condition: 'Complete 5 Incident Rooms',
+    icon: '🚨',
+    target: 5,
+  },
+  {
+    key: 'PERFECT_RUN',
+    name: 'Kanpeki',
+    condition: 'A Daily Kata with every answer correct',
+    icon: '🌕',
+    target: 1,
+  },
 ] as const;

@@ -8,7 +8,12 @@ import { challengesRepo } from '../challenges/challenges.repository';
 import { getDifficulty } from '../progress/topicProgress.service';
 import { dueRevisits } from '../progress/revisit.service';
 
-export type PickedItem = { challenge: ChallengeDoc; isRevisit: boolean };
+export type PickedItem = {
+  challenge: ChallengeDoc;
+  isRevisit: boolean;
+  /** Preset option order per stage (duels share one order); shuffled when absent. */
+  optionOrders?: string[][];
+};
 const fresh = (challenge: ChallengeDoc): PickedItem => ({ challenge, isRevisit: false });
 
 export async function seenIds(userId: string): Promise<Set<string>> {

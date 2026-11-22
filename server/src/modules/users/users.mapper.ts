@@ -29,7 +29,12 @@ export function toPublicUser(u: UserDoc): PublicUser {
   };
 }
 
-type PlayerSource = { _id: { toString(): string }; username: string; avatarId: string; totalXP: number };
+type PlayerSource = {
+  _id: { toString(): string };
+  username: string;
+  avatarId: string;
+  totalXP: number;
+};
 
 /** What other players may see of a user (leaderboard rows, duel rivals). */
 export function toPlayerView(u: PlayerSource): PlayerView {

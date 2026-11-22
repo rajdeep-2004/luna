@@ -68,7 +68,10 @@ const Stage = z
     misconception: z.string().min(10),
     hint: z.string().optional(),
   })
-  .refine((s) => s.options.some((o) => o.id === s.answerKey), 'stage answerKey must match an option id');
+  .refine(
+    (s) => s.options.some((o) => o.id === s.answerKey),
+    'stage answerKey must match an option id',
+  );
 
 export const IncidentSeed = z.object({
   ...base,

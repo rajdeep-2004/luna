@@ -10,7 +10,10 @@ export function validateContent() {
   const errors: string[] = [];
   const parsed = CHALLENGES.map((c, i) => {
     const r = ChallengeSeed.safeParse(c);
-    if (!r.success) errors.push(`#${i} ${c.slug}: ${r.error.issues.map((x) => `${x.path.join('.')} ${x.message}`).join('; ')}`);
+    if (!r.success)
+      errors.push(
+        `#${i} ${c.slug}: ${r.error.issues.map((x) => `${x.path.join('.')} ${x.message}`).join('; ')}`,
+      );
     return r.data;
   });
   const slugs = new Set<string>();
@@ -26,7 +29,9 @@ export function validateContent() {
 export async function loadContent() {
   const challenges = validateContent();
   await TopicModel.bulkWrite(
-    TOPICS.map((t) => ({ updateOne: { filter: { slug: t.slug }, update: { $set: t }, upsert: true } })),
+    TOPICS.map((t) => ({
+      updateOne: { filter: { slug: t.slug }, update: { $set: t }, upsert: true },
+    })),
   );
   await ChallengeModel.bulkWrite(
     challenges.map((c) => ({
@@ -41,5 +46,9 @@ export async function loadContent() {
     { slug: { $nin: challenges.map((c) => c.slug) } },
     { $set: { isActive: false } },
   );
-  return { topics: TOPICS.length, challenges: challenges.length, deactivated: removed.modifiedCount };
+  return {
+    topics: TOPICS.length,
+    challenges: challenges.length,
+    deactivated: removed.modifiedCount,
+  };
 }

@@ -21,7 +21,11 @@ function signToken(userId: string): string {
 export async function register(input: RegisterRequest): Promise<AuthResponse> {
   const passwordHash = await bcrypt.hash(input.password, BCRYPT_COST);
   try {
-    const user = await usersRepo.create({ email: input.email, username: input.username, passwordHash });
+    const user = await usersRepo.create({
+      email: input.email,
+      username: input.username,
+      passwordHash,
+    });
     return { token: signToken(user._id.toString()), user: toPublicUser(user) };
   } catch (err) {
     if (isDuplicateKey(err)) {

@@ -2,7 +2,10 @@ import { rateLimit } from 'express-rate-limit';
 import { env } from '../config/env';
 import { AppError } from '../lib/errors';
 
-const limited = new AppError('RATE_LIMITED', 'Too many requests. Wait a few minutes and try again.');
+const limited = new AppError(
+  'RATE_LIMITED',
+  'Too many requests. Wait a few minutes and try again.',
+);
 
 /** Login and register: 10 attempts per 15 minutes per IP (D-015: basic limits on auth only). */
 export const authLimiter = rateLimit({

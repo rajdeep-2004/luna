@@ -6,6 +6,11 @@ export const usersRepo = {
   create: (data: { email: string; username: string; passwordHash: string }) =>
     UserModel.create({ ...data, usernameLower: data.username.toLowerCase() }),
   update: (id: string, set: Record<string, unknown>): Promise<UserDoc | null> =>
-    UserModel.findByIdAndUpdate(id, { $set: set }, { returnDocument: 'after', runValidators: true }),
-  addXP: (id: string, amount: number) => UserModel.updateOne({ _id: id }, { $inc: { totalXP: amount } }),
+    UserModel.findByIdAndUpdate(
+      id,
+      { $set: set },
+      { returnDocument: 'after', runValidators: true },
+    ),
+  addXP: (id: string, amount: number) =>
+    UserModel.updateOne({ _id: id }, { $inc: { totalXP: amount } }),
 };

@@ -16,7 +16,9 @@ export async function initTopicProgress(userId: string, level: ExperienceLevel):
 }
 
 export async function getDifficulty(userId: string, topicSlug: TopicSlug): Promise<1 | 2 | 3> {
-  const row = await UserTopicProgressModel.findOne({ userId, topicSlug }).select('difficultyLevel').lean();
+  const row = await UserTopicProgressModel.findOne({ userId, topicSlug })
+    .select('difficultyLevel')
+    .lean();
   return (row?.difficultyLevel ?? 1) as 1 | 2 | 3;
 }
 

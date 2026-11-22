@@ -7,8 +7,13 @@ export function validateBody(schema: ZodType): RequestHandler {
   return (req, _res, next) => {
     const result = schema.safeParse(req.body ?? {});
     if (!result.success) {
-      const details = result.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message }));
-      return next(new AppError('VALIDATION_ERROR', details[0]?.message ?? 'Invalid request', details));
+      const details = result.error.issues.map((i) => ({
+        path: i.path.join('.'),
+        message: i.message,
+      }));
+      return next(
+        new AppError('VALIDATION_ERROR', details[0]?.message ?? 'Invalid request', details),
+      );
     }
     req.body = result.data;
     next();

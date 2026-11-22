@@ -29,7 +29,10 @@ export async function updateMe(userId: string, input: UpdateMeRequest): Promise<
   if (input.completeOnboarding && !current.onboardedAt) {
     const topics = input.preferredTopicSlugs ?? current.preferredTopicSlugs;
     if (!level || topics.length === 0) {
-      throw new AppError('VALIDATION_ERROR', 'Pick your topics and level before finishing onboarding');
+      throw new AppError(
+        'VALIDATION_ERROR',
+        'Pick your topics and level before finishing onboarding',
+      );
     }
     set.onboardedAt = new Date();
   }

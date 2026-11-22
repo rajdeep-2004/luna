@@ -35,7 +35,8 @@ export const DATABASES: ChallengeSeed[] = [
     answerKey: 'a',
     explanation:
       'The LEFT JOIN keeps Chen with NULLs for the order columns. COUNT(o.id) counts only non-NULL values, so Chen gets 0.',
-    misconception: 'COUNT(*) and COUNT(column) differ: COUNT(*) would count the NULL row and give 1.',
+    misconception:
+      'COUNT(*) and COUNT(column) differ: COUNT(*) would count the NULL row and give 1.',
     hint: 'Which values does COUNT(o.id) skip?',
   },
   {
@@ -57,7 +58,8 @@ export const DATABASES: ChallengeSeed[] = [
     answerKey: 'b',
     explanation:
       'An UPDATE that matches zero rows is not an error, so nothing triggers a rollback and COMMIT succeeds. Application code must check the affected-row count and roll back when it is not 1.',
-    misconception: 'Transactions roll back on errors, not on logic mistakes. "0 rows updated" is a success to the database.',
+    misconception:
+      'Transactions roll back on errors, not on logic mistakes. "0 rows updated" is a success to the database.',
     hint: 'Is "0 rows affected" an error?',
   },
   {
@@ -73,7 +75,8 @@ export const DATABASES: ChallengeSeed[] = [
     answerKey: '3',
     explanation:
       'User input is pasted straight into the SQL text, so the input can change the query itself. That is SQL injection. Use a parameterised query: db.query("... WHERE name = $1", [term]).',
-    misconception: 'Escaping quotes by hand is fragile. Parameters keep data and code separate by design.',
+    misconception:
+      'Escaping quotes by hand is fragile. Parameters keep data and code separate by design.',
   },
   {
     slug: 'db-n-plus-one',
@@ -82,13 +85,15 @@ export const DATABASES: ChallengeSeed[] = [
     subtopic: 'query performance',
     type: 'BUG_HUNT',
     difficulty: 2,
-    prompt: 'This page makes 21 database queries and gets slower as you raise the limit. Which line causes it?',
+    prompt:
+      'This page makes 21 database queries and gets slower as you raise the limit. Which line causes it?',
     codeSnippet:
       'const posts = await Post.find().limit(20);\nfor (const post of posts) {\n  post.author = await User.findById(post.authorId);\n}\nres.json(posts);',
     answerKey: '3',
     explanation:
       'One query loads the posts, then the loop runs one more query per post: the N+1 problem. Collect the author ids and load them in one query with $in, or use a join or populate.',
-    misconception: 'Each small query looks cheap, but round trips add up linearly with the list size.',
+    misconception:
+      'Each small query looks cheap, but round trips add up linearly with the list size.',
     hint: 'How many times does the loop body run?',
   },
   {
@@ -104,7 +109,8 @@ export const DATABASES: ChallengeSeed[] = [
     answerKey: '3',
     explanation:
       'An UPDATE without WHERE changes every row in the table. It needs WHERE id = $1 with userId as the parameter.',
-    misconception: 'Wrapping it in a transaction does not help: the bad update commits successfully.',
+    misconception:
+      'Wrapping it in a transaction does not help: the bad update commits successfully.',
   },
   {
     slug: 'db-add-index',
@@ -113,7 +119,8 @@ export const DATABASES: ChallengeSeed[] = [
     subtopic: 'indexes',
     type: 'ENGINEER_CHOICE',
     difficulty: 1,
-    prompt: 'SELECT * FROM users WHERE email = ? takes 900 ms on a table of 2 million users. What helps most?',
+    prompt:
+      'SELECT * FROM users WHERE email = ? takes 900 ms on a table of 2 million users. What helps most?',
     options: opts(
       'Add an index on email',
       'Add LIMIT 1000 to the query',
@@ -163,7 +170,8 @@ export const DATABASES: ChallengeSeed[] = [
     subtopic: 'indexes',
     type: 'ENGINEER_CHOICE',
     difficulty: 3,
-    prompt: 'The hot query is: WHERE user_id = ? ORDER BY created_at DESC LIMIT 20. Which index serves it best?',
+    prompt:
+      'The hot query is: WHERE user_id = ? ORDER BY created_at DESC LIMIT 20. Which index serves it best?',
     options: opts(
       'A compound index on (user_id, created_at)',
       'A compound index on (created_at, user_id)',
@@ -172,12 +180,13 @@ export const DATABASES: ChallengeSeed[] = [
     ),
     answerKey: 'a',
     explanation:
-      'Put the equality column first and the sort column second. The database jumps to that user\'s entries, which are already ordered by date, and reads 20 of them. No sorting is needed.',
-    misconception: 'Column order in a compound index matters: it works like a phone book sorted by last name, then first name.',
+      "Put the equality column first and the sort column second. The database jumps to that user's entries, which are already ordered by date, and reads 20 of them. No sorting is needed.",
+    misconception:
+      'Column order in a compound index matters: it works like a phone book sorted by last name, then first name.',
     optionFeedback: {
-      b: 'Dates come first, so one user\'s rows are scattered across the index.',
+      b: "Dates come first, so one user's rows are scattered across the index.",
       c: 'The database usually uses only one, then filters or sorts the rest.',
-      d: 'It reads everyone\'s recent rows and filters out other users.',
+      d: "It reads everyone's recent rows and filters out other users.",
     },
     hint: 'Equality filter first, then the sort.',
   },
@@ -199,7 +208,8 @@ export const DATABASES: ChallengeSeed[] = [
     answerKey: 'a',
     explanation:
       'Data that is read together and bounded in size belongs together. Embedding gives one read per order and updates the order and its items atomically.',
-    misconception: '"Always normalise" is a relational habit. In document databases, model around how you read the data.',
+    misconception:
+      '"Always normalise" is a relational habit. In document databases, model around how you read the data.',
     optionFeedback: {
       b: 'An extra join on every read for no benefit.',
       c: 'User documents grow without limit and hit the 16 MB cap.',

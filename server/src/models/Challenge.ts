@@ -1,7 +1,10 @@
 import { Schema, model, type InferSchemaType, type HydratedDocument } from 'mongoose';
 import { CHALLENGE_TYPES, DIFFICULTIES, TOPIC_SLUGS } from '@luna/shared';
 
-const optionSchema = new Schema({ id: { type: String, required: true }, text: { type: String, required: true } }, { _id: false });
+const optionSchema = new Schema(
+  { id: { type: String, required: true }, text: { type: String, required: true } },
+  { _id: false },
+);
 
 /** One Incident Room stage. `answerKey`, `explanation` and `hint` never leave the server unanswered. */
 const stageSchema = new Schema(

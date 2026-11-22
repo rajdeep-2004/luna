@@ -18,22 +18,25 @@ export const CACHING_QUEUES: ChallengeSeed[] = [
     answerKey: 'b',
     explanation:
       'The cache knows nothing about the database. The entry stays valid until its 60-second TTL runs out, so the read at 45 s still returns the old value, 100.',
-    misconception: 'A cache does not update itself. Without invalidation, a TTL is the upper bound on staleness.',
+    misconception:
+      'A cache does not update itself. Without invalidation, a TTL is the upper bound on staleness.',
   },
   {
     slug: 'cache-key-missing-viewer',
-    title: 'Seeing someone else\'s view',
+    title: "Seeing someone else's view",
     topicSlug,
     subtopic: 'cache keys',
     type: 'BUG_HUNT',
     difficulty: 2,
-    prompt: 'Profiles include viewer-specific fields (like "you follow them"). Users sometimes see another viewer\'s version. Which line is the bug?',
+    prompt:
+      'Profiles include viewer-specific fields (like "you follow them"). Users sometimes see another viewer\'s version. Which line is the bug?',
     codeSnippet:
       "async function getProfile(userId, viewerId) {\n  const key = `profile:${userId}`;\n  const cached = await redis.get(key);\n  if (cached) return JSON.parse(cached);\n  const profile = await buildProfile(userId, viewerId);\n  await redis.set(key, JSON.stringify(profile), 'EX', 300);\n  return profile;\n}",
     answerKey: '2',
     explanation:
-      'The result depends on both userId and viewerId, but the key only contains userId. The first viewer\'s version is served to everyone. The key must include every input that changes the result, or the viewer-specific parts must not be cached.',
-    misconception: 'A cache key is not just "the thing being looked up". It is every input that affects the output.',
+      "The result depends on both userId and viewerId, but the key only contains userId. The first viewer's version is served to everyone. The key must include every input that changes the result, or the viewer-specific parts must not be cached.",
+    misconception:
+      'A cache key is not just "the thing being looked up". It is every input that affects the output.',
     hint: 'What does the cached value depend on?',
   },
   {
@@ -50,7 +53,8 @@ export const CACHING_QUEUES: ChallengeSeed[] = [
     answerKey: '2',
     explanation:
       'Deleting first opens a window: a read between line 2 and line 3 misses the cache, loads the old price from the database and caches it again. Update the database first, then delete the cache entry.',
-    misconception: 'Invalidation order matters under concurrency. "Delete, then write" races with readers.',
+    misconception:
+      'Invalidation order matters under concurrency. "Delete, then write" races with readers.',
     hint: 'What happens if a read arrives between the two lines?',
   },
   {
@@ -65,13 +69,14 @@ export const CACHING_QUEUES: ChallengeSeed[] = [
     options: opts(
       'A caching layer (e.g. Redis) with a sensible TTL',
       'A much larger database connection pool',
-      'Store all product data in the phone\'s local storage only',
+      "Store all product data in the phone's local storage only",
       'Switch from HTTP to WebSockets',
     ),
     answerKey: 'a',
     explanation:
       'Data that is read often and changes rarely is the ideal cache candidate. Serving it from memory removes repeated identical queries, and the TTL bounds how stale it can get.',
-    misconception: 'A bigger pool lets the database do more of the same work at once. It does not remove the work.',
+    misconception:
+      'A bigger pool lets the database do more of the same work at once. It does not remove the work.',
     optionFeedback: {
       b: 'More connections mean more load on an already busy database.',
       c: 'Each device still fetches once, and prices go stale with no expiry.',
@@ -85,7 +90,8 @@ export const CACHING_QUEUES: ChallengeSeed[] = [
     subtopic: 'background jobs',
     type: 'ENGINEER_CHOICE',
     difficulty: 1,
-    prompt: 'Signup sends the welcome email inside the request. When the email provider is slow, signups take 8 s or fail. What do you change?',
+    prompt:
+      'Signup sends the welcome email inside the request. When the email provider is slow, signups take 8 s or fail. What do you change?',
     options: opts(
       'Put the email on a background job queue and respond right away',
       'Increase the signup request timeout',
@@ -95,7 +101,8 @@ export const CACHING_QUEUES: ChallengeSeed[] = [
     answerKey: 'a',
     explanation:
       'The user does not need to wait for the email. A queued job decouples signup from the provider: the request stays fast, and the job can retry if the provider is down.',
-    misconception: 'Not all work belongs in the request path. Only what the response actually needs does.',
+    misconception:
+      'Not all work belongs in the request path. Only what the response actually needs does.',
     optionFeedback: {
       b: 'Signups get slower, not more reliable.',
       c: 'Exposes email credentials in the app.',
@@ -113,13 +120,14 @@ export const CACHING_QUEUES: ChallengeSeed[] = [
     options: opts(
       'The list of supported countries',
       'A published blog post',
-      'A user\'s wallet balance during checkout',
+      "A user's wallet balance during checkout",
       'The product catalogue page',
     ),
     answerKey: 'c',
     explanation:
       'A balance used to approve a payment must be exact at that moment. A stale value can allow overspending. The other three change rarely and tolerate a few minutes of staleness.',
-    misconception: 'Caching is a trade-off between speed and freshness. Some data cannot be even slightly stale.',
+    misconception:
+      'Caching is a trade-off between speed and freshness. Some data cannot be even slightly stale.',
     optionFeedback: {
       a: 'Almost never changes: a great candidate.',
       b: 'Changes rarely once published.',
@@ -134,7 +142,8 @@ export const CACHING_QUEUES: ChallengeSeed[] = [
     subtopic: 'retries',
     type: 'ENGINEER_CHOICE',
     difficulty: 2,
-    prompt: 'A background job calls a partner API that fails about 5% of the time with timeouts. How should the job retry?',
+    prompt:
+      'A background job calls a partner API that fails about 5% of the time with timeouts. How should the job retry?',
     options: opts(
       'Retry immediately, forever, until it succeeds',
       'Never retry; log the failure',
@@ -144,7 +153,8 @@ export const CACHING_QUEUES: ChallengeSeed[] = [
     answerKey: 'c',
     explanation:
       'Backoff (e.g. 1 s, 2 s, 4 s...) gives the partner time to recover without hammering it. A retry limit plus a dead-letter queue means permanent failures stop retrying and can be inspected.',
-    misconception: 'Aggressive retries can turn a small outage into a big one by overloading the struggling service.',
+    misconception:
+      'Aggressive retries can turn a small outage into a big one by overloading the struggling service.',
     optionFeedback: {
       a: 'A permanently broken job blocks the worker forever.',
       b: 'Gives up on errors that a retry would fix.',
@@ -170,7 +180,8 @@ export const CACHING_QUEUES: ChallengeSeed[] = [
     answerKey: 'b',
     explanation:
       'At-least-once delivery means duplicates will happen, for example when a worker crashes after charging but before acknowledging. An idempotent consumer makes a duplicate harmless by remembering what it already did.',
-    misconception: 'Exactly-once delivery is rarely what you get. Design consumers to tolerate repeats.',
+    misconception:
+      'Exactly-once delivery is rarely what you get. Design consumers to tolerate repeats.',
     optionFeedback: {
       a: 'Then a crash mid-processing loses the message entirely.',
       c: 'Customers still see the double charge.',
@@ -196,7 +207,8 @@ export const CACHING_QUEUES: ChallengeSeed[] = [
     answerKey: 'b',
     explanation:
       'This is a cache stampede. A lock or "single flight" makes one request recompute while the rest wait briefly or keep serving the stale value (stale-while-revalidate). The query then runs once, not 5,000 times.',
-    misconception: 'A cache miss is not one event. On a hot key it is thousands of identical misses at once.',
+    misconception:
+      'A cache miss is not one event. On a hot key it is thousands of identical misses at once.',
     optionFeedback: {
       a: 'More expiries mean more stampedes.',
       c: 'The database takes the full load all the time.',
@@ -211,7 +223,7 @@ export const CACHING_QUEUES: ChallengeSeed[] = [
     subtopic: 'TTL',
     type: 'ENGINEER_CHOICE',
     difficulty: 1,
-    prompt: 'A weather widget\'s data source updates every 10 minutes. What TTL fits?',
+    prompt: "A weather widget's data source updates every 10 minutes. What TTL fits?",
     options: opts('1 second', 'About 5–10 minutes', '1 week', 'No TTL, cache forever'),
     answerKey: 'b',
     explanation:

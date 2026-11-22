@@ -16,7 +16,8 @@ export const JS_ASYNC: ChallengeSeed[] = [
     answerKey: 'b',
     explanation:
       'setTimeout always schedules its callback as a task for a later turn of the event loop, even with 0 ms. The synchronous code runs to the end first, so A and C print before B.',
-    misconception: 'A 0 ms timeout does not mean "run now". It means "run as soon as the current code has finished".',
+    misconception:
+      'A 0 ms timeout does not mean "run now". It means "run as soon as the current code has finished".',
   },
   {
     slug: 'js-microtask-vs-macrotask',
@@ -37,7 +38,8 @@ export const JS_ASYNC: ChallengeSeed[] = [
     answerKey: 'b',
     explanation:
       'Synchronous logs run first (Start, End). Then the microtask queue is drained, which holds the promise callback, before the event loop picks up the next task, the timeout.',
-    misconception: 'Timeouts and promise callbacks are not one queue: microtasks always run before the next timer task.',
+    misconception:
+      'Timeouts and promise callbacks are not one queue: microtasks always run before the next timer task.',
     hint: 'Promise callbacks go to the microtask queue. When is it emptied?',
   },
   {
@@ -53,7 +55,8 @@ export const JS_ASYNC: ChallengeSeed[] = [
     answerKey: 'b',
     explanation:
       'An async function always returns a promise. Returning 1 resolves that promise with 1, so logging the call (without await) shows the promise itself.',
-    misconception: 'The async keyword does not make the caller wait. Only await (or .then) unwraps the value.',
+    misconception:
+      'The async keyword does not make the caller wait. Only await (or .then) unwraps the value.',
   },
   {
     slug: 'js-await-yields',
@@ -69,7 +72,8 @@ export const JS_ASYNC: ChallengeSeed[] = [
     answerKey: 'b',
     explanation:
       'An async function runs synchronously until its first await. At the await it pauses and returns control to the caller, which prints 2. The rest of run() continues as a microtask and prints 3.',
-    misconception: 'Code before the first await is not deferred: it runs immediately when the function is called.',
+    misconception:
+      'Code before the first await is not deferred: it runs immediately when the function is called.',
     hint: 'Where does run() pause, and who gets control back?',
   },
   {
@@ -86,7 +90,8 @@ export const JS_ASYNC: ChallengeSeed[] = [
     answerKey: 'b',
     explanation:
       'Promise.all rejects as soon as any input rejects, with that reason. After 50 ms it logs "err boom". The slow promise still settles later, but its result is ignored.',
-    misconception: 'Promise.all does not collect partial results. Use Promise.allSettled when you need every outcome.',
+    misconception:
+      'Promise.all does not collect partial results. Use Promise.allSettled when you need every outcome.',
     hint: 'Does Promise.all wait for the others once one of them fails?',
   },
   {
@@ -102,7 +107,8 @@ export const JS_ASYNC: ChallengeSeed[] = [
     answerKey: '2',
     explanation:
       'fetch returns a promise. Without await, res is the pending promise, which has no json() method. The fix is const res = await fetch(...).',
-    misconception: 'An await later in the function does not apply to earlier calls: each promise needs its own await.',
+    misconception:
+      'An await later in the function does not apply to earlier calls: each promise needs its own await.',
   },
   {
     slug: 'js-foreach-async',
@@ -117,7 +123,8 @@ export const JS_ASYNC: ChallengeSeed[] = [
     answerKey: '2',
     explanation:
       'forEach ignores the promises its callback returns, so nothing waits for the saves. Use for...of with await inside, or await Promise.all(items.map(...)).',
-    misconception: 'Marking the callback async does not make forEach wait. forEach has no idea the callback is asynchronous.',
+    misconception:
+      'Marking the callback async does not make forEach wait. forEach has no idea the callback is asynchronous.',
     hint: 'What does forEach do with the value each callback returns?',
   },
   {
@@ -133,7 +140,8 @@ export const JS_ASYNC: ChallengeSeed[] = [
     answerKey: '3',
     explanation:
       'return fetchConfig() hands the promise back without waiting, so the function leaves the try block before the rejection happens. return await fetchConfig() keeps the wait inside the try, and catch works.',
-    misconception: '"return await is redundant" is only true outside try/catch. Inside it, the await is what makes catch work.',
+    misconception:
+      '"return await is redundant" is only true outside try/catch. Inside it, the await is what makes catch work.',
     hint: 'When does the promise reject: before or after the function has left the try block?',
   },
   {
@@ -154,7 +162,8 @@ export const JS_ASYNC: ChallengeSeed[] = [
     answerKey: 'a',
     explanation:
       'Independent work can run concurrently. Starting both calls and awaiting Promise.all brings the total time down to the slower call, about 1 s.',
-    misconception: 'await does not have to be one at a time: you can start many promises first and wait for them together.',
+    misconception:
+      'await does not have to be one at a time: you can start many promises first and wait for them together.',
     optionFeedback: {
       b: 'setTimeout only delays work; the calls still finish in about 2 s.',
       c: 'async is a property of the function, not a speed setting.',
@@ -179,7 +188,8 @@ export const JS_ASYNC: ChallengeSeed[] = [
     answerKey: 'b',
     explanation:
       'Node runs JavaScript on one thread, so a long CPU loop blocks the event loop for everyone. Moving it to a worker thread or a job queue frees the main thread to keep serving requests.',
-    misconception: 'async/await helps with waiting on I/O. It does not make CPU-heavy code non-blocking.',
+    misconception:
+      'async/await helps with waiting on I/O. It does not make CPU-heavy code non-blocking.',
     optionFeedback: {
       a: 'An async function still runs its loop on the main thread.',
       c: 'There is nothing to await: the loop is synchronous work.',

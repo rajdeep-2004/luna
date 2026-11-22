@@ -24,7 +24,11 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
     appErr = new AppError('INTERNAL', 'Something went wrong. Try again.');
   }
   const body: ApiErrorBody = {
-    error: { code: appErr.code, message: appErr.message, ...(appErr.details ? { details: appErr.details } : {}) },
+    error: {
+      code: appErr.code,
+      message: appErr.message,
+      ...(appErr.details ? { details: appErr.details } : {}),
+    },
   };
   res.status(appErr.status).json(body);
 };

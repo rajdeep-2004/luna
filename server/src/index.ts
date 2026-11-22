@@ -5,7 +5,9 @@ import { logger } from './lib/logger';
 
 async function main() {
   await connectDb();
-  const server = createApp().listen(env.PORT, () => logger.info({ port: env.PORT }, 'Luna API listening'));
+  const server = createApp().listen(env.PORT, () =>
+    logger.info({ port: env.PORT }, 'Luna API listening'),
+  );
 
   const shutdown = (signal: string) => {
     logger.info({ signal }, 'shutting down');

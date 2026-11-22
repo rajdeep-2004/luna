@@ -9,6 +9,8 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { healthRouter } from './modules/health/health.routes';
 import { authRouter } from './modules/auth/auth.routes';
 import { usersRouter } from './modules/users/users.routes';
+import { topicsRouter } from './modules/topics/topics.routes';
+import { sessionsRouter } from './modules/sessions/sessions.routes';
 
 /** Builds the Express app without listening, so tests can mount it directly. */
 export function createApp() {
@@ -27,6 +29,8 @@ export function createApp() {
   v1.use('/health', healthRouter);
   v1.use('/auth', authRouter);
   v1.use('/users', usersRouter);
+  v1.use('/topics', topicsRouter);
+  v1.use('/sessions', sessionsRouter);
   app.use('/api/v1', v1);
 
   app.use(notFoundHandler);

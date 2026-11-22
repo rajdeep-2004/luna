@@ -10,14 +10,16 @@ export const HTTP_APIS: ChallengeSeed[] = [
     subtopic: 'routing',
     type: 'TRACE',
     difficulty: 2,
-    prompt: 'items = [{ id: 42, name: "Lamp" }]. A client calls GET /items/42. What is the response?',
+    prompt:
+      'items = [{ id: 42, name: "Lamp" }]. A client calls GET /items/42. What is the response?',
     codeSnippet:
       "app.get('/items/:id', (req, res) => {\n  const item = items.find((i) => i.id === req.params.id);\n  if (!item) return res.status(404).json({ error: 'Not found' });\n  res.json(item);\n});",
     options: opts('200 with the Lamp item', '404 Not found', '500 server error', '400 bad request'),
     answerKey: 'b',
     explanation:
       'Route params are always strings, so req.params.id is "42" while the stored id is the number 42. Strict equality fails, find returns undefined, and the handler sends 404.',
-    misconception: 'Express does not convert path params to numbers. You must parse and validate them yourself.',
+    misconception:
+      'Express does not convert path params to numbers. You must parse and validate them yourself.',
     hint: 'What type is req.params.id?',
   },
   {
@@ -38,7 +40,8 @@ export const HTTP_APIS: ChallengeSeed[] = [
     answerKey: 'b',
     explanation:
       'A PUT with a JSON content type is not a "simple" request, so the browser first sends an OPTIONS preflight. It asks whether the API allows that origin, method and headers. Only if the API says yes does the real PUT go out.',
-    misconception: 'CORS is enforced by the browser, not the server. curl or a mobile app never sends a preflight.',
+    misconception:
+      'CORS is enforced by the browser, not the server. curl or a mobile app never sends a preflight.',
     hint: 'Some cross-origin requests need permission before they are sent.',
   },
   {
@@ -59,7 +62,8 @@ export const HTTP_APIS: ChallengeSeed[] = [
     answerKey: 'b',
     explanation:
       'PUT replaces the resource at a known URL, so repeating it leaves the same result. That property is called idempotency, and it is what makes PUT safe to retry.',
-    misconception: 'Not every method is safe to retry: POST usually creates something new each time.',
+    misconception:
+      'Not every method is safe to retry: POST usually creates something new each time.',
   },
   {
     slug: 'http-missing-return',
@@ -68,7 +72,8 @@ export const HTTP_APIS: ChallengeSeed[] = [
     subtopic: 'express handlers',
     type: 'BUG_HUNT',
     difficulty: 1,
-    prompt: 'A login with no email crashes with "Cannot set headers after they are sent". Which line is the bug?',
+    prompt:
+      'A login with no email crashes with "Cannot set headers after they are sent". Which line is the bug?',
     codeSnippet:
       "app.post('/login', (req, res) => {\n  if (!req.body.email) {\n    res.status(400).json({ error: 'Email required' });\n  }\n  const user = findUser(req.body.email);\n  res.json(user);\n});",
     answerKey: '3',
@@ -83,13 +88,14 @@ export const HTTP_APIS: ChallengeSeed[] = [
     subtopic: 'authorization',
     type: 'BUG_HUNT',
     difficulty: 3,
-    prompt: 'Any logged-in user can delete any other user\'s post. Which line is the bug?',
+    prompt: "Any logged-in user can delete any other user's post. Which line is the bug?",
     codeSnippet:
       "app.delete('/posts/:id', requireAuth, async (req, res) => {\n  const post = await Post.findById(req.params.id);\n  if (!post) return res.status(404).end();\n  await post.deleteOne();\n  res.status(204).end();\n});",
     answerKey: '4',
     explanation:
       'requireAuth checks who the user is (authentication), but nothing checks whether this user owns the post (authorization). The delete on line 4 runs for anyone. Check post.authorId against req.userId first and return 404 or 403 if they differ.',
-    misconception: 'Being logged in is not permission. Every resource needs its own ownership check.',
+    misconception:
+      'Being logged in is not permission. Every resource needs its own ownership check.',
     hint: 'Logged in, yes. But is it their post?',
   },
   {
@@ -99,12 +105,19 @@ export const HTTP_APIS: ChallengeSeed[] = [
     subtopic: 'status codes',
     type: 'ENGINEER_CHOICE',
     difficulty: 1,
-    prompt: 'A client sends POST /orders without the required "productId" field. What should the API return?',
-    options: opts('200 with { "error": "missing productId" }', '400 Bad Request with a clear message', '404 Not Found', '500 Internal Server Error'),
+    prompt:
+      'A client sends POST /orders without the required "productId" field. What should the API return?',
+    options: opts(
+      '200 with { "error": "missing productId" }',
+      '400 Bad Request with a clear message',
+      '404 Not Found',
+      '500 Internal Server Error',
+    ),
     answerKey: 'b',
     explanation:
       '400 tells the client the request itself is wrong and should not be retried unchanged. A clear message saying which field is missing lets the client fix it.',
-    misconception: 'Returning 200 with an error inside hides failures from clients, retries and monitoring.',
+    misconception:
+      'Returning 200 with an error inside hides failures from clients, retries and monitoring.',
     optionFeedback: {
       a: '200 says it worked, so clients and dashboards miss the failure.',
       c: '404 means the resource or route does not exist.',
@@ -118,12 +131,14 @@ export const HTTP_APIS: ChallengeSeed[] = [
     subtopic: 'status codes',
     type: 'ENGINEER_CHOICE',
     difficulty: 1,
-    prompt: 'A logged-in student calls GET /admin/reports, which only admins may see. Which status fits best?',
+    prompt:
+      'A logged-in student calls GET /admin/reports, which only admins may see. Which status fits best?',
     options: opts('401 Unauthorized', '403 Forbidden', '400 Bad Request', '204 No Content'),
     answerKey: 'b',
     explanation:
       'The server knows who the user is but refuses the action, which is 403. 401 means the request has no valid credentials, so the client should log in.',
-    misconception: '401 is about who you are (authentication). 403 is about what you may do (authorization).',
+    misconception:
+      '401 is about who you are (authentication). 403 is about what you may do (authorization).',
     optionFeedback: {
       a: 'The user is authenticated; logging in again will not help.',
       c: 'The request is well formed; the problem is permission.',
@@ -137,7 +152,8 @@ export const HTTP_APIS: ChallengeSeed[] = [
     subtopic: 'API design',
     type: 'ENGINEER_CHOICE',
     difficulty: 2,
-    prompt: 'GET /orders returns all 200,000 orders in one response. The app is slow and the server runs out of memory. What do you change?',
+    prompt:
+      'GET /orders returns all 200,000 orders in one response. The app is slow and the server runs out of memory. What do you change?',
     options: opts(
       'Paginate: return a limited page plus a cursor for the next one',
       'Gzip the response and keep returning everything',
@@ -147,7 +163,8 @@ export const HTTP_APIS: ChallengeSeed[] = [
     answerKey: 'a',
     explanation:
       'Every list endpoint should be bounded. Cursor pagination returns, say, 50 orders and a cursor, so memory, query time and payload stay small no matter how big the table grows.',
-    misconception: 'Compression and bigger servers delay the problem. The response still grows with your data.',
+    misconception:
+      'Compression and bigger servers delay the problem. The response still grows with your data.',
     optionFeedback: {
       b: 'Smaller over the wire, but the server still loads 200,000 rows.',
       c: 'Buys time until the table doubles.',
@@ -173,7 +190,8 @@ export const HTTP_APIS: ChallengeSeed[] = [
     answerKey: 'b',
     explanation:
       'The first request may have succeeded even though the response was lost. An idempotency key lets the server recognise a retry and return the original result instead of charging again.',
-    misconception: 'A timeout does not mean the request failed. It means you do not know whether it did.',
+    misconception:
+      'A timeout does not mean the request failed. It means you do not know whether it did.',
     optionFeedback: {
       a: 'Real network failures then leave payments unconfirmed.',
       c: 'Timeouts still happen; double charges just become rarer.',
@@ -199,7 +217,8 @@ export const HTTP_APIS: ChallengeSeed[] = [
     answerKey: 'b',
     explanation:
       'An additive change never breaks existing clients. Sending both fields keeps old apps working while new ones move over. Remove the old field only when usage data shows old versions are gone.',
-    misconception: 'You cannot deploy a mobile client the way you deploy a server. Old versions live for months.',
+    misconception:
+      'You cannot deploy a mobile client the way you deploy a server. Old versions live for months.',
     optionFeedback: {
       a: 'Every user on the old version breaks immediately.',
       c: 'Turns a rename into an outage for old clients.',

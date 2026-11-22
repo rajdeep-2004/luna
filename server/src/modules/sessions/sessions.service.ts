@@ -167,6 +167,17 @@ export async function getSession(userId: string, sessionId: string): Promise<Ses
 const duelFormatOf = (session: SessionDoc): DuelFormat =>
   (session.duelFormat ?? 'CLASSIC') as DuelFormat;
 
+const endsOnMiss = (session: SessionDoc): boolean =>
+  session.type === 'DUEL' && DUEL_FORMAT_RULES[duelFormatOf(session)].endsOnMiss;
+
+/**
+ * A Sudden Death run is over once it holds a miss. Derived from the attempts as well as the flag,
+ * so a crash between saving the miss and setting `endedEarly` can't leave a run that neither
+ * continues correctly nor completes.
+ */
+const runIsOver = (session: SessionDoc, attempts: { isCorrect: boolean }[]): boolean =>
+  session.endedEarly || (endsOnMiss(session) && attempts.some((a) => !a.isCorrect));
+
 /** Time since the session's latest answer (or its start): the server clock for the current step. */
 function elapsedSince(session: SessionDoc, attempts: { createdAt: Date }[]): number {
   const last = attempts.reduce((t, a) => (a.createdAt > t ? a.createdAt : t), session.startedAt);
@@ -205,7 +216,7 @@ async function buildView(session: SessionDoc, challenges: ChallengeDoc[]): Promi
     type: session.type as SessionType,
     ...(session.mode ? { mode: session.mode as PracticeMode } : {}),
     ...(session.type === 'DUEL' ? { duelFormat: duelFormatOf(session) } : {}),
-    ...(session.endedEarly ? { endedEarly: true } : {}),
+    ...(runIsOver(session, attempts) ? { endedEarly: true } : {}),
     status: session.status as SessionView['status'],
     startedAt: session.startedAt.toISOString(),
     totalAnswers: session.totalAnswers,
@@ -280,10 +291,14 @@ export async function submitAnswer(
     throw conflict('Already answered');
   }
   if (session.endedEarly) throw conflict('This run has ended');
-  if (session.type === 'DUEL' && DUEL_FORMAT_RULES[duelFormatOf(session)].endsOnMiss) {
-    // Sudden Death is strictly in order: only the first unanswered question may be answered.
-    const done = await AnswerAttemptModel.distinct('challengeId', { sessionId });
-    const doneIds = new Set(done.map(String));
+  if (endsOnMiss(session)) {
+    // Sudden Death is strictly in order: only the first unanswered question may be answered,
+    // and nothing after a miss (even if the flag was never set).
+    const done = await AnswerAttemptModel.find({ sessionId })
+      .select('challengeId isCorrect')
+      .lean();
+    if (runIsOver(session, done)) throw conflict('This run has ended');
+    const doneIds = new Set(done.map((a) => a.challengeId.toString()));
     const firstOpen = [...session.items]
       .sort((a, b) => a.order - b.order)
       .find((i) => !doneIds.has(i.challengeId.toString()));
@@ -371,7 +386,7 @@ export async function submitAnswer(
 
   // Sudden Death: the first miss (or timeout) ends the run. A conditional update, so a retry
   // can't flip it twice; the flag lets completion accept fewer answers than the total.
-  const endsRun = !!rules?.endsOnMiss && !result.isCorrect;
+  const endsRun = endsOnMiss(session) && !result.isCorrect;
   if (endsRun)
     await SessionModel.updateOne(
       { _id: sessionId, endedEarly: false },
@@ -426,8 +441,7 @@ function runUpToFirstMiss<T extends { challengeId: unknown; isCorrect: boolean }
   session: SessionDoc,
   attempts: T[],
 ): T[] {
-  if (session.type !== 'DUEL' || !DUEL_FORMAT_RULES[duelFormatOf(session)].endsOnMiss)
-    return attempts;
+  if (!endsOnMiss(session)) return attempts;
   const kept: T[] = [];
   for (const item of [...session.items].sort((a, b) => a.order - b.order)) {
     const a = attempts.find((x) => String(x.challengeId) === item.challengeId.toString());
@@ -458,7 +472,7 @@ export async function completeSession(userId: string, sessionId: string): Promis
     .lean();
   const attempts = runUpToFirstMiss(session, all);
   // Only a Sudden Death run that ended at a miss may finish short (D-039).
-  if (attempts.length < session.totalAnswers && !session.endedEarly)
+  if (attempts.length < session.totalAnswers && !runIsOver(session, attempts))
     throw conflict('Answer every challenge before finishing');
 
   const revisitIds = new Set(

@@ -11,7 +11,7 @@ export function ElapsedClock() {
   const mm = Math.floor(seconds / 60);
   const ss = String(seconds % 60).padStart(2, '0');
   return (
-    <AppText variant="code" color="textMuted" accessibilityLabel={`${seconds} seconds elapsed`}>
+    <AppText variant="code" color="muted" accessibilityLabel={`${seconds} seconds elapsed`}>
       {mm}:{ss}
     </AppText>
   );

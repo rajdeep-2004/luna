@@ -22,23 +22,5 @@ const palette = {
   matShade: '#7C6649',
 } as const;
 
-/**
- * TEMPORARY (P7, D-039): old token names pointing at the new palette, so screens not yet rebuilt
- * keep compiling. Removed in P7 task 11; `tsc` then lists any straggler.
- */
-const legacy = {
-  bg: palette.ground,
-  surface: palette.tatami,
-  surfaceRaised: palette.wood,
-  track: palette.wallLight,
-  textSoft: palette.text,
-  textMuted: palette.muted,
-  moon: palette.primary,
-  moonDeep: palette.primaryPressed,
-  onMoon: palette.onPrimary,
-  ember: palette.seal,
-  emberSoft: palette.primary,
-} as const;
-
-export const colors = { ...palette, ...legacy } as const;
+export const colors = palette;
 export type ColorToken = keyof typeof colors;

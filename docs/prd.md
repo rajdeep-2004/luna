@@ -4,6 +4,10 @@
 > Source: `docs/luna-idea.md` (the original brainstorm, kept unchanged). Scope confirmed in chat on
 > 2026-11-22: **P0 + P1** from the brainstorm (see `decisions.md` D-001).
 
+> **Positioning (P7, D-037):** Luna is played as a game, not studied: a "samurai of code" dojo that a tired
+> engineer opens in the evening instead of scrolling. The scope below is unchanged. The presentation is now
+> game-first (Kiri-e Den, `DESIGN.md`), with topic + mode rounds and three duel formats.
+
 Luna is a mobile app that helps computer science students build engineering intuition
 through short, game-like technical challenges: predicting code output, finding bugs, choosing
 between engineering trade-offs, and investigating simulated production incidents.

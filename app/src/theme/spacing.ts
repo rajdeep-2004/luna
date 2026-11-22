@@ -15,10 +15,6 @@ export const radii = {
   sm: 6,
   md: 10,
   lg: 14,
-  /** TEMPORARY aliases (P7, removed in task 11). */
-  card: 14,
-  cardLg: 14,
-  pill: 999,
 } as const;
 
 export const layout = {

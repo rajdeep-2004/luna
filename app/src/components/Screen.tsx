@@ -22,4 +22,4 @@ export function Screen({ children, padded = true, style }: Props) {
   );
 }
 
-const styles = StyleSheet.create({ root: { flex: 1, backgroundColor: colors.bg } });
+const styles = StyleSheet.create({ root: { flex: 1, backgroundColor: colors.ground } });

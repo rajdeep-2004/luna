@@ -16,7 +16,7 @@ export function RootNavigator() {
     return (
       <Screen>
         <View style={{ flex: 1, justifyContent: 'center' }}>
-          <ActivityIndicator color={colors.moon} />
+          <ActivityIndicator color={colors.primary} />
         </View>
       </Screen>
     );

@@ -12,7 +12,7 @@ export function ChoiceBody(props: BodyProps) {
   const label = challenge.type === 'TRACE' ? LABEL.TRACE : LABEL.ENGINEER_CHOICE;
   return (
     <View style={styles.wrap}>
-      <AppText variant="label" color="textMuted">
+      <AppText variant="label" color="muted">
         {label}
       </AppText>
       <AppText variant="question">{props.step.prompt}</AppText>

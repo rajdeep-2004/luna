@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
-import { AppText, BrushMarks } from '../../components';
+import { Alert, StyleSheet, View } from 'react-native';
+import { AppText, BrushMarks, PressableSink } from '../../components';
 import { layout, spacing } from '../../theme';
 
 type Props = {
@@ -27,7 +27,7 @@ export function SessionHeader({
   return (
     <View style={styles.wrap}>
       <View style={styles.row}>
-        <Pressable
+        <PressableSink
           onPress={() =>
             Alert.alert('Leave this session?', leaveMessage, [
               { text: 'Keep playing', style: 'cancel' },
@@ -39,7 +39,7 @@ export function SessionHeader({
           style={styles.leave}
         >
           <AppText color="muted">✕</AppText>
-        </Pressable>
+        </PressableSink>
         <AppText variant="label" color="muted">
           {Math.min(position, total)} / {total}
         </AppText>

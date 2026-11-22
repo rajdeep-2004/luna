@@ -1389,3 +1389,48 @@ stats after a duel and a Kata.
 **Files.** `shared/src/competition.ts`, `sessions.ts`, `progress.ts`; `server/src/config/game.ts`;
 `models/Duel.ts`, `Session.ts`; `modules/duels/*`; `modules/sessions/sessions.service.ts`;
 `modules/progress/progress.service.ts`.
+
+### D-043 — P7 wrap-up: the game redesign as built
+
+**What shipped.** The whole app now follows the Kiri-e Den design (`DESIGN.md`, D-038):
+- **Dojo:** a room whose objects are the controls, with an entrance on every return (D-040).
+- **A round:** hanko stamps, the correct-answer "cut", a shoji sheet for misses, and a summary with a grade
+  seal, an XP count-up and a lantern relight. Rank-up draws a katana and brushes the new kanji.
+- **Explore:** nobori banners for topics, three game modes with their own art, and a boss stage (D-041).
+- **Duel:** a face-off with the clash, three blades (Classic, Blitz, Sudden Death), six-cell code entry, and
+  stamped results (D-042).
+- **Profile:** a warrior sheet with banner, ensō rank, trophies, crests and stamped runs.
+- **Board:** tatami rows with medal discs, and your own row on shoji.
+- **Welcome and onboarding:** the shoji open on a lantern, and you pick your mask from a wooden rack. The
+  cold-start notice reads "Waking the dojo…".
+
+**Cleanup.** The temporary colour and radius aliases are gone: `colors` is now exactly the DESIGN.md palette,
+and `tsc` confirmed that nothing still used an old name. Deleted as dead code: `Card`, `MoonPhase`,
+`ProgressLine`, the old `components/Lantern`, `Stamp` and `lib/moon`. Every tappable uses `PressableSink`, so
+there is no grey ripple and every press sinks and buzzes. No emoji are left in the UI. The server still sends
+an `icon` with each achievement for older clients, but the app draws crests instead.
+
+**Deviations from the plan.**
+- The Explore mode list has no "mixed" round. The preview showed only the three modes and the boss, and the
+  Summary's "Train again" still starts a mixed topic round.
+- The rank-up kanji reveal sweeps a clipping mask instead of animating stroke order. Stroke data for brush
+  glyphs does not exist in the font, and the sweep reads the same at this speed.
+- The Profile shows "N XP to next rank" without the next rank's name. The progress view does not carry it,
+  and adding it was not worth a contract change.
+
+**Deploy note (repeat of D-041).** After deploying P7, run `npm run seed -w server` once against production, so
+`syncIndexes` replaces the old open-practice unique index with the one that includes `mode`.
+
+**Revisit** after a week of play: whether Blitz's 10 s is fair for Engineer's Choice questions with long
+option text (the slot cycle puts one in every three), and whether the Dojo entrance should shorten after the
+first visit of the day.
+
+**Backend review (P7, before merge).** I reviewed the server and shared diff for tasks 5 and 7 myself. One real
+bug was found and fixed. If the server crashed after saving a Sudden Death miss but before setting `endedEarly`,
+the order check let the run continue past the miss. Completion then refused the shorter scored run, so the
+session could never finish. "Run over" is now derived from the attempts as well as the flag: in submit (a 409
+after any miss), in the session view (so the app goes to the summary) and in completion. A new test simulates
+the crash. The other points checked out: validation at the boundary (`mode`, `format`), atomic and conditional
+updates, bounded indexed counts, and no `answerKey` in any new response. Accepted as they are: Blitz's clock
+includes the client's short verdict and refetch time, as in Classic. Classic duels now fall back to any kind
+when a slot's kind runs out, where they used to fail.

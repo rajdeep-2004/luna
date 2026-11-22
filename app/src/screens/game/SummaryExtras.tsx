@@ -12,7 +12,7 @@ const BONUS_LABEL: Record<BonusAward['kind'], (b: BonusAward) => string> = {
 };
 
 /** progression.md §7: "Achievement unlocked", shown once, on the completion that earned it. No emoji (DESIGN.md). */
-export function AchievementsCard({ summary }: { summary: SessionSummary }) {
+export function Achievements({ summary }: { summary: SessionSummary }) {
   const unlocked = summary.newAchievements ?? [];
   if (!unlocked.length) return null;
   return (
@@ -30,7 +30,7 @@ export function AchievementsCard({ summary }: { summary: SessionSummary }) {
 }
 
 /** Bonuses, the lantern and fixed mistakes: what this session did for progress. */
-export function ProgressCard({ summary }: { summary: SessionSummary }) {
+export function ProgressNotes({ summary }: { summary: SessionSummary }) {
   const { bonuses, streak, fixedMistakes } = summary;
   if (!bonuses.length && !streak && !fixedMistakes) return null;
   return (

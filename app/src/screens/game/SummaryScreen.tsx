@@ -18,7 +18,7 @@ import { colors, radii, spacing } from '../../theme';
 import { useStartSession } from '../explore/useStartSession';
 import { DUELS_KEY } from '../duel/useDuelActions';
 import { RankUpOverlay } from './RankUpOverlay';
-import { AchievementsCard, CheckpointComparison, ProgressCard } from './SummaryExtras';
+import { Achievements, CheckpointComparison, ProgressNotes } from './SummaryExtras';
 
 type Props = NativeStackScreenProps<AppStackParams, 'Summary'>;
 
@@ -109,8 +109,8 @@ export function SummaryScreen({ route, navigation }: Props) {
       <ScrollView contentContainerStyle={styles.content}>
         <Result summary={summary} />
 
-        <AchievementsCard summary={summary} />
-        <ProgressCard summary={summary} />
+        <Achievements summary={summary} />
+        <ProgressNotes summary={summary} />
         {summary.type === 'CHECKPOINT' ? (
           <CheckpointComparison
             baseline={progress.data?.assessments.baseline ?? null}

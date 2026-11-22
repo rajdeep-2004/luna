@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { DUEL_FORMAT_RULES } from '@luna/shared';
 import { sessionsApi, userMessage } from '../../api';
-import { AppText, Button, Card, ErrorState, Screen } from '../../components';
+import { AppText, Button, ErrorState, Screen } from '../../components';
 import { haptic } from '../../lib/haptics';
 import { answeredCount, DUEL_VERDICT_MS, findStep, progressOf } from '../../lib/session';
 import type { AppStackParams } from '../../navigation/types';
-import { colors, spacing } from '../../theme';
+import { colors, radii, spacing } from '../../theme';
 import { BugHuntBody } from './BugHuntBody';
 import { ChoiceBody } from './ChoiceBody';
 import { DuelCountdown } from './DuelCountdown';
@@ -93,7 +93,7 @@ export function SessionScreen({ route, navigation }: Props) {
     ]);
   }
 
-  if (query.isPending) return <Centered>{<ActivityIndicator color={colors.moon} />}</Centered>;
+  if (query.isPending) return <Centered>{<ActivityIndicator color={colors.primary} />}</Centered>;
   if (query.isError || !session || (!step && !allDone)) {
     return (
       <Centered>
@@ -106,7 +106,7 @@ export function SessionScreen({ route, navigation }: Props) {
       </Centered>
     );
   }
-  if (!step) return <Centered>{<ActivityIndicator color={colors.moon} />}</Centered>;
+  if (!step) return <Centered>{<ActivityIndicator color={colors.primary} />}</Centered>;
 
   const type = step.item.challenge.type;
   const body = {
@@ -156,18 +156,18 @@ export function SessionScreen({ route, navigation }: Props) {
           <ChoiceBody {...body} />
         )}
         {flow.hint ? (
-          <Card>
-            <AppText variant="label" color="moon">
+          <View style={styles.hint} accessibilityLiveRegion="polite">
+            <AppText variant="label" color="wood">
               Hint
             </AppText>
-            <AppText>{flow.hint}</AppText>
-          </Card>
+            <AppText color="onShoji">{flow.hint}</AppText>
+          </View>
         ) : null}
       </ScrollView>
 
       <View style={styles.actions}>
         {flow.error ? (
-          <AppText color="emberSoft" accessibilityRole="alert">
+          <AppText color="primary" accessibilityRole="alert">
             {flow.error}
           </AppText>
         ) : null}
@@ -220,6 +220,12 @@ function Centered({ children }: { children: React.ReactNode }) {
 }
 
 const styles = StyleSheet.create({
+  hint: {
+    backgroundColor: colors.shoji,
+    borderRadius: radii.md,
+    padding: spacing.lg,
+    gap: spacing.xs,
+  },
   content: { gap: spacing.lg, paddingVertical: spacing.xl },
   actions: { gap: spacing.sm, paddingBottom: spacing.lg },
   center: { flex: 1, justifyContent: 'center', gap: spacing.md },

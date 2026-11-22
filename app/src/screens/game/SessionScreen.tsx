@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { sessionsApi, userMessage } from '../../api';
 import { AppText, Button, Card, ErrorState, Screen } from '../../components';
+import { haptic } from '../../lib/haptics';
 import { answeredCount, findStep, progressOf } from '../../lib/session';
 import type { AppStackParams } from '../../navigation/types';
 import { colors, spacing } from '../../theme';
@@ -85,7 +86,10 @@ export function SessionScreen({ route, navigation }: Props) {
     step,
     selected: flow.selected,
     result: flow.result,
-    onSelect: flow.setSelected,
+    onSelect: (answer: string) => {
+      haptic.selection();
+      flow.setSelected(answer);
+    },
     locked: flow.submitting || !!flow.result,
   };
   const stepKey = `${step.item.challenge.id}:${step.stageIndex}`;

@@ -1060,3 +1060,27 @@ service and settle modules, `shared/src/competition.ts`, `app/src/screens/profil
 **Still to do in P6:** deploy to Render and Atlas prod and seed it; the network-failure pass (airplane
 mode, cold start, token expiry); the full acceptance checklist with two accounts; the demo script and
 metrics script.
+
+---
+
+### D-036 — API deployed to Render, production database seeded
+- **Date:** 2026-11-22 · **Step:** P6 — deploy · **Status:** Active · **Type:** infra
+
+Rajdeep created the Render web service (`https://luna-kloi.onrender.com`) from `main` with the settings in
+`architecture.md` §14: repo root as the root directory, `npm ci --include=dev && npm run build -w server`,
+`npm run start -w server`, health check `/api/v1/health`. The production database `luna_prod` on Atlas was
+seeded. Before the deploy, the production build was run locally with `NODE_ENV=production` to prove the
+bundle starts and reaches the database.
+
+**Verified on the live API:** health reports the database as connected; protected routes return 401
+without a token; helmet's security headers (CSP, HSTS) are present; a practice session builds 5 items and
+the response contains no answer keys. That check used one throwaway account, `smoke_p6`
+(`smoke-p6@luna.test`), which has 0 XP and does not appear on the Dojo Board. Delete it from `luna_prod`
+before the demo if a clean user list matters.
+
+**App.** `app/.env` now points at the Render URL. The previous LAN value is kept in the gitignored
+`app/.env.local-dev.bak`, so local development is one copy away.
+
+**Why this order.** The API went live from `main` (P5) before the P6 branch was merged. The P6 changes are a
+refactor, docs and two small UI fixes, so the live API behaves the same; they reach Render automatically when
+P6 is merged.

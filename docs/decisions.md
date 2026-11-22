@@ -486,3 +486,20 @@ writes `typography.title` instead of repeating a font size.
 **Files.** `app/*`, `package.json` (workspace added), `docs/prd.md` (P2 → building).
 **Concepts.** npm workspaces + Metro monorepo resolution; Expo Go vs. development builds.
 **Revisit if** a feature needs a native module Expo Go does not ship (then switch to a dev build).
+
+### D-020 — Core UI components: small, token-only, accessible by default
+- **Date:** 2026-11-22 · **Step:** P2 task 2 · **Status:** Active · **Type:** technical
+
+**Decision.** Twelve components live in `app/src/components/` (Screen, Button, TextField, Card,
+ProgressLine, MoonPhase, YokaiAvatar, Lantern, EmptyState, ErrorState, WakingServer, plus an `AppText`
+wrapper). None hardcodes a colour, size or font: they read `src/theme`. `AppText` takes a `variant`
+(not `role`, which React Native's own `Text` already uses for accessibility) and caps Dynamic Type at 1.3x.
+
+**Edge cases handled.** `Button` ignores taps while `pending` (the double-submit rule) and exposes
+`busy`/`disabled` to screen readers. `ProgressLine` clamps its value to 0..1 and treats NaN as 0.
+`TextField` shows its error in a live region. Moons and avatars are SVG, so they stay sharp at any size.
+
+**Alternatives rejected.** A UI kit such as React Native Paper: it would bring its own look and fight the
+"calm night, one moon" design. Bitmap avatars: heavier and blurry when scaled.
+
+**Revisit if** the masks need to be redrawn by a designer. Each is one entry in `YokaiAvatar.tsx`.

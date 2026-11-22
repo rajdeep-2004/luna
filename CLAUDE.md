@@ -33,3 +33,10 @@ cd .scratch/api-tests && npx vitest run   # local API tests (not in git)
 - Frontend: give Rajdeep a click-through checklist. No automated UI reviewers or browser scripts.
 - Never send `answerKey` to the client. All game logic (evaluation, XP, streaks) is server-side.
 - Only `server/src/config` reads `process.env`. Game constants live in `server/src/config/game.ts`.
+
+## Design System
+Read DESIGN.md before visual or UI work: it defines the fonts, colors, spacing, and
+aesthetic direction (Kiri-e Den). Ask the user before departing from it. When reviewing or QA-ing
+UI, flag code that doesn't match DESIGN.md. The approved visual reference is
+`docs/design/kirie-preview.html` (open it in a browser). Luna is a game, not a study app (D-037):
+judge every screen by feel against that preview, not only by a functional checklist.

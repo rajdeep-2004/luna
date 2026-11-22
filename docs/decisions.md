@@ -1118,3 +1118,56 @@ tasks (demo and metrics scripts, acceptance run) move to after P7, since the dem
 **Lesson worth keeping.** A game spec is not enough. The earlier phases checked behaviour ("does it work")
 against a checklist but never checked feel ("does it look and play like a game"). From P7 on, every screen is
 judged against the approved design previews, not only against a functional checklist.
+
+---
+
+### D-038 — Design system: Kiri-e Den
+- **Date:** 2026-11-22 · **Step:** P7 — /design-consultation · **Status:** Active · **Type:** product + design
+
+**Context.** After D-037 (Luna becomes a game), the visual system had to be redone before any screen was rebuilt.
+Rajdeep's "one thing to remember": a tired engineer comes home after a long day and, instead of reels, opens
+Luna. It feels like a real game, they are the samurai of code, and the Dojo is their den where the master has
+come home to rest.
+
+**How it was decided.** Competitive research was declined (the real UIs of Elevate, Peak or Duolingo live
+inside their apps, not on their websites). I drafted a direction, and an independent agent proposed its own from
+the same brief without seeing mine. Codex wasn't installed, so it was the only outside voice. Both landed on a
+warm dark ground, Dela Gothic One, vermilion seals and a home screen that is a room. From the second proposal I
+adopted the kiri-e (flat cut-paper) style and the ensō instead of progress bars. The AI mockup tool had no image
+API key, so Rajdeep approved an HTML preview of the Dojo, Explore, Duel and Profile instead.
+
+**Decision.** `DESIGN.md` (open spec format) is now the design source of truth, with the approved preview at
+`docs/design/kirie-preview.html`. `docs/product/ui-design.md` is marked superseded. In short:
+- **Look:** every screen is a stage of 3–4 flat cut-paper layers lit warm from inside. No cards on the main
+  screens, no glows or gradients, one line of copy per element.
+- **Dojo is a room:** the lantern is the streak, the hanging scroll is the rank with an ensō for XP, the ema
+  plaque is the weekly rank, and the sealed scroll on the low table is the Daily Kata.
+- **Palette:** persimmon brown (`#3B2418`) with tatami and lacquer woods. Washi text. **Amber** (`#F2A93B`) is the
+  only action colour. **Vermilion** (`#D9442B`) is for seals only. Night blue appears only through windows.
+- **Type:** Dela Gothic One for the game voice, Source Sans 3 for questions and UI, JetBrains Mono for code.
+  Brush kanji are baked to SVG.
+- **Motion:** six authored moments (coming home, unrolling the kata, the hanko strike, the lantern relight, the
+  rank-up, the duel face-off), each with a Reduce Motion fallback.
+
+**Alternatives rejected and why.**
+- *Vermilion buttons:* washi text on vermilion is only 3.5:1, below the readability bar. Amber with dark text is 8.4:1.
+- *Zen Kaku Gothic New for body text, and loading a brush font:* 12 MB and 8.6 MB. Too heavy for Expo Go when only
+  about 20 brush glyphs are needed.
+- *Generated woodblock-style art (my first draft):* hard for one person to keep consistent and to edit. Flat SVG
+  cut paper is producible, crisp at any size, and animatable.
+- *The old navy and pale-gold system:* it was the rejected UI.
+
+**Concepts worth learning.** *Diegetic UI:* information shown as objects inside the game world (a lantern instead
+of a "streak: 4" label), the way games such as Dead Space show health on the character. *Use-scene-driven
+theming:* light or dark comes from where and when the app is used (at night, at home), not from the category.
+*Contrast ratios:* WCAG asks for 4.5:1 for body text; a brand colour can fail that for text and still be fine for
+large shapes.
+
+**Process notes.** Tool limits hit during the consultation, logged so the next attempt doesn't trip on them:
+- The gstack self-upgrade (v1.99.3.0 → v1.102.2.0) and a local server for screenshots were both blocked by the
+  permission classifier.
+- The headless browser can't open files outside `/private/tmp` and the repo.
+- The mockup tool needs an `OPENAI_API_KEY` or `GEMINI_API_KEY`.
+
+**Next.** Plan the P7 rebuild against `DESIGN.md`: the tab bar, Dojo, Explore mode picker, Duel with formats
+(server rules too), Profile, challenge, feedback and summary.

@@ -20,7 +20,12 @@ export function runStartDate(current: number, lastDate: string): string {
   return addDays(lastDate, -(current - 1));
 }
 
-export type StreakStatus = { current: number; longest: number; doneToday: boolean; wentOut: boolean };
+export type StreakStatus = {
+  current: number;
+  longest: number;
+  doneToday: boolean;
+  wentOut: boolean;
+};
 
 /**
  * What the lantern shows now. The stored streak only changes when a Kata completes, so a run

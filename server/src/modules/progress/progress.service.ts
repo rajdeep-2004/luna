@@ -6,18 +6,21 @@ import { UserTopicProgressModel } from '../../models/UserTopicProgress';
 import { usersRepo } from '../users/users.repository';
 import { masteryPhase, recentAccuracy, weakestTopic, type TopicStats } from './mastery';
 import { revisitCount } from './revisit.service';
+import { assessmentStatus } from './assessments.service';
 import { streakStatus } from './streak';
 
-/** Everything the Dojo home needs in one call: rank, lantern, moons and the weakest blade. */
-export async function getProgress(userId: string): Promise<ProgressView> {
-  const user = await usersRepo.findById(userId);
-  if (!user) throw notFound('User');
-  const [rows, queued] = await Promise.all([
-    UserTopicProgressModel.find({ userId }).lean(),
-    revisitCount(userId),
-  ]);
+type ProgressRow = {
+  topicSlug: string;
+  answers: number;
+  recentResults: boolean[];
+  hasAdvancedCorrect: boolean;
+  lastPractisedAt?: Date | null;
+  difficultyLevel: number;
+};
 
-  const stats: (TopicStats & { difficulty: number })[] = rows.map((r) => ({
+/** Topic rows as the pure mastery functions want them. */
+export function getProgressStats(rows: ProgressRow[]): (TopicStats & { difficulty: number })[] {
+  return rows.map((r) => ({
     topicSlug: r.topicSlug as TopicSlug,
     answers: r.answers,
     recentResults: r.recentResults,
@@ -25,6 +28,19 @@ export async function getProgress(userId: string): Promise<ProgressView> {
     lastPractisedAt: r.lastPractisedAt ?? null,
     difficulty: r.difficultyLevel,
   }));
+}
+
+/** Everything the Dojo home needs in one call: rank, lantern, moons and the weakest blade. */
+export async function getProgress(userId: string): Promise<ProgressView> {
+  const user = await usersRepo.findById(userId);
+  if (!user) throw notFound('User');
+  const [rows, queued, assessments] = await Promise.all([
+    UserTopicProgressModel.find({ userId }).lean(),
+    revisitCount(userId),
+    assessmentStatus(userId),
+  ]);
+
+  const stats = getProgressStats(rows);
   const lvl = levelForXP(user.totalXP);
   const next = LEVELS.find((l) => l.level === lvl.level + 1);
 
@@ -57,5 +73,6 @@ export async function getProgress(userId: string): Promise<ProgressView> {
     }),
     weakestTopic: weakestTopic(stats, user.preferredTopicSlugs as TopicSlug[]),
     revisitsQueued: queued,
+    assessments,
   };
 }

@@ -166,11 +166,10 @@ not as magic numbers. Their values come from `docs/product/` (approved).
 | users | email, username, usernameLower, passwordHash (select: false), avatarId, preferredTopicSlugs, experienceLevel, onboardedAt, totalXP (level and rank are computed from it, not stored), currentStreak, longestStreak, lastDailyDate (`YYYY-MM-DD` local), timezone (IANA) | unique email, unique usernameLower |
 | topics | slug, name, description, icon, order | unique slug |
 | challenges | slug, title, topicSlug (slugs are stable, so no join to topics is needed), subtopic, type (`TRACE`/`BUG_HUNT`/`ENGINEER_CHOICE`/`INCIDENT`), difficulty 1–3, prompt, codeSnippet?, options[{id,text}], answerKey, explanation, misconception, optionFeedback?, hint?, estimatedTimeSec (XP comes from difficulty via config), stages[] (incident only: title, evidence, prompt, options, answerKey, explanation), rootCause?, isActive | unique slug; `{topicId, type, difficulty, isActive}` |
-| sessions | userId, type (`PRACTICE`/`DAILY`/`INCIDENT`/`BASELINE`/`CHECKPOINT`/`DUEL`), topicId?, dailyDate?, duelId?, items[{challengeId, order, optionOrders[][], isRevisit, hintsUsed[]}], status (`ACTIVE`/`COMPLETED`), startedAt, completedAt, correctCount, totalQuestions, totalTimeMs, totalXP | `{userId, createdAt:-1}`; unique partial `{userId, type:DAILY, dailyDate}`; unique partial `{duelId, userId}` |
+| sessions | userId, type (`PRACTICE`/`DAILY`/`INCIDENT`/`BASELINE`/`CHECKPOINT`/`DUEL`), topicId?, dailyDate?, duelId?, items[{challengeId, order, optionOrders[][], isRevisit, hintsUsed[]}], status (`ACTIVE`/`COMPLETED`), startedAt, completedAt, correctCount, totalQuestions, totalTimeMs, totalXP | `{userId, createdAt:-1}`; unique partial `{userId, dailyDate}` (type DAILY); unique partial `{userId, type, topicSlug}` (ACTIVE PRACTICE/BASELINE/CHECKPOINT); unique partial `{duelId, userId}` |
 | answerattempts | userId, sessionId, challengeId, stageIndex (0 for non-incident), answer, isCorrect, usedHint, isTimeout, timeTakenMs (server-measured), topicId, difficulty, createdAt | **unique `{sessionId, challengeId, stageIndex}`** (blocks double submits); `{userId, challengeId}`; `{userId, topicId, createdAt:-1}` |
 | usertopicprogress | userId, topicSlug, answers, correct, recentResults (last 10 booleans, mastery), adaptWindow (answers since last difficulty change, max 5), difficultyLevel 1–3, hasAdvancedCorrect, lastPractisedAt | unique `{userId, topicId}` |
 | xpevents | userId, sourceKey (`challenge:<id>[:<stage>]`, `review:<date>:<id>`, `daily:<date>`, `perfect:<date>`, `first-incident`, `streak<N>:<runStart>`, `duelwin:<duelId>`), amount, weekKey (`2026-W47`), createdAt | **unique `{userId, sourceKey}`** (first-completion XP only); `{weekKey, userId}` |
-| dailycircuits | userId, date (local `YYYY-MM-DD`), challengeIds[5], sessionId | unique `{userId, date}` |
 | revisititems | userId, challengeId, topicSlug, missedAt, missedDate (local `YYYY-MM-DD`), notBeforeDate? (set when a revisit is missed again) | unique `{userId, challengeId}`; `{userId, missedAt}` |
 | duels | code, creatorId, opponentId?, challengeIds[5], creatorSessionId, opponentSessionId?, status (`OPEN`/`ACTIVE`/`COMPLETED`/`EXPIRED`), winnerId?, expiresAt | unique code; TTL-free (expiry checked on read); `{creatorId}`, `{opponentId}` |
 | revisits | userId, challengeId, answersAtMiss, notBefore (date), status | unique `{userId, challengeId}` while open; `{userId, status, notBefore}` |
@@ -197,9 +196,11 @@ so only the first call does the work, and repeats return the stored summary (ide
 sessions it also awards the daily bonus XpEvent `daily:<date>` and updates the streak with a
 conditional update on `lastDailyDate`, then runs the achievement checks.
 
-**Daily Kata** (`GET /daily`): compute the user's local date from `users.timezone`. Upsert the
-`dailycircuits` doc on `{userId, date}`. Two concurrent first opens produce a single circuit, because
-the unique index makes the loser re-read. Selection: 1 TRACE, 1 BUG_HUNT, 2 ENGINEER_CHOICE,
+**Daily Kata** (`GET /daily`): compute the user's local date from `users.timezone`. The Kata *is* a
+`DAILY` session with `dailyDate` set; a unique partial index on `{userId, dailyDate}` (type `DAILY`)
+means two concurrent first opens produce a single Kata, because the loser re-reads the winner's (D-028).
+Answers to a Kata whose day has ended are refused with 409, so a completed Kata was always played on its
+own day. Selection: 1 TRACE, 1 BUG_HUNT, 2 ENGINEER_CHOICE,
 1 INCIDENT. Prefer unseen challenges at the user's per-topic difficulty, include up to 2 previously
 missed ones (missed ≥3 questions ago), and weight towards weak and preferred topics. Fall back to any
 active challenge of that type if a pool is empty.

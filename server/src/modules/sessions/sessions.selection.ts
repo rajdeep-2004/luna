@@ -2,7 +2,7 @@ import { TOPIC_SLUGS, type TopicSlug } from '@luna/shared';
 import { AnswerAttemptModel } from '../../models/AnswerAttempt';
 import type { ChallengeDoc } from '../../models/Challenge';
 import { AppError } from '../../lib/errors';
-import { REVISIT, SESSION } from '../../config/game';
+import { CHECKPOINT, REVISIT, SESSION } from '../../config/game';
 import { localDateKey } from '../../lib/time';
 import { challengesRepo } from '../challenges/challenges.repository';
 import { getDifficulty } from '../progress/topicProgress.service';
@@ -11,7 +11,7 @@ import { dueRevisits } from '../progress/revisit.service';
 export type PickedItem = { challenge: ChallengeDoc; isRevisit: boolean };
 const fresh = (challenge: ChallengeDoc): PickedItem => ({ challenge, isRevisit: false });
 
-async function seenIds(userId: string): Promise<Set<string>> {
+export async function seenIds(userId: string): Promise<Set<string>> {
   const ids = await AnswerAttemptModel.distinct('challengeId', { userId });
   return new Set(ids.map(String));
 }
@@ -54,10 +54,7 @@ export async function pickPractice(
     seen,
     difficulty,
   ).slice(0, SESSION.practiceSize - revisits.length);
-  return [
-    ...revisits.map((challenge) => ({ challenge, isRevisit: true })),
-    ...rest.map(fresh),
-  ];
+  return [...revisits.map((challenge) => ({ challenge, isRevisit: true })), ...rest.map(fresh)];
 }
 
 export async function pickIncident(userId: string, challengeId?: string): Promise<PickedItem[]> {
@@ -82,6 +79,22 @@ export async function pickBaseline(): Promise<PickedItem[]> {
   return TOPIC_SLUGS.flatMap((slug) => {
     const options = pool.filter((c) => c.topicSlug === slug);
     const pick = options[Math.floor(Math.random() * options.length)];
+    return pick ? [fresh(pick)] : [];
+  });
+}
+
+/**
+ * benchmarks.md §1: one intermediate single challenge per topic, unseen first, so the "after"
+ * score isn't inflated by memory. Falls back to any single challenge in the topic.
+ */
+export async function pickCheckpoint(userId: string): Promise<PickedItem[]> {
+  const [pool, seen] = await Promise.all([
+    challengesRepo.findActive({ type: { $ne: 'INCIDENT' } }),
+    seenIds(userId),
+  ]);
+  return TOPIC_SLUGS.flatMap((slug) => {
+    const inTopic = pool.filter((c) => c.topicSlug === slug);
+    const pick = rank(inTopic, seen, CHECKPOINT.difficulty)[0];
     return pick ? [fresh(pick)] : [];
   });
 }

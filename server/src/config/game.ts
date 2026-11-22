@@ -2,9 +2,14 @@
  * Game rules as data. Every number here comes from docs/product/ (approved 2026-11-22).
  * Change a rule here, not in services.
  */
-import type { Difficulty } from '@luna/shared';
+import type { Difficulty, SessionType } from '@luna/shared';
 
 export const XP_BY_DIFFICULTY: Record<Difficulty, number> = { 1: 10, 2: 15, 3: 20 };
+/** scoring.md §2: a correct answer on content already earned, inside the Daily Kata only. */
+export const REVIEW_XP = 2;
+/** Measurements, not play: no answer XP and no bonuses (scoring.md §2 rule 4). */
+export const NO_XP_SESSION_TYPES: readonly SessionType[] = ['BASELINE', 'CHECKPOINT'];
+
 /** A hint halves the XP for that answer, rounded down (scoring.md §2). */
 export const HINT_XP_DIVISOR = 2;
 
@@ -68,6 +73,18 @@ export const REVISIT = {
   /** Bounds the queue read; the bank is ~60 challenges. */
   maxScan: 100,
 } as const;
+
+/** game-modes.md §2. Slot order is the play order; the incident closes the Kata. */
+export const DAILY_KATA_SLOTS = [
+  'TRACE',
+  'BUG_HUNT',
+  'ENGINEER_CHOICE',
+  'ENGINEER_CHOICE',
+  'INCIDENT',
+] as const;
+
+/** benchmarks.md §1: a Checkpoint unlocks after every N completed Daily Katas (active days). */
+export const CHECKPOINT = { everyKatas: 7, difficulty: 2 } as const;
 
 /** scoring.md §5 grade bands, by accuracy. */
 export const GRADES = [

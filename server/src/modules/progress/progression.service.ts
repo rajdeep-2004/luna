@@ -1,6 +1,5 @@
 import type { BonusAward } from '@luna/shared';
 import { BONUS_XP, STREAK_MILESTONES } from '../../config/game';
-import { localDateKey } from '../../lib/time';
 import { XpEventModel } from '../../models/XpEvent';
 import { usersRepo } from '../users/users.repository';
 import { nextStreak, runStartDate, type StreakResult } from './streak';
@@ -9,10 +8,11 @@ import { awardXP } from './xp.service';
 const MAX_STREAK_RETRIES = 3;
 
 /**
- * Moves the streak for a Daily Kata completed now. Compare-and-set on `lastDailyDate`: if a
+ * Moves the streak for the Daily Kata of local date `dateKey`. Answers to a Kata are refused once
+ * its day has ended, so a completed Kata was always played on its own day. Compare-and-set on `lastDailyDate`: if a
  * concurrent completion changed it first, re-read and decide again, so the streak moves once.
  */
-export async function updateStreak(userId: string, now = new Date()): Promise<StreakResult> {
+export async function updateStreak(userId: string, dateKey: string): Promise<StreakResult> {
   for (let i = 0; i < MAX_STREAK_RETRIES; i++) {
     const user = await usersRepo.findById(userId);
     if (!user) throw new Error(`User ${userId} vanished while completing a Kata`);
@@ -21,8 +21,10 @@ export async function updateStreak(userId: string, now = new Date()): Promise<St
       longest: user.longestStreak,
       lastDate: user.lastDailyDate ?? null,
     };
-    const next = nextStreak(prev, localDateKey(now, user.timezone));
-    if (!next.extended) return next;
+    const next = nextStreak(prev, dateKey);
+    // Already counted (a parallel completion of this same Kata won the write): report it as
+    // counted, so every caller returns the same summary. Only this Kata carries this date.
+    if (!next.extended) return { ...next, extended: prev.lastDate === dateKey };
     const moved = await usersRepo.setStreakIf(userId, prev.lastDate, next);
     if (moved) return next;
   }
@@ -37,7 +39,9 @@ export function dailyBonusCandidates(
   allCorrect: boolean,
   streak: StreakResult,
 ): Candidate[] {
-  const out: Candidate[] = [{ kind: 'DAILY_KATA', key: `daily:${dailyDate}`, xp: BONUS_XP.dailyKata }];
+  const out: Candidate[] = [
+    { kind: 'DAILY_KATA', key: `daily:${dailyDate}`, xp: BONUS_XP.dailyKata },
+  ];
   if (allCorrect)
     out.push({ kind: 'PERFECT_KATA', key: `perfect:${dailyDate}`, xp: BONUS_XP.perfectKata });
   if (streak.lastDate) {

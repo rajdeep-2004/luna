@@ -40,8 +40,16 @@ sessionSchema.index(
   { userId: 1, type: 1, topicSlug: 1 },
   {
     unique: true,
-    partialFilterExpression: { status: 'ACTIVE', type: { $in: ['PRACTICE', 'BASELINE'] } },
+    partialFilterExpression: {
+      status: 'ACTIVE',
+      type: { $in: ['PRACTICE', 'BASELINE', 'CHECKPOINT'] },
+    },
   },
+);
+// One Daily Kata per user per local day: two concurrent first opens can't build two (D-028).
+sessionSchema.index(
+  { userId: 1, dailyDate: 1 },
+  { unique: true, partialFilterExpression: { type: 'DAILY' } },
 );
 
 export type Session = InferSchemaType<typeof sessionSchema>;

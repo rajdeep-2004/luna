@@ -9,6 +9,7 @@ export const StartSessionRequest = z.discriminatedUnion('type', [
   z.object({ type: z.literal('PRACTICE'), topicSlug: z.enum(TOPIC_SLUGS) }),
   z.object({ type: z.literal('INCIDENT'), challengeId: ObjectId.optional() }),
   z.object({ type: z.literal('BASELINE') }),
+  z.object({ type: z.literal('CHECKPOINT') }),
 ]);
 export type StartSessionRequest = z.infer<typeof StartSessionRequest>;
 
@@ -68,7 +69,11 @@ export type HintResult = { hint: string };
 export type TopicResult = { topicSlug: TopicSlug; correct: number; total: number };
 
 export type BonusKind = 'DAILY_KATA' | 'PERFECT_KATA' | 'FIRST_INCIDENT' | 'STREAK_MILESTONE';
-export type BonusAward = { kind: BonusKind; xp: number; /** Streak milestones only. */ days?: number };
+export type BonusAward = {
+  kind: BonusKind;
+  xp: number;
+  /** Streak milestones only. */ days?: number;
+};
 
 export type SessionSummary = {
   sessionId: string;
@@ -90,3 +95,6 @@ export type SessionSummary = {
   /** Set when this session's XP crossed a level threshold. */
   rankUp?: { level: number; rankName: string; kanji: string };
 };
+
+/** `GET /daily`: today's Kata (built once per local day) and, once finished, its summary. */
+export type DailyView = { date: string; session: SessionView; summary: SessionSummary | null };

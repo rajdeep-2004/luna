@@ -651,9 +651,9 @@ bonuses were never paid, and the retry would just return the stored summary.
 their IANA timezone, computed with `Intl.DateTimeFormat`). Same day: no change. The day after the last
 Kata: +1. Any gap: back to 1. If the stored date is *later* than today (the user moved their timezone
 west), it is also "no change", so changing timezone can never add a day. Day arithmetic is done on the
-date string in UTC, so daylight-saving changes cannot shift it. The streak uses the date the Kata is
-*completed*, not the date it was built for, so an old unfinished Kata cannot be used to repair a broken
-streak. The bonus keys use the Kata's own date, so each Kata pays its bonus once.
+date string in UTC, so daylight-saving changes cannot shift it. The streak and the bonus keys both use the
+Kata's own date. *(Amended in D-028: answers to a Kata are refused once its day ends, so an old Kata can't
+be finished later to repair a broken streak.)*
 
 **Milestones once per run.** The run start is derived (`lastDate − (current − 1)` days) instead of
 stored, and keys the milestone. A new run after a break has a new start date, so it can earn the
@@ -727,3 +727,62 @@ full spaced-repetition scheduler such as SM-2 (more than V1 needs; the brainstor
 **Concepts.** MongoDB update pipelines (atomic conditional updates); derived vs stored state; spaced repetition.
 **Revisit if** difficulty bounces too often in play tests (raise the window), or the queue grows large enough
 to need a cap.
+
+### D-028 — Daily Kata as a session, review XP, baseline effect, Checkpoint
+- **Date:** 2026-11-22 · **Step:** P4 task 3 · **Status:** Active · **Type:** technical + product
+
+**The Kata is a session, not a separate "circuit".** The architecture planned a `dailycircuits`
+collection holding the five challenge ids plus a link to the session. The session already stores its
+challenges, their option order and now its `dailyDate`, so the circuit would only duplicate it. Instead a
+unique partial index on sessions `{userId, dailyDate}` (only for `DAILY`) is the "one Kata per user per
+day" guarantee. Two phones opening the app at the same moment both try to insert; the database accepts
+one, the other gets a duplicate-key error and returns the winner's Kata. One less collection to keep in
+sync. `GET /daily` returns `{ date, session, summary }`: building it on the first open, resuming it after,
+and including the stored summary once it is finished.
+
+**Composition.** Five slots: Trace, Bug Hunt, two Engineer's Choice, Incident (incident last, as the
+climax). Up to 2 due revisits (missed before today, 3+ answers ago) take a slot of their own type. Each
+other slot takes the lowest-scoring challenge of its type, where the score adds: +10 if seen, the distance
+from the user's difficulty for that topic, −0.5 for a preferred topic, −0.75 for the weakest topic, +0.75
+per earlier slot already from that topic (spread), and a little randomness. Because "seen" only adds a
+penalty, a user who has seen everything still gets a full Kata of the least-bad options: that is the
+fallback `game-modes.md` describes.
+
+**Expiry.** `game-modes.md` says an unfinished Kata expires at the end of the local day: answers count for
+mastery, but no bonus or streak. Implemented as: answering (or asking for a hint in) a Kata whose
+`dailyDate` is before today is a 409 "This Kata ended at midnight". The next `GET /daily` builds today's.
+So the streak can safely use the Kata's own date.
+
+**Review XP.** A correct answer to content already earned pays 2 XP, only inside the Kata, under the key
+`review:<date>:<challenge>[:stage]`. The subtle part is the retry path: a retry finds the first-correct
+ledger row already there (inserted by the first try) and must not mistake it for "earned before". So
+"earned before" means a ledger row created *before this attempt's timestamp*. The XP rules moved to
+`sessions.xp.ts`, used by both the normal and the retry path. Baseline and Checkpoint pay nothing
+(`NO_XP_SESSION_TYPES`).
+
+**Baseline effect.** When the baseline completes, each topic's difficulty is set from its one question:
+correct keeps the onboarding segment's difficulty, wrong sets 1 (`progression.md` §4). Plain `$set`s, so a
+retry is harmless.
+
+**Checkpoint (approved scope, `benchmarks.md` §1).** `POST /sessions {type: CHECKPOINT}`: one intermediate
+single challenge per topic, unseen first, no XP. "Every 7 active days" is defined as every 7 completed
+Daily Katas (one per local day, so each is an active day): the Nth Checkpoint needs N × 7. That rule is
+computed, not stored, and can't be farmed. The progress view gets `assessments` (baseline score, latest
+checkpoint score, availability, Katas to go), which is the "Baseline 2/5 → Checkpoint 4/5" learning metric.
+Concurrent starts are de-duplicated by adding CHECKPOINT to the existing "one open session" index.
+
+**Refactor.** `sessions.service.ts` was near 400 lines, so progression settlement moved to
+`sessions.settle.ts` and answer XP to `sessions.xp.ts`. `createSession` is shared by `startSession` and
+the Daily service.
+
+**Alternatives rejected.** Keep `dailycircuits` (duplicate state). Let an expired Kata be finished
+without bonus (more states for the app to explain, same outcome). Count "active days" from XP events by
+day (a practice-only day would count, which isn't what a checkpoint window means).
+
+**Files.** `server/src/modules/daily/*`, `server/src/modules/sessions/{sessions.service,sessions.settle,sessions.xp,sessions.selection}.ts`,
+`server/src/modules/progress/{assessments.service,progression.service,progress.service}.ts`,
+`server/src/models/Session.ts`, `server/src/config/game.ts`, `shared/src/{sessions,progress}.ts`, `docs/architecture.md`.
+**Concepts.** Partial unique indexes as concurrency guards; deriving rules from history instead of storing
+counters; timestamp-ordered idempotency.
+**Revisit if** the bank grows enough that the scoring weights need tuning, or testers ask to finish
+yesterday's Kata.

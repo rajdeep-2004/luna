@@ -23,4 +23,16 @@ export type ProgressView = {
   topics: TopicProgressView[];
   weakestTopic: TopicSlug | null;
   revisitsQueued: number;
+  assessments: AssessmentStatus;
+};
+
+export type AssessmentScore = { correct: number; total: number; completedAt: string };
+
+/** benchmarks.md §1: Baseline "before", latest Checkpoint "after", and when the next unlocks. */
+export type AssessmentStatus = {
+  baseline: AssessmentScore | null;
+  checkpoint: AssessmentScore | null;
+  checkpointAvailable: boolean;
+  /** Daily Katas left until the next Checkpoint unlocks; 0 when available. */
+  katasUntilCheckpoint: number;
 };

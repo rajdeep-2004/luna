@@ -1,9 +1,10 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
 import type { BoardRow, BoardView } from '@luna/shared';
 import { leaderboardApi, userMessage } from '../../api';
-import { AppText, Button, EmptyState, ErrorState, Screen, YokaiAvatar } from '../../components';
+import { YokaiMask } from '../../art/YokaiMask';
+import { AppText, Button, EmptyState, ErrorState, PressableSink, Screen } from '../../components';
 import { formatRemaining } from '../../lib/duration';
 import type { AppStackParams } from '../../navigation/types';
 import { colors, layout, radii, spacing } from '../../theme';
@@ -11,7 +12,8 @@ import { colors, layout, radii, spacing } from '../../theme';
 type Props = NativeStackScreenProps<AppStackParams, 'DojoBoard'>;
 
 export const BOARD_KEY = ['board'] as const;
-const MEDAL = { 1: '🥇', 2: '🥈', 3: '🥉' } as const;
+/** Last week's top three wear a medal: a small disc in amber, shoji or wood (no emoji, DESIGN.md). */
+const MEDAL = { 1: colors.primary, 2: colors.shoji, 3: colors.wood } as const;
 
 /** competition.md §1: this week's XP ranking, top 50, with my own row pinned when out of view. */
 export function DojoBoardScreen({ navigation }: Props) {
@@ -30,23 +32,23 @@ export function DojoBoardScreen({ navigation }: Props) {
   return (
     <Screen>
       <View style={styles.header}>
-        <Pressable
+        <PressableSink
           onPress={() => navigation.goBack()}
           accessibilityRole="button"
           accessibilityLabel="Back"
           style={styles.back}
         >
-          <AppText color="textMuted">‹ Back</AppText>
-        </Pressable>
+          <AppText color="muted">‹ Back</AppText>
+        </PressableSink>
         <AppText variant="display">Dojo Board</AppText>
         {head ? (
-          <AppText variant="label" color="textMuted">
+          <AppText variant="label" color="muted">
             This week · resets in {formatRemaining(head.resetsAt)}
           </AppText>
         ) : null}
       </View>
 
-      {query.isPending ? <ActivityIndicator color={colors.moon} /> : null}
+      {query.isPending ? <ActivityIndicator color={colors.primary} /> : null}
       {query.isError ? (
         <ErrorState
           message={userMessage(query.error)}
@@ -85,7 +87,7 @@ export function DojoBoardScreen({ navigation }: Props) {
         </View>
       ) : null}
       {head && !me && rows.length > 0 ? (
-        <AppText color="textMuted" style={styles.note}>
+        <AppText color="muted" style={styles.note}>
           You&apos;re not on the board yet this week. One kata puts you there.
         </AppText>
       ) : null}
@@ -94,27 +96,46 @@ export function DojoBoardScreen({ navigation }: Props) {
 }
 
 function Row({ row, isMe }: { row: BoardRow; isMe: boolean }) {
-  const medal = row.lastWeekPlace ? MEDAL[row.lastWeekPlace] : '';
+  const top = row.rank <= 3;
   return (
     <View
       style={[styles.row, isMe && styles.me]}
       accessible
       accessibilityLabel={`Rank ${row.rank}, ${row.player.username}${isMe ? ' (you)' : ''}, ${row.player.rankName}, ${row.weeklyXP} XP this week${row.lastWeekPlace ? `, number ${row.lastWeekPlace} last week` : ''}`}
     >
-      <AppText variant="code" color={row.rank <= 3 ? 'moon' : 'textMuted'} style={styles.rank}>
+      <AppText
+        variant="title"
+        color={isMe ? 'onShoji' : top ? 'primary' : 'muted'}
+        style={styles.rank}
+      >
         {row.rank}
       </AppText>
-      <YokaiAvatar id={row.player.avatarId} size={36} />
+      <YokaiMask id={row.player.avatarId} size={36} />
       <View style={styles.who}>
-        <AppText color={isMe ? 'moon' : 'textSoft'} numberOfLines={1}>
-          {row.player.username}
-          {medal ? ` ${medal}` : ''}
-        </AppText>
-        <AppText variant="label" color="textMuted">
+        <View style={styles.nameRow}>
+          <AppText color={isMe ? 'onShoji' : 'text'} style={styles.name} numberOfLines={1}>
+            {row.player.username}
+            {isMe ? ' (you)' : ''}
+          </AppText>
+          {row.lastWeekPlace ? (
+            <View style={[styles.medal, { backgroundColor: MEDAL[row.lastWeekPlace] }]}>
+              <AppText
+                variant="label"
+                color={row.lastWeekPlace === 3 ? 'text' : 'onShoji'}
+                style={styles.medalText}
+              >
+                {row.lastWeekPlace}
+              </AppText>
+            </View>
+          ) : null}
+        </View>
+        <AppText variant="label" color={isMe ? 'wood' : 'muted'}>
           {row.player.rankName}
         </AppText>
       </View>
-      <AppText variant="code">{row.weeklyXP} XP</AppText>
+      <AppText variant="code" color={isMe ? 'onShoji' : 'text'}>
+        {row.weeklyXP} XP
+      </AppText>
     </View>
   );
 }
@@ -127,14 +148,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.tatami,
+    borderRadius: radii.md,
+    minHeight: 56,
   },
-  me: { backgroundColor: colors.surfaceRaised },
-  rank: { width: 28 },
+  me: { backgroundColor: colors.shoji },
+  rank: { width: 32, fontSize: 18, lineHeight: 22, textAlign: 'center' },
   who: { flex: 1, gap: 2 },
-  pinned: { paddingVertical: spacing.md, borderTopWidth: 1, borderTopColor: colors.track },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  name: { fontWeight: '600', flexShrink: 1 },
+  medal: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  medalText: { fontSize: 10, lineHeight: 12 },
+  pinned: { paddingVertical: spacing.md, borderTopWidth: 1, borderTopColor: colors.wood },
   note: { textAlign: 'center', paddingBottom: spacing.lg },
 });

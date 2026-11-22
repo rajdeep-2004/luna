@@ -23,6 +23,7 @@ import { RankScroll } from '../../art/RankScroll';
 import { DOJO, DOJO_ANCHORS } from '../../art/scene';
 import { AppText, Button, ErrorState, PressableSink } from '../../components';
 import { useReduceMotion } from '../../lib/motion';
+import { rankProgress } from '../../lib/rank';
 import { useProgress } from '../../lib/useProgress';
 import type { AppStackParams, MainTabParams } from '../../navigation/types';
 import { useAuthStore } from '../../store/auth';
@@ -43,12 +44,6 @@ const LETTER = { x: 214, y: 268, w: 60 };
 function lanternState(p: ProgressView): LanternState {
   if (p.streak.current === 0) return 'out';
   return p.streak.doneToday ? 'lit' : 'waiting';
-}
-
-function rankProgress(level: ProgressView['level']): number {
-  if (level.nextLevelXP === null) return 1;
-  const span = level.nextLevelXP - level.levelStartXP;
-  return span > 0 ? (level.totalXP - level.levelStartXP) / span : 1;
 }
 
 /** 0..1 through the local day: the moon's place on its arc, heading for the kata reset at midnight. */

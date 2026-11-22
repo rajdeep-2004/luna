@@ -6,3 +6,9 @@ export type MainTabParams = {
   Duel: undefined;
   Profile: undefined;
 };
+/** Signed-in, onboarded app: the tabs, plus full-screen game routes pushed on top of them. */
+export type AppStackParams = {
+  Tabs: undefined;
+  Session: { sessionId: string };
+  Summary: { sessionId: string };
+};

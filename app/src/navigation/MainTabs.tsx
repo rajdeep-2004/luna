@@ -1,4 +1,5 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { ExploreScreen } from '../screens/explore/ExploreScreen';
 import { PlaceholderScreen, ProfilePlaceholder } from '../screens/tabs/PlaceholderScreen';
 import { colors, fontFamily } from '../theme';
 import type { MainTabParams } from './types';
@@ -7,9 +8,6 @@ const Tab = createBottomTabNavigator<MainTabParams>();
 
 const Dojo = () => (
   <PlaceholderScreen title="Dojo" message="Your Daily Kata and streak appear here soon." />
-);
-const Explore = () => (
-  <PlaceholderScreen title="Explore" message="Topic practice arrives in the next phase." />
 );
 const Duel = () => (
   <PlaceholderScreen title="Duel" message="Challenge a friend. Coming in a later phase." />
@@ -29,7 +27,7 @@ export function MainTabs() {
       }}
     >
       <Tab.Screen name="Dojo" component={Dojo} />
-      <Tab.Screen name="Explore" component={Explore} />
+      <Tab.Screen name="Explore" component={ExploreScreen} />
       <Tab.Screen name="Duel" component={Duel} />
       <Tab.Screen name="Profile" component={ProfilePlaceholder} />
     </Tab.Navigator>

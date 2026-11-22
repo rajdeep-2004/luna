@@ -3,7 +3,7 @@ import { ErrorState, Screen } from '../components';
 import { useAuthStore } from '../store/auth';
 import { colors } from '../theme';
 import { AuthStack } from './AuthStack';
-import { MainTabs } from './MainTabs';
+import { AppStack } from './AppStack';
 import { OnboardingStack } from './OnboardingStack';
 
 /** Picks the stack from the auth state. Swapping stacks (not pushing) means Back can never return to a stale one. */
@@ -34,5 +34,5 @@ export function RootNavigator() {
     );
   }
   if (status === 'signedOut' || !user) return <AuthStack />;
-  return user.onboarded ? <MainTabs /> : <OnboardingStack />;
+  return user.onboarded ? <AppStack /> : <OnboardingStack />;
 }

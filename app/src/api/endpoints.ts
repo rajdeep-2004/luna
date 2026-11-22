@@ -1,8 +1,15 @@
 import type {
+  AnswerResult,
   AuthResponse,
+  HintRequest,
+  HintResult,
   LoginRequest,
   PublicUser,
   RegisterRequest,
+  SessionSummary,
+  SessionView,
+  StartSessionRequest,
+  SubmitAnswerRequest,
   Topic,
   UpdateMeRequest,
 } from '@luna/shared';
@@ -21,4 +28,13 @@ export const usersApi = {
 
 export const topicsApi = {
   list: () => api.get<Topic[]>('/topics'),
+};
+
+export const sessionsApi = {
+  start: (body: StartSessionRequest) => api.post<SessionView>('/sessions', body),
+  get: (id: string) => api.get<SessionView>(`/sessions/${id}`),
+  answer: (id: string, body: SubmitAnswerRequest) =>
+    api.post<AnswerResult>(`/sessions/${id}/answers`, body),
+  hint: (id: string, body: HintRequest) => api.post<HintResult>(`/sessions/${id}/hint`, body),
+  complete: (id: string) => api.post<SessionSummary>(`/sessions/${id}/complete`, {}),
 };

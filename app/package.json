@@ -8,9 +8,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@expo-google-fonts/inter": "^0.4.2",
+    "@expo-google-fonts/dela-gothic-one": "^0.4.1",
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",
-    "@expo-google-fonts/shippori-mincho": "^0.4.1",
+    "@expo-google-fonts/source-sans-3": "^0.4.2",
     "@luna/shared": "^0.1.0",
     "@react-navigation/bottom-tabs": "^7.22.0",
     "@react-navigation/native": "^7.5.2",
@@ -31,6 +31,8 @@
     "zustand": "^5.1.0"
   },
   "devDependencies": {
-    "@types/react": "~19.3.0"
+    "@expo-google-fonts/yuji-boku": "^0.4.2",
+    "@types/react": "~19.3.0",
+    "opentype.js": "^2.0.0"
   }
 }

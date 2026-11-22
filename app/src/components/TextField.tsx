@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     backgroundColor: colors.surface,
     color: colors.text,
-    fontFamily: fontFamily.sans,
+    fontFamily: fontFamily.sansMedium,
     fontSize: 16,
     borderWidth: 1,
     borderColor: 'transparent',

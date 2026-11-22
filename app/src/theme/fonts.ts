@@ -1,12 +1,18 @@
-import { ShipporiMincho_500Medium } from '@expo-google-fonts/shippori-mincho';
-import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-google-fonts/inter';
+import { DelaGothicOne_400Regular } from '@expo-google-fonts/dela-gothic-one';
+import {
+  SourceSans3_400Regular,
+  SourceSans3_500Medium,
+  SourceSans3_600SemiBold,
+  SourceSans3_700Bold,
+} from '@expo-google-fonts/source-sans-3';
 import { JetBrainsMono_400Regular } from '@expo-google-fonts/jetbrains-mono';
 
-/** Passed to `useFonts` during the splash screen. */
+/** Passed to `useFonts` during the splash screen (DESIGN.md: Typography). */
 export const fontAssets = {
-  ShipporiMincho_500Medium,
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
+  DelaGothicOne_400Regular,
+  SourceSans3_400Regular,
+  SourceSans3_500Medium,
+  SourceSans3_600SemiBold,
+  SourceSans3_700Bold,
   JetBrainsMono_400Regular,
 };

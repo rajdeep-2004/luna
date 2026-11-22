@@ -10,7 +10,7 @@ const Stack = createNativeStackNavigator<OnboardingStackParams>();
 export function OnboardingStack() {
   return (
     <Stack.Navigator
-      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
+      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ground } }}
     >
       <Stack.Screen name="Avatar" component={AvatarScreen} />
       <Stack.Screen name="Topics" component={TopicsScreen} />

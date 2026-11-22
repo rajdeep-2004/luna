@@ -2,3 +2,4 @@ node_modules
 dist
 .scratch
 docs/luna-idea.md
+app/src/art/kanjiPaths.ts

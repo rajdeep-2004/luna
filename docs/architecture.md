@@ -71,8 +71,13 @@ luna/
 │       ├── screens/          one folder per area: auth, onboarding, dojo, explore, game, duel, board, profile
 │       ├── api/              fetch client (timeout, GET retries, envelope parsing), endpoints, query client
 │       ├── store/            Zustand: auth (token in SecureStore), onboarding, connection (cold start)
-│       ├── components/       design-system pieces: Button, Card, MoonPhase, YokaiAvatar, Stamp...
-│       ├── lib/              session position, haptics, durations, small hooks
+│       ├── art/              Kiri-e Den cut-paper art as react-native-svg components on a 390-wide grid:
+│       │                     DojoScene, Lantern, RankScroll, Enso, KataScroll, EmaPlaque, YokaiMask,
+│       │                     HankoStamp/HankoStrike, TopicBanner, ModeArt, FaceOff, Crest, WinSeal, Kanji
+│       │                     (brush kanji baked to paths in kanjiPaths.ts by app/scripts/bake-kanji.mjs)
+│       ├── components/       interaction kit: PressableSink, Button, OptionRow, CodeBlock, CodeCells,
+│       │                     BrushMarks, TextField, YokaiAvatar, ErrorState, EmptyState, WakingServer
+│       ├── lib/              session position, haptics, motion (Reduce Motion), duel formats, small hooks
 │       ├── config/env.ts     the only module that reads process.env in the app
 │       └── theme/            colours, spacing, typography, fonts
 ├── server/                   Express API
@@ -173,12 +178,12 @@ not as magic numbers. Their values come from `docs/product/` (approved).
 | users | email, username, usernameLower, passwordHash (select: false), avatarId, preferredTopicSlugs, experienceLevel, onboardedAt, totalXP (level and rank are computed from it, not stored), currentStreak, longestStreak, lastDailyDate (`YYYY-MM-DD` local), timezone (IANA) | unique email, unique usernameLower |
 | topics | slug, name, description, icon, order | unique slug |
 | challenges | slug, title, topicSlug (slugs are stable, so no join to topics is needed), subtopic, type (`TRACE`/`BUG_HUNT`/`ENGINEER_CHOICE`/`INCIDENT`), difficulty 1–3, prompt, codeSnippet?, options[{id,text}], answerKey, explanation, misconception, optionFeedback?, hint?, estimatedTimeSec (XP comes from difficulty via config), stages[] (incident only: title, evidence, prompt, options, answerKey, explanation), rootCause?, isActive | unique slug; `{topicId, type, difficulty, isActive}` |
-| sessions | userId, type (`PRACTICE`/`DAILY`/`INCIDENT`/`BASELINE`/`CHECKPOINT`/`DUEL`), topicId?, dailyDate?, duelId?, items[{challengeId, order, optionOrders[][], isRevisit, hintsUsed[]}], status (`ACTIVE`/`COMPLETED`), startedAt, completedAt, correctCount, totalQuestions, totalTimeMs, totalXP | `{userId, createdAt:-1}`; unique partial `{userId, dailyDate}` (type DAILY); unique partial `{userId, type, topicSlug}` (ACTIVE PRACTICE/BASELINE/CHECKPOINT); unique partial `{duelId, userId}` (type DUEL); `{userId, status, completedAt:-1, _id:-1}` (history) |
+| sessions | userId, type (`PRACTICE`/`DAILY`/`INCIDENT`/`BASELINE`/`CHECKPOINT`/`DUEL`), topicId?, mode? (`TRACE`/`BUG_HUNT`/`ENGINEER_CHOICE`, PRACTICE mode rounds), dailyDate?, duelId?, duelFormat? (DUEL), endedEarly (Sudden Death), items[{challengeId, order, optionOrders[][], isRevisit, hintsUsed[]}], status (`ACTIVE`/`COMPLETED`), startedAt, completedAt, correctCount, totalQuestions, totalTimeMs, totalXP | `{userId, createdAt:-1}`; unique partial `{userId, dailyDate}` (type DAILY); unique partial `{userId, type, topicSlug, mode}` (ACTIVE PRACTICE/BASELINE/CHECKPOINT); unique partial `{duelId, userId}` (type DUEL); `{userId, status, completedAt:-1, _id:-1}` (history) |
 | answerattempts | userId, sessionId, challengeId, stageIndex (0 for non-incident), answer, isCorrect, usedHint, isTimeout, timeTakenMs (server-measured), topicId, difficulty, createdAt | **unique `{sessionId, challengeId, stageIndex}`** (blocks double submits); `{userId, challengeId}`; `{userId, topicId, createdAt:-1}` |
 | usertopicprogress | userId, topicSlug, answers, correct, recentResults (last 10 booleans, mastery), adaptWindow (answers since last difficulty change, max 5), difficultyLevel 1–3, hasAdvancedCorrect, lastPractisedAt | unique `{userId, topicId}` |
 | xpevents | userId, sourceKey (`challenge:<id>[:<stage>]`, `review:<date>:<id>`, `daily:<date>`, `perfect:<date>`, `first-incident`, `streak<N>:<runStart>`, `duelwin:<localDate>:<1..3>`), amount, weekKey (`2026-W47`), createdAt | **unique `{userId, sourceKey}`** (first-completion XP only); `{weekKey, userId}` |
 | revisititems | userId, challengeId, topicSlug, missedAt, missedDate (local `YYYY-MM-DD`), notBeforeDate? (set when a revisit is missed again) | unique `{userId, challengeId}`; `{userId, missedAt}` |
-| duels | code, creatorId, opponentId?, items[5]{challengeId, optionOrders[][]}, status (`OPEN`/`ACTIVE`/`COMPLETED`/`EXPIRED`), creatorResult?/opponentResult? {correct, totalTimeMs, finishedAt}, winnerId?, endReason (`PLAYED`/`FORFEIT`/`EXPIRED`), winBonusClaimed, winBonusSettled, winBonusXP, expiresAt | unique code; TTL-free (expiry checked on read); `{creatorId, createdAt:-1}`, `{opponentId, createdAt:-1}`. A player's DUEL session is found by `{duelId, userId}` |
+| duels | code, creatorId, opponentId?, format (`CLASSIC`/`BLITZ`/`SUDDEN_DEATH`), items[5 or 10]{challengeId, optionOrders[][]}, status (`OPEN`/`ACTIVE`/`COMPLETED`/`EXPIRED`), creatorResult?/opponentResult? {correct, totalTimeMs, finishedAt}, winnerId?, endReason (`PLAYED`/`FORFEIT`/`EXPIRED`), winBonusClaimed, winBonusSettled, winBonusXP, expiresAt | unique code; TTL-free (expiry checked on read); `{creatorId, createdAt:-1}`, `{opponentId, createdAt:-1}`. A player's DUEL session is found by `{duelId, userId}` |
 | revisits | userId, challengeId, answersAtMiss, notBefore (date), status | unique `{userId, challengeId}` while open; `{userId, status, notBefore}` |
 | userachievements | userId, key, awardedAt | unique `{userId, key}` |
 
@@ -224,9 +229,15 @@ then lower `totalTimeMs` (compared in whole seconds), else draw. Duel sessions s
 (same ledger rules). Details of what P5 built (D-032):
 - *Play:* `POST /duels/:id/play` creates the player's DUEL session on the duel's fixed challenges and option
   order. The unique `{duelId, userId}` index turns a double tap into one session.
-- *Timer:* 60 s per challenge on the server's clock, measured from the previous answer. An answer later than
-  60 s + 5 s grace, or the `TIMEOUT` answer the app sends at zero, is wrong and records exactly 60 s. There are
-  no hints. The app shows a brief ✓/✗ instead of the feedback sheet, so reading time doesn't eat the next timer.
+- *Formats (D-042):* `DUEL_FORMAT_RULES` in `shared` sets each format's size and clock: Classic 5 × 60 s (5 s
+  grace), Blitz 10 × 10 s (2 s grace), Sudden Death up to 10 × 30 s (5 s grace). The duel stores its format and
+  each DUEL session copies it, so an answer reads its timer without a second query.
+- *Timer:* the format's timer per challenge on the server's clock, measured from the previous answer. An answer
+  later than the timer plus its grace, or the `TIMEOUT` answer the app sends at zero, is wrong and records
+  exactly the timer.
+- *Sudden Death:* answers must come in order. The first miss or timeout sets `endedEarly` (a conditional update)
+  and reports `sessionReadyToComplete`; later answers return 409. Completion accepts fewer answers than the total
+  only when `endedEarly` is set, and the score counts the run up to and including the first miss.
 - *Settle:* when a DUEL session completes, the player's score is written onto the duel only if the duel is live
   and before `expiresAt`. Every read of a duel then settles it: both scores → `COMPLETED`/`PLAYED`; past expiry →
   the player who finished wins by default (`FORFEIT`, no bonus), or `EXPIRED` if nobody finished or joined. Each
@@ -237,6 +248,14 @@ then lower `totalTimeMs` (compared in whole seconds), else draw. Duel sessions s
 **Dojo Board** (`GET /leaderboard/weekly`): one aggregation over this week's `xpevents` grouped by user, sorted by
 XP, then by who reached it first (earliest last award), then id. Pages are offsets inside the top 50; the `me` row
 comes from the same aggregation. Last week's top 3 is a second aggregation with `$limit: 3`.
+
+**Mode rounds and boss incidents (D-041):** `POST /sessions` PRACTICE with `mode` builds a round of one challenge
+kind: the topic's own challenges first (one due revisit, then unseen, nearest the player's difficulty), topped up
+to five from the same kind in other topics. INCIDENT with `topicSlug` picks that topic's boss incident and falls
+back to any incident.
+
+**Player stats:** `GET /users/me/progress` includes `stats` (Katas completed; duels won, lost and drawn) from four
+indexed counts on sessions and duels. There are no counters to keep in sync.
 
 **Achievements:** checked right after a session flips to `COMPLETED`, from cumulative counts (completed sessions,
 correct Bug Hunt answers, completed Katas, perfect Katas). A missed check catches up on the next completion. Newly

@@ -2,6 +2,7 @@ import type {
   AchievementView,
   AnswerResult,
   BoardView,
+  DuelFormat,
   DuelListView,
   DuelView,
   Page,
@@ -46,7 +47,7 @@ export const leaderboardApi = {
 
 export const duelsApi = {
   list: () => api.get<DuelListView>('/duels'),
-  create: () => api.post<DuelView>('/duels', {}),
+  create: (format: DuelFormat = 'CLASSIC') => api.post<DuelView>('/duels', { format }),
   join: (code: string) => api.post<DuelView>('/duels/join', { code }),
   get: (id: string) => api.get<DuelView>(`/duels/${id}`),
   /** Starts (or resumes) my DUEL session. */

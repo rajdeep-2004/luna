@@ -1,6 +1,8 @@
 import { randomInt } from 'node:crypto';
 import {
   DUEL_CODE_ALPHABET,
+  DUEL_FORMAT_RULES,
+  type DuelFormat,
   type DuelListView,
   type DuelPlayerResult,
   type DuelStatus,
@@ -40,8 +42,14 @@ async function findOwnDuel(userId: string, duelId: string): Promise<DuelDoc> {
   return settleDuel(duel);
 }
 
-/** Per-challenge ✓/✗ and times for both players, in duel order. Only shown once a duel ends. */
+const formatOf = (d: DuelDoc): DuelFormat => (d.format ?? 'CLASSIC') as DuelFormat;
+
+/**
+ * Per-challenge ✓/✗ and times for both players, in duel order. Only shown once a duel ends. In
+ * Sudden Death a run stops at the first miss, so the questions after it are left off.
+ */
 async function perQuestion(duel: DuelDoc) {
+  const rules = DUEL_FORMAT_RULES[formatOf(duel)];
   const sessions = await SessionModel.find({ duelId: duel._id }).select('userId').lean();
   const attempts = await AnswerAttemptModel.find({ sessionId: { $in: sessions.map((s) => s._id) } })
     .select('sessionId challengeId isCorrect timeTakenMs isTimeout')
@@ -49,18 +57,21 @@ async function perQuestion(duel: DuelDoc) {
   const forUser = (userId: string | undefined) => {
     const session = sessions.find((s) => s.userId.toString() === userId);
     if (!session) return [];
-    return duel.items.map((item) => {
+    const rows = duel.items.map((item) => {
       const a = attempts.find(
         (x) =>
           x.sessionId.toString() === session._id.toString() &&
           x.challengeId.toString() === item.challengeId.toString(),
       );
       return {
+        answered: Boolean(a),
         isCorrect: a?.isCorrect ?? false,
-        timeTakenMs: a?.timeTakenMs ?? DUEL.timerMs,
+        timeTakenMs: a?.timeTakenMs ?? rules.timerMs,
         timedOut: a ? a.isTimeout : true,
       };
     });
+    const kept = rules.endsOnMiss ? rows.filter((r) => r.answered) : rows;
+    return kept.map(({ answered: _a, ...r }) => r);
   };
   return {
     creator: forUser(duel.creatorId.toString()),
@@ -104,6 +115,7 @@ async function toViews(userId: string, duels: DuelDoc[], detail = false): Promis
       return {
         id: d._id.toString(),
         code: d.code,
+        format: formatOf(d),
         status: d.status as DuelStatus,
         role: isCreator ? 'CREATOR' : 'OPPONENT',
         me: player(userId)!,
@@ -132,7 +144,10 @@ async function toViews(userId: string, duels: DuelDoc[], detail = false): Promis
  * are two steps, so two simultaneous creates could make a sixth; that only weakens a spam guard,
  * so it is accepted (D-033). The code retries on the rare unique-index collision.
  */
-export async function createDuel(userId: string): Promise<DuelView> {
+export async function createDuel(
+  userId: string,
+  format: DuelFormat = 'CLASSIC',
+): Promise<DuelView> {
   const open = await DuelModel.countDocuments({
     creatorId: userId,
     status: { $in: LIVE },
@@ -141,7 +156,7 @@ export async function createDuel(userId: string): Promise<DuelView> {
   if (open >= DUEL.maxOpenPerUser)
     throw conflict(`You already have ${DUEL.maxOpenPerUser} open duels. Finish one first.`);
 
-  const challenges = await pickDuelChallenges(await duelDifficulty(userId));
+  const challenges = await pickDuelChallenges(await duelDifficulty(userId), format);
   const items = challenges.map((c) => ({
     challengeId: c._id,
     optionOrders: [shuffle(c.options.map((o) => o.id))],
@@ -151,6 +166,7 @@ export async function createDuel(userId: string): Promise<DuelView> {
       const duel = await DuelModel.create({
         code: newCode(),
         creatorId: userId,
+        format,
         items,
         expiresAt: new Date(Date.now() + DUEL.expiryMs),
       });
@@ -209,7 +225,12 @@ export async function playDuel(userId: string, duelId: string): Promise<SessionV
       ? [{ challenge, isRevisit: false, optionOrders: item.optionOrders as unknown as string[][] }]
       : [];
   });
-  const created = await createSession(userId, { type: 'DUEL', duelId, picked });
+  const created = await createSession(userId, {
+    type: 'DUEL',
+    duelId,
+    duelFormat: formatOf(duel),
+    picked,
+  });
   if (created) return created;
   // A double tap on "Play" lost the unique-index race: return the session the other call made.
   const winner = await findMine();

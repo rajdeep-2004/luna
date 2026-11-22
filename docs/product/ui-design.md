@@ -1,5 +1,8 @@
 # Luna — UI Design System
 
+> **Superseded on 2026-11-22 by `DESIGN.md` (Kiri-e Den, D-038).** Kept for history. The colours, type and
+> screen rules below describe the rejected first UI. Use `DESIGN.md` and `docs/design/kirie-preview.html` instead.
+
 > Status: **approved** by Rajdeep — 2026-11-22 (mockups v2, "Calmer").
 > Mockups: https://claude.ai/artifact/BiQbGdeWApLetcurfUC6WZ (private canvas, 6 screens).
 > In code, all of the values below live in `app/src/theme/` and nowhere else.

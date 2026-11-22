@@ -13,7 +13,7 @@ const Stack = createNativeStackNavigator<AppStackParams>();
 export function AppStack() {
   return (
     <Stack.Navigator
-      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
+      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ground } }}
     >
       <Stack.Screen name="Tabs" component={MainTabs} />
       <Stack.Screen name="Session" component={SessionScreen} options={{ gestureEnabled: false }} />

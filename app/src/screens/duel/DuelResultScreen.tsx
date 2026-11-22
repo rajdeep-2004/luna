@@ -1,22 +1,27 @@
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
-  useReducedMotion,
   useSharedValue,
   withDelay,
+  withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import type { DuelPlayerResult, DuelView, PlayerView } from '@luna/shared';
+import type { DuelPlayerResult, DuelView } from '@luna/shared';
 import { duelsApi, userMessage } from '../../api';
-import { AppText, Button, Card, ErrorState, Screen, YokaiAvatar } from '../../components';
+import { FaceOff } from '../../art/FaceOff';
+import { HankoStamp } from '../../art/HankoStamp';
+import { WinSeal } from '../../art/WinSeal';
+import { AppText, Button, ErrorState, Screen } from '../../components';
 import { formatClock, formatRemaining } from '../../lib/duration';
+import { bladeOf, formatOrClassic, rulesLine } from '../../lib/duelFormats';
 import { haptic } from '../../lib/haptics';
+import { useReduceMotion } from '../../lib/motion';
 import type { AppStackParams } from '../../navigation/types';
-import { colors, spacing } from '../../theme';
+import { colors, layout, radii, spacing } from '../../theme';
 import { confirmReady, shareDuelCode, useDuelActions } from './useDuelActions';
 
 type Props = NativeStackScreenProps<AppStackParams, 'DuelResult'>;
@@ -26,16 +31,19 @@ export function DuelResultScreen({ route, navigation }: Props) {
   const { duelId } = route.params;
   const query = useQuery({ queryKey: ['duel', duelId], queryFn: () => duelsApi.get(duelId) });
   const actions = useDuelActions();
+  const { width } = useWindowDimensions();
+  const [clash, setClash] = useState(0);
   const { refetch } = query;
   useFocusEffect(
     useCallback(() => {
       void refetch();
+      setClash((k) => k + 1);
     }, [refetch]),
   );
   const home = () => navigation.popToTop();
 
   async function rematch() {
-    const duel = await actions.create();
+    const duel = await actions.create(formatOrClassic(query.data?.format));
     if (duel) navigation.replace('DuelResult', { duelId: duel.id });
   }
 
@@ -44,7 +52,7 @@ export function DuelResultScreen({ route, navigation }: Props) {
     return (
       <Screen>
         <View style={styles.center}>
-          <ActivityIndicator color={colors.moon} />
+          <ActivityIndicator color={colors.primary} />
         </View>
       </Screen>
     );
@@ -63,9 +71,17 @@ export function DuelResultScreen({ route, navigation }: Props) {
     );
 
   return (
-    <Screen>
+    <Screen padded={false}>
       <ScrollView contentContainerStyle={styles.content}>
-        {d.result ? <Result duel={d} /> : <Waiting duel={d} />}
+        <FaceOff
+          width={width}
+          me={d.me.avatarId}
+          rival={d.rival?.avatarId ?? null}
+          meLabel={`You · ${bladeOf(d.format).name}`}
+          rivalLabel={d.rival ? `@${d.rival.username}` : 'A friend'}
+          playKey={clash}
+        />
+        <View style={styles.inner}>{d.result ? <Result duel={d} /> : <Waiting duel={d} />}</View>
         {!d.result ? (
           <Button
             label="Check again"
@@ -77,7 +93,7 @@ export function DuelResultScreen({ route, navigation }: Props) {
       </ScrollView>
       <View style={styles.actions}>
         {actions.error ? (
-          <AppText color="emberSoft" accessibilityRole="alert">
+          <AppText color="primary" accessibilityRole="alert">
             {actions.error}
           </AppText>
         ) : null}
@@ -89,7 +105,7 @@ export function DuelResultScreen({ route, navigation }: Props) {
             onPress={() =>
               d.myState === 'PLAYING'
                 ? void actions.play(d.id)
-                : confirmReady(d.rival?.username ?? null, () => void actions.play(d.id))
+                : confirmReady(d.rival?.username ?? null, d.format, () => void actions.play(d.id))
             }
           />
         ) : null}
@@ -114,7 +130,6 @@ export function DuelResultScreen({ route, navigation }: Props) {
 function Waiting({ duel }: { duel: DuelView }) {
   return (
     <View style={styles.waiting}>
-      <YokaiAvatar id={duel.me.avatarId} size={72} />
       <AppText variant="title" style={styles.centerText}>
         {duel.myState !== 'FINISHED'
           ? 'Your turn'
@@ -122,26 +137,31 @@ function Waiting({ duel }: { duel: DuelView }) {
             ? `Waiting for @${duel.rival.username}…`
             : 'Waiting for someone to join…'}
       </AppText>
-      <AppText color="textMuted" style={styles.centerText}>
+      <AppText color="muted" style={styles.centerText}>
         {duel.myState !== 'FINISHED'
-          ? '5 questions, 60 seconds each, no hints.'
+          ? `${rulesLine(duel.format)} No hints.`
           : 'Your answers are in. The result appears when they finish.'}{' '}
         The duel expires in {formatRemaining(duel.expiresAt)}.
       </AppText>
       {!duel.rival ? (
-        <Card style={styles.codeCard}>
-          <AppText variant="label" color="textMuted">
+        <View style={styles.codeSlip}>
+          <AppText variant="label" color="wood">
             Duel code
           </AppText>
-          <AppText variant="display" accessibilityLabel={duel.code.split('').join(' ')}>
+          <AppText
+            variant="display"
+            color="onShoji"
+            style={styles.codeText}
+            accessibilityLabel={duel.code.split('').join(' ')}
+          >
             {duel.code}
           </AppText>
           <Button
             label="Share code"
             variant="ghost"
-            onPress={() => void shareDuelCode(duel.code)}
+            onPress={() => void shareDuelCode(duel.code, duel.format)}
           />
-        </Card>
+        </View>
       ) : null}
     </View>
   );
@@ -151,64 +171,70 @@ function bannerText(d: DuelView): string {
   const r = d.result!;
   if (r.endReason === 'EXPIRED') return 'This duel expired';
   if (!r.winnerId) return 'A draw. Evenly matched.';
-  const winner = r.winnerId === d.me.id ? d.me : d.rival;
-  const suffix = r.endReason === 'FORFEIT' ? ' by default' : '';
-  return `@${winner?.username ?? 'rival'} wins the duel${suffix} ⚔️`;
+  if (r.winnerId === d.me.id) return r.endReason === 'FORFEIT' ? 'You win by default' : 'You win';
+  const name = d.rival?.username ?? 'rival';
+  return `@${name} wins${r.endReason === 'FORFEIT' ? ' by default' : ''}`;
 }
 
-/** Avatars slide in from both sides (600 ms), then the score flashes in (ui-design.md §6). */
+/** After the face-off clash, the score lands and the winner's 勝 seal strikes (motion 6). */
 function Result({ duel }: { duel: DuelView }) {
   const r = duel.result!;
-  const reduce = useReducedMotion();
-  const slide = useSharedValue(reduce ? 0 : 1);
-  const flash = useSharedValue(reduce ? 1 : 0);
+  const reduce = useReduceMotion();
+  const land = useSharedValue(reduce ? 1 : 0);
+  const seal = useSharedValue(reduce ? 1 : 0);
   const iWon = r.winnerId === duel.me.id;
+  const someoneWon = r.winnerId !== null;
   useEffect(() => {
     if (!reduce) {
-      slide.value = withTiming(0, { duration: 600 });
-      flash.value = withDelay(600, withTiming(1, { duration: 400 }));
+      land.value = withDelay(420, withTiming(1, { duration: 320 }));
+      seal.value = withDelay(760, withSpring(1, { damping: 12, stiffness: 240 }));
     }
-    const t = setTimeout(() => (iWon ? haptic.heavy() : haptic.light()), reduce ? 0 : 600);
+    const t = setTimeout(() => (iWon ? haptic.heavy() : haptic.light()), reduce ? 0 : 760);
     return () => clearTimeout(t);
-  }, [reduce, slide, flash, iWon]);
-  const left = useAnimatedStyle(() => ({ transform: [{ translateX: -120 * slide.value }] }));
-  const right = useAnimatedStyle(() => ({ transform: [{ translateX: 120 * slide.value }] }));
-  const score = useAnimatedStyle(() => ({ opacity: flash.value }));
+  }, [reduce, land, seal, iWon]);
+  const scoreIn = useAnimatedStyle(() => ({
+    opacity: land.value,
+    transform: [{ translateY: (1 - land.value) * 10 }],
+  }));
+  const sealIn = useAnimatedStyle(() => ({
+    opacity: seal.value > 0 ? 1 : 0,
+    transform: [{ scale: 1.6 - 0.6 * seal.value }],
+  }));
 
   return (
     <View style={styles.result}>
-      <View style={styles.clash}>
-        <Animated.View style={left}>
-          <Side player={duel.me} label="You" won={iWon} />
-        </Animated.View>
-        <Animated.View style={score}>
-          <AppText
-            variant="display"
-            accessibilityLabel={`Score ${r.mine?.correct ?? 0} to ${r.rivals?.correct ?? 0}`}
-          >
-            {r.mine?.correct ?? '–'} – {r.rivals?.correct ?? '–'}
-          </AppText>
-        </Animated.View>
-        <Animated.View style={right}>
-          {duel.rival ? (
-            <Side
-              player={duel.rival}
-              label={`@${duel.rival.username}`}
-              won={r.winnerId === duel.rival.id}
-            />
+      <Animated.View style={[styles.scoreRow, scoreIn]}>
+        <View style={styles.sealSlot}>
+          {iWon ? (
+            <Animated.View style={sealIn}>
+              <WinSeal size={44} label="You won" />
+            </Animated.View>
           ) : null}
-        </Animated.View>
-      </View>
+        </View>
+        <AppText
+          variant="number"
+          accessibilityLabel={`Score ${r.mine?.correct ?? 0} to ${r.rivals?.correct ?? 0}`}
+        >
+          {r.mine?.correct ?? '–'} – {r.rivals?.correct ?? '–'}
+        </AppText>
+        <View style={styles.sealSlot}>
+          {someoneWon && !iWon ? (
+            <Animated.View style={sealIn}>
+              <WinSeal size={44} label="Rival won" />
+            </Animated.View>
+          ) : null}
+        </View>
+      </Animated.View>
       <AppText
         variant="title"
-        color={iWon ? 'moon' : 'text'}
+        color={iWon ? 'primary' : 'text'}
         style={styles.centerText}
         accessibilityLiveRegion="polite"
       >
         {bannerText(duel)}
       </AppText>
       {iWon && r.winBonusXP > 0 ? (
-        <AppText color="moon" style={styles.centerText}>
+        <AppText color="primary" style={styles.centerText}>
           +{r.winBonusXP} XP win bonus
         </AppText>
       ) : null}
@@ -219,40 +245,43 @@ function Result({ duel }: { duel: DuelView }) {
   );
 }
 
-function Side({ player, label, won }: { player: PlayerView; label: string; won: boolean }) {
-  return (
-    <View style={styles.side}>
-      <YokaiAvatar id={player.avatarId} size={64} />
-      <AppText variant="label" color={won ? 'moon' : 'textMuted'}>
-        {label}
-      </AppText>
-    </View>
-  );
-}
-
 type BreakdownProps = {
   mine: DuelPlayerResult | null;
   rivals: DuelPlayerResult | null;
   rivalName: string;
 };
+type Q = { isCorrect: boolean; timedOut: boolean } | undefined;
 
-/** Per-question ✓/✗ for both players, then total times (the tie-breaker). */
+/** One stamp per answer: 正 in seal ink, 誤 in grey sumi; a dash where the run never reached. */
+function Mark({ q }: { q: Q }) {
+  if (!q)
+    return (
+      <AppText color="muted" style={styles.bCell}>
+        –
+      </AppText>
+    );
+  return (
+    <View style={styles.bCell}>
+      <HankoStamp glyph={q.isCorrect ? '正' : '誤'} size={24} tone={q.isCorrect ? 'seal' : 'ink'} />
+    </View>
+  );
+}
+
+/** Per-question results for both players, then total times (the tie-breaker). */
 function Breakdown({ mine, rivals, rivalName }: BreakdownProps) {
   const rows = Math.max(mine?.perQuestion?.length ?? 0, rivals?.perQuestion?.length ?? 0);
-  const mark = (q?: { isCorrect: boolean; timedOut: boolean }) =>
-    !q ? '–' : q.isCorrect ? '✓' : q.timedOut ? '⏱' : '✗';
-  const said = (q?: { isCorrect: boolean; timedOut: boolean }) =>
-    !q ? 'not played' : q.isCorrect ? 'correct' : q.timedOut ? 'timed out' : 'wrong';
+  const said = (q: Q) =>
+    !q ? 'not reached' : q.isCorrect ? 'correct' : q.timedOut ? 'timed out' : 'wrong';
   return (
-    <Card>
+    <View style={styles.breakdown}>
       <View style={styles.bRow}>
-        <AppText variant="label" color="textMuted" style={styles.bCell}>
+        <AppText variant="label" color="muted" style={styles.bCell}>
           Q
         </AppText>
-        <AppText variant="label" color="textMuted" style={styles.bCell}>
+        <AppText variant="label" color="muted" style={styles.bCell}>
           You
         </AppText>
-        <AppText variant="label" color="textMuted" style={styles.bCell} numberOfLines={1}>
+        <AppText variant="label" color="muted" style={styles.bCell} numberOfLines={1}>
           @{rivalName}
         </AppText>
       </View>
@@ -266,20 +295,16 @@ function Breakdown({ mine, rivals, rivalName }: BreakdownProps) {
             accessible
             accessibilityLabel={`Question ${i + 1}: you ${said(a)}, ${rivalName} ${said(b)}`}
           >
-            <AppText color="textMuted" style={styles.bCell}>
+            <AppText variant="code" color="muted" style={styles.bCell}>
               {i + 1}
             </AppText>
-            <AppText color={a?.isCorrect ? 'moon' : 'emberSoft'} style={styles.bCell}>
-              {mark(a)}
-            </AppText>
-            <AppText color={b?.isCorrect ? 'moon' : 'emberSoft'} style={styles.bCell}>
-              {mark(b)}
-            </AppText>
+            <Mark q={a} />
+            <Mark q={b} />
           </View>
         );
       })}
-      <View style={styles.bRow}>
-        <AppText variant="label" color="textMuted" style={styles.bCell}>
+      <View style={[styles.bRow, styles.bTime]}>
+        <AppText variant="label" color="muted" style={styles.bCell}>
           Time
         </AppText>
         <AppText variant="code" style={styles.bCell}>
@@ -289,20 +314,37 @@ function Breakdown({ mine, rivals, rivalName }: BreakdownProps) {
           {rivals ? formatClock(rivals.totalTimeMs) : '–'}
         </AppText>
       </View>
-    </Card>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { gap: spacing.lg, paddingVertical: spacing.xxl },
+  content: { paddingBottom: spacing.xxl },
+  inner: { paddingHorizontal: layout.screenPadding, marginTop: spacing.lg, gap: spacing.lg },
   center: { flex: 1, justifyContent: 'center', gap: spacing.md },
   centerText: { textAlign: 'center' },
   waiting: { alignItems: 'center', gap: spacing.md },
-  codeCard: { alignItems: 'center', alignSelf: 'stretch' },
-  result: { gap: spacing.lg },
-  clash: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  side: { alignItems: 'center', gap: spacing.sm, minWidth: 80 },
-  bRow: { flexDirection: 'row', alignItems: 'center' },
-  bCell: { flex: 1, textAlign: 'center' },
-  actions: { gap: spacing.sm, paddingBottom: spacing.lg },
+  codeSlip: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    backgroundColor: colors.shoji,
+    borderRadius: radii.md,
+    padding: spacing.lg,
+    gap: spacing.xs,
+  },
+  codeText: { letterSpacing: 6 },
+  result: { gap: spacing.md },
+  scoreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  sealSlot: { width: 72, alignItems: 'center' },
+  breakdown: {
+    marginTop: spacing.sm,
+    backgroundColor: colors.tatami,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  bRow: { flexDirection: 'row', alignItems: 'center', minHeight: 30 },
+  bTime: { borderTopWidth: 1, borderTopColor: colors.wood, paddingTop: spacing.sm },
+  bCell: { flex: 1, textAlign: 'center', alignItems: 'center' },
+  actions: { gap: spacing.sm, paddingBottom: spacing.lg, paddingHorizontal: layout.screenPadding },
 });

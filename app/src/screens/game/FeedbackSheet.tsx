@@ -1,15 +1,16 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
-  useReducedMotion,
   useSharedValue,
+  withDelay,
   withTiming,
 } from 'react-native-reanimated';
 import type { AnswerResult, PublicOption } from '@luna/shared';
-import { AppText, Button, Stamp } from '../../components';
-import { haptic } from '../../lib/haptics';
+import { HankoStrike } from '../../art/HankoStrike';
+import { AppText, Button, PressableSink } from '../../components';
+import { useReduceMotion } from '../../lib/motion';
 import { useCountUp } from '../../lib/useCountUp';
 import { colors, radii, spacing } from '../../theme';
 
@@ -19,26 +20,45 @@ type Props = {
   nextLabel: string;
   advancing: boolean;
   onNext: () => void;
+  /** Opened from the correct-answer celebration's "Why it works": unfold the explanation at once. */
+  startOpen?: boolean;
 };
 
-const RISE_MS = 500;
+const RISE_MS = 420;
 const RISE_EASING = Easing.bezier(0.2, 0.8, 0.2, 1);
 const START_OFFSET = 320;
 
+/** The text of the right answer: an option's text, or the line number for Bug Hunt. */
+function answerText(result: AnswerResult, options: PublicOption[]): string {
+  const option = options.find((o) => o.id === result.correctAnswer);
+  return option ? option.text : `Line ${result.correctAnswer}`;
+}
+
 /**
- * Verdict panel after every answer: stamp, XP count-up, explanation, misconception, and (Engineer's Choice)
- * why each wrong option is worse. It rises from the bottom while the board dims; with Reduce Motion it fades instead.
+ * The verdict after every answer, as a slip of shoji paper rising over the board (DESIGN.md): the
+ * hanko strike, one word, the XP, and the right answer when you missed. The explanation is folded
+ * behind "Why?" so the game keeps moving (DESIGN.md: paragraphs only here, collapsed by default).
+ * With Reduce Motion it fades in instead of rising.
  */
-export function FeedbackSheet({ result, options, nextLabel, advancing, onNext }: Props) {
-  const reduce = useReducedMotion();
+export function FeedbackSheet({
+  result,
+  options,
+  nextLabel,
+  advancing,
+  onNext,
+  startOpen = false,
+}: Props) {
+  const reduce = useReduceMotion();
   const progress = useSharedValue(0);
   const xp = useCountUp(result.xpEarned, 600, reduce);
+  const [open, setOpen] = useState(startOpen);
 
   useEffect(() => {
-    progress.value = withTiming(1, { duration: reduce ? 150 : RISE_MS, easing: RISE_EASING });
-    if (result.isCorrect) haptic.success();
-    else haptic.error();
-  }, [progress, reduce, result.isCorrect]);
+    progress.value = withDelay(
+      reduce ? 0 : 120,
+      withTiming(1, { duration: reduce ? 150 : RISE_MS, easing: RISE_EASING }),
+    );
+  }, [progress, reduce]);
 
   const backdrop = useAnimatedStyle(() => ({ opacity: progress.value }));
   const sheet = useAnimatedStyle(() => ({
@@ -49,50 +69,77 @@ export function FeedbackSheet({ result, options, nextLabel, advancing, onNext }:
   const worse = options.filter(
     (o) => o.id !== result.correctAnswer && result.optionFeedback?.[o.id],
   );
+  const word = result.isCorrect ? 'Correct' : 'Not quite';
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, backdrop]} />
       <View style={styles.bottom} pointerEvents="box-none">
         <Animated.View style={[styles.sheet, sheet]} accessibilityViewIsModal>
-          <ScrollView contentContainerStyle={styles.content}>
-            <View style={styles.head}>
-              <Stamp correct={result.isCorrect} />
-              <View style={styles.headText}>
-                <AppText variant="title" color={result.isCorrect ? 'moon' : 'emberSoft'}>
-                  {result.isCorrect ? 'Correct' : 'Not quite'}
-                </AppText>
-                <AppText
-                  variant="button"
-                  color="moon"
-                  accessibilityLabel={`${result.xpEarned} experience points earned`}
-                >
-                  +{xp} XP
-                </AppText>
-              </View>
+          <View style={styles.head}>
+            <HankoStrike correct={result.isCorrect} size={64} label={word} />
+            <View style={styles.headText}>
+              <AppText variant="display" color="onShoji">
+                {word}
+              </AppText>
+              <AppText
+                variant="title"
+                color="wood"
+                accessibilityLabel={`${result.xpEarned} experience points earned`}
+              >
+                +{xp} XP
+              </AppText>
             </View>
-            <AppText>{result.explanation}</AppText>
-            {result.misconception ? (
-              <View style={styles.block}>
-                <AppText variant="label" color="emberSoft">
-                  Common misconception
-                </AppText>
-                <AppText color="textSoft">{result.misconception}</AppText>
-              </View>
-            ) : null}
-            {worse.length > 0 ? (
-              <View style={styles.block}>
-                <AppText variant="label" color="textMuted">
-                  Why the others are worse
-                </AppText>
-                {worse.map((o) => (
-                  <AppText key={o.id} color="textSoft">
-                    • {o.text}: {result.optionFeedback?.[o.id]}
+          </View>
+
+          {!result.isCorrect ? (
+            <AppText color="onShoji">
+              <AppText color="wood" style={styles.strong}>
+                Answer:{' '}
+              </AppText>
+              {answerText(result, options)}
+            </AppText>
+          ) : null}
+
+          <PressableSink
+            onPress={() => setOpen((v) => !v)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: open }}
+            accessibilityLabel={open ? 'Hide the explanation' : 'Why? Show the explanation'}
+            style={styles.why}
+          >
+            <AppText variant="label" color="wood">
+              {open ? 'Hide' : 'Why?'}
+            </AppText>
+            <AppText color="wood">{open ? '▴' : '▾'}</AppText>
+          </PressableSink>
+
+          {open ? (
+            <ScrollView style={styles.more} contentContainerStyle={styles.moreContent}>
+              <AppText color="onShoji">{result.explanation}</AppText>
+              {result.misconception ? (
+                <View style={styles.block}>
+                  <AppText variant="label" color="wood">
+                    The trap
                   </AppText>
-                ))}
-              </View>
-            ) : null}
-          </ScrollView>
+                  <AppText color="onShoji">{result.misconception}</AppText>
+                </View>
+              ) : null}
+              {worse.length > 0 ? (
+                <View style={styles.block}>
+                  <AppText variant="label" color="wood">
+                    Why the others are worse
+                  </AppText>
+                  {worse.map((o) => (
+                    <AppText key={o.id} color="onShoji">
+                      {o.text}: {result.optionFeedback?.[o.id]}
+                    </AppText>
+                  ))}
+                </View>
+              ) : null}
+            </ScrollView>
+          ) : null}
+
           <Button label={nextLabel} onPress={onNext} pending={advancing} />
         </Animated.View>
       </View>
@@ -101,18 +148,28 @@ export function FeedbackSheet({ result, options, nextLabel, advancing, onNext }:
 }
 
 const styles = StyleSheet.create({
-  backdrop: { backgroundColor: 'rgba(10,13,26,0.7)' },
+  backdrop: { backgroundColor: 'rgba(42,25,16,0.72)' },
   bottom: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
-    maxHeight: '80%',
-    backgroundColor: colors.surfaceRaised,
-    borderTopLeftRadius: radii.cardLg,
-    borderTopRightRadius: radii.cardLg,
+    maxHeight: '82%',
+    backgroundColor: colors.shoji,
+    borderTopLeftRadius: radii.lg,
+    borderTopRightRadius: radii.lg,
     padding: spacing.xl,
+    paddingBottom: spacing.xxl,
     gap: spacing.lg,
   },
-  content: { gap: spacing.md },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
-  headText: { flex: 1, gap: spacing.xs },
+  headText: { flex: 1, gap: 2 },
+  strong: { fontWeight: '700' },
+  why: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    alignSelf: 'flex-start',
+    minHeight: 44,
+  },
+  more: { maxHeight: 260 },
+  moreContent: { gap: spacing.md },
   block: { gap: spacing.xs },
 });

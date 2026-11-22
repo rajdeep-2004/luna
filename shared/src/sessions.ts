@@ -1,13 +1,24 @@
 import { z } from 'zod';
-import { TOPIC_SLUGS } from './domain';
-import type { SessionType, TopicSlug } from './domain';
+import { PRACTICE_MODES, TOPIC_SLUGS } from './domain';
+import type { PracticeMode, SessionType, TopicSlug } from './domain';
 import type { PublicChallenge, PublicStage } from './challenges';
+import type { DuelFormat } from './competition';
 
 const ObjectId = z.string().regex(/^[a-f0-9]{24}$/, 'Invalid id');
 
 export const StartSessionRequest = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('PRACTICE'), topicSlug: z.enum(TOPIC_SLUGS) }),
-  z.object({ type: z.literal('INCIDENT'), challengeId: ObjectId.optional() }),
+  /** `mode` makes it a mode round: that topic's challenges of one kind, topped up from other topics. */
+  z.object({
+    type: z.literal('PRACTICE'),
+    topicSlug: z.enum(TOPIC_SLUGS),
+    mode: z.enum(PRACTICE_MODES).optional(),
+  }),
+  /** `topicSlug` asks for that topic's boss incident (any incident when the topic has none). */
+  z.object({
+    type: z.literal('INCIDENT'),
+    challengeId: ObjectId.optional(),
+    topicSlug: z.enum(TOPIC_SLUGS).optional(),
+  }),
   z.object({ type: z.literal('BASELINE') }),
   z.object({ type: z.literal('CHECKPOINT') }),
 ]);
@@ -41,6 +52,8 @@ export type SessionItemView = {
 export type SessionView = {
   id: string;
   type: SessionType;
+  /** PRACTICE mode rounds only. */
+  mode?: PracticeMode;
   status: 'ACTIVE' | 'COMPLETED';
   startedAt: string;
   totalAnswers: number;
@@ -50,6 +63,10 @@ export type SessionView = {
    * shows the real remaining seconds of the 60 s timer (no phone-clock skew).
    */
   stepElapsedMs?: number;
+  /** DUEL only: the duel's format, which sets the timer (DUEL_FORMAT_RULES). */
+  duelFormat?: DuelFormat;
+  /** Sudden Death only: the run ended at a miss, so the session is ready to complete early. */
+  endedEarly?: boolean;
 };
 
 export type AnswerResult = {

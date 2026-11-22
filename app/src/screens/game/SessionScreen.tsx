@@ -2,16 +2,18 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native';
-import { DUEL_TIMER_MS } from '@luna/shared';
+import { DUEL_FORMAT_RULES } from '@luna/shared';
 import { sessionsApi, userMessage } from '../../api';
-import { AppText, Button, Card, ErrorState, Screen } from '../../components';
+import { AppText, Button, ErrorState, Screen } from '../../components';
+import { formatOrClassic } from '../../lib/duelFormats';
 import { haptic } from '../../lib/haptics';
 import { answeredCount, DUEL_VERDICT_MS, findStep, progressOf } from '../../lib/session';
 import type { AppStackParams } from '../../navigation/types';
-import { colors, spacing } from '../../theme';
+import { colors, radii, spacing } from '../../theme';
 import { BugHuntBody } from './BugHuntBody';
 import { ChoiceBody } from './ChoiceBody';
 import { DuelCountdown } from './DuelCountdown';
+import { CorrectCelebration } from './CorrectCelebration';
 import { DuelVerdict } from './DuelVerdict';
 import { ElapsedClock } from './ElapsedClock';
 import { FeedbackSheet } from './FeedbackSheet';
@@ -37,10 +39,19 @@ export function SessionScreen({ route, navigation }: Props) {
   const step = session ? findStep(session) : null;
   const flow = useAnswerFlow(sessionId, step);
   const [advancing, setAdvancing] = useState(false);
+  // A correct answer celebrates first; "Why it works" swaps in the full sheet for that answer.
+  const [explain, setExplain] = useState(false);
   const rootCause = useRef<string | undefined>(undefined);
 
   const isDuel = session?.type === 'DUEL';
-  const allDone = !!session && session.items.length > 0 && session.items.every((i) => i.isComplete);
+  const rules = DUEL_FORMAT_RULES[formatOrClassic(session?.duelFormat)];
+  // Blitz's 10 s clock restarts at each answer on the server, so its verdict is shorter.
+  const verdictMs = session?.duelFormat === 'BLITZ' ? DUEL_VERDICT_MS / 2 : DUEL_VERDICT_MS;
+  // A Sudden Death run that ended at a miss is finished even though questions are left.
+  const allDone =
+    !!session &&
+    session.items.length > 0 &&
+    (session.endedEarly === true || session.items.every((i) => i.isComplete));
   const goToSummary = () =>
     navigation.replace('Summary', { sessionId, rootCause: rootCause.current });
 
@@ -58,6 +69,7 @@ export function SessionScreen({ route, navigation }: Props) {
     try {
       await query.refetch();
       flow.reset();
+      setExplain(false);
     } finally {
       setAdvancing(false);
     }
@@ -71,9 +83,9 @@ export function SessionScreen({ route, navigation }: Props) {
   });
   useEffect(() => {
     if (!isDuel || !flow.result) return;
-    const t = setTimeout(() => void nextRef.current(), DUEL_VERDICT_MS);
+    const t = setTimeout(() => void nextRef.current(), verdictMs);
     return () => clearTimeout(t);
-  }, [isDuel, flow.result]);
+  }, [isDuel, flow.result, verdictMs]);
 
   function confirmHint() {
     Alert.alert('Use a hint?', 'Using a hint halves the XP for this question.', [
@@ -82,7 +94,7 @@ export function SessionScreen({ route, navigation }: Props) {
     ]);
   }
 
-  if (query.isPending) return <Centered>{<ActivityIndicator color={colors.moon} />}</Centered>;
+  if (query.isPending) return <Centered>{<ActivityIndicator color={colors.primary} />}</Centered>;
   if (query.isError || !session || (!step && !allDone)) {
     return (
       <Centered>
@@ -95,7 +107,7 @@ export function SessionScreen({ route, navigation }: Props) {
       </Centered>
     );
   }
-  if (!step) return <Centered>{<ActivityIndicator color={colors.moon} />}</Centered>;
+  if (!step) return <Centered>{<ActivityIndicator color={colors.primary} />}</Centered>;
 
   const type = step.item.challenge.type;
   const body = {
@@ -119,14 +131,15 @@ export function SessionScreen({ route, navigation }: Props) {
         onLeave={() => navigation.goBack()}
         leaveMessage={
           isDuel
-            ? 'Your answers are saved, but the 60-second clock keeps running on the server.'
+            ? `Your answers are saved, but the ${rules.timerMs / 1000}-second clock keeps running on the server.`
             : undefined
         }
         clock={
           isDuel ? (
             <DuelCountdown
               key={stepKey}
-              remainingMs={DUEL_TIMER_MS - (session.stepElapsedMs ?? 0)}
+              remainingMs={rules.timerMs - (session.stepElapsedMs ?? 0)}
+              totalMs={rules.timerMs}
               paused={flow.submitting || !!flow.result}
               onExpire={() => void flow.submitTimeout()}
             />
@@ -144,22 +157,28 @@ export function SessionScreen({ route, navigation }: Props) {
           <ChoiceBody {...body} />
         )}
         {flow.hint ? (
-          <Card>
-            <AppText variant="label" color="moon">
+          <View style={styles.hint} accessibilityLiveRegion="polite">
+            <AppText variant="label" color="wood">
               Hint
             </AppText>
-            <AppText>{flow.hint}</AppText>
-          </Card>
+            <AppText color="onShoji">{flow.hint}</AppText>
+          </View>
         ) : null}
       </ScrollView>
 
       <View style={styles.actions}>
         {flow.error ? (
-          <AppText color="emberSoft" accessibilityRole="alert">
+          <AppText color="primary" accessibilityRole="alert">
             {flow.error}
           </AppText>
         ) : null}
-        {isDuel && flow.result ? <DuelVerdict result={flow.result} /> : null}
+        {isDuel && flow.result ? (
+          <DuelVerdict
+            result={flow.result}
+            timerMs={rules.timerMs}
+            endsRun={rules.endsOnMiss && !flow.result.isCorrect}
+          />
+        ) : null}
         {step.hasHint && !flow.hint && !isDuel ? (
           <Button label="Need a hint?" variant="ghost" onPress={confirmHint} />
         ) : null}
@@ -171,13 +190,22 @@ export function SessionScreen({ route, navigation }: Props) {
         />
       </View>
 
-      {flow.result && !isDuel ? (
+      {flow.result && !isDuel && flow.result.isCorrect && !explain ? (
+        <CorrectCelebration
+          xpEarned={flow.result.xpEarned}
+          nextLabel={flow.result.sessionReadyToComplete ? 'Finish' : 'Next'}
+          advancing={advancing}
+          onNext={() => void next()}
+          onExplain={() => setExplain(true)}
+        />
+      ) : flow.result && !isDuel ? (
         <FeedbackSheet
           result={flow.result}
           options={step.options}
           nextLabel={flow.result.sessionReadyToComplete ? 'Finish' : 'Next'}
           advancing={advancing}
           onNext={() => void next()}
+          startOpen={explain}
         />
       ) : null}
     </Screen>
@@ -193,6 +221,12 @@ function Centered({ children }: { children: React.ReactNode }) {
 }
 
 const styles = StyleSheet.create({
+  hint: {
+    backgroundColor: colors.shoji,
+    borderRadius: radii.md,
+    padding: spacing.lg,
+    gap: spacing.xs,
+  },
   content: { gap: spacing.lg, paddingVertical: spacing.xl },
   actions: { gap: spacing.sm, paddingBottom: spacing.lg },
   center: { flex: 1, justifyContent: 'center', gap: spacing.md },

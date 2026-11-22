@@ -3,7 +3,8 @@ import { DojoScreen } from '../screens/dojo/DojoScreen';
 import { ExploreScreen } from '../screens/explore/ExploreScreen';
 import { DuelScreen } from '../screens/duel/DuelScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
-import { colors, fontFamily } from '../theme';
+import { colors } from '../theme';
+import { TabBar } from './TabBar';
 import type { MainTabParams } from './types';
 
 const Tab = createBottomTabNavigator<MainTabParams>();
@@ -11,15 +12,8 @@ const Tab = createBottomTabNavigator<MainTabParams>();
 export function MainTabs() {
   return (
     <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.moon,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: { backgroundColor: colors.bg, borderTopColor: colors.track },
-        tabBarLabelStyle: { fontFamily: fontFamily.sansMedium, fontSize: 12 },
-        tabBarIconStyle: { display: 'none' },
-        sceneStyle: { backgroundColor: colors.bg },
-      }}
+      tabBar={(props) => <TabBar {...props} />}
+      screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.ground } }}
     >
       <Tab.Screen name="Dojo" component={DojoScreen} />
       <Tab.Screen name="Explore" component={ExploreScreen} />

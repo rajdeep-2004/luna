@@ -3,17 +3,18 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Alert, Share } from 'react-native';
-import type { DuelView } from '@luna/shared';
+import type { DuelFormat, DuelView } from '@luna/shared';
+import { bladeOf, rulesLine } from '../../lib/duelFormats';
 import { duelsApi, userMessage } from '../../api';
 import type { AppStackParams } from '../../navigation/types';
 
 export const DUELS_KEY = ['duels'] as const;
 
 /** Opens the system share sheet with the code. Dismissing it is not an error. */
-export async function shareDuelCode(code: string): Promise<void> {
+export async function shareDuelCode(code: string, format?: DuelFormat): Promise<void> {
   try {
     await Share.share({
-      message: `Duel me on Luna ⚔️ Enter code ${code} in the Duel tab. 5 questions, 60 seconds each.`,
+      message: `Duel me on Luna: ${bladeOf(format).name}. Enter code ${code} in the Duel tab. ${rulesLine(format)}`,
     });
   } catch {
     // The share sheet failed to open: the code is still on screen to read out.
@@ -21,10 +22,14 @@ export async function shareDuelCode(code: string): Promise<void> {
 }
 
 /** The duel rules, shown once before the timer starts, so nobody is surprised by the countdown. */
-export function confirmReady(rivalName: string | null, onPlay: () => void): void {
+export function confirmReady(
+  rivalName: string | null,
+  format: DuelFormat | undefined,
+  onPlay: () => void,
+): void {
   Alert.alert(
-    rivalName ? `Duel @${rivalName}` : 'Play your duel',
-    '5 questions, 60 seconds each, no hints. The timer starts as soon as you begin.',
+    `${bladeOf(format).name}${rivalName ? ` vs @${rivalName}` : ''}`,
+    `${rulesLine(format)} No hints. The timer starts as soon as you begin.`,
     [
       { text: 'Not now', style: 'cancel' },
       { text: 'Begin', onPress: onPlay },
@@ -57,11 +62,11 @@ export function useDuelActions() {
     }
   }
 
-  async function create(): Promise<DuelView | null> {
-    const duel = await run('create', duelsApi.create);
+  async function create(format: DuelFormat): Promise<DuelView | null> {
+    const duel = await run('create', () => duelsApi.create(format));
     if (duel) {
       void refresh();
-      await shareDuelCode(duel.code);
+      await shareDuelCode(duel.code, duel.format);
     }
     return duel;
   }

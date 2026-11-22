@@ -24,6 +24,15 @@ export type ProgressView = {
   weakestTopic: TopicSlug | null;
   revisitsQueued: number;
   assessments: AssessmentStatus;
+  /** The Profile's warrior sheet: plain counts, no topic knowledge (D-039). */
+  stats: PlayerStats;
+};
+
+export type PlayerStats = {
+  katasCompleted: number;
+  duelsWon: number;
+  duelsLost: number;
+  duelsDrawn: number;
 };
 
 export type AssessmentScore = { correct: number; total: number; completedAt: string };

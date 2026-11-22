@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
-import { AppText, Card } from '../../components';
-import { spacing } from '../../theme';
+import { AppText } from '../../components';
+import { colors, radii, spacing } from '../../theme';
 import type { BodyProps } from './bodyTypes';
 import { OptionList } from './OptionList';
 
@@ -12,28 +12,29 @@ export function IncidentBody(props: BodyProps) {
   if (!stage) return null;
   return (
     <View style={styles.wrap}>
-      <AppText variant="label" color="textMuted">
+      <AppText variant="label" color="muted">
         Incident Room · Stage {stage.index + 1} of {step.item.challenge.stageCount}
       </AppText>
       <AppText variant="title">{step.item.challenge.title}</AppText>
 
       {earlier.map((s) => (
         <View key={s.index} style={styles.earlier}>
-          <AppText variant="label" color="textMuted">
+          <AppText variant="label" color="muted">
             {s.title}
           </AppText>
-          <AppText color="textMuted" numberOfLines={3}>
+          <AppText color="muted" numberOfLines={3}>
             {s.evidence}
           </AppText>
         </View>
       ))}
 
-      <Card>
-        <AppText variant="label" color="moon">
+      {/* The evidence for this stage, pinned like a report slip on the incident board. */}
+      <View style={styles.evidence}>
+        <AppText variant="label" color="primary">
           {stage.title}
         </AppText>
         <AppText>{stage.evidence}</AppText>
-      </Card>
+      </View>
       <AppText variant="question">{stage.prompt}</AppText>
       <OptionList {...props} />
     </View>
@@ -42,5 +43,11 @@ export function IncidentBody(props: BodyProps) {
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.lg },
+  evidence: {
+    backgroundColor: colors.night,
+    borderRadius: radii.md,
+    padding: spacing.lg,
+    gap: spacing.xs,
+  },
   earlier: { gap: spacing.xs, opacity: 0.8 },
 });

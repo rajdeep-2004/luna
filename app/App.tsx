@@ -14,7 +14,7 @@ import { colors, fontAssets, spacing } from './src/theme';
 
 const navTheme = {
   ...DarkTheme,
-  colors: { ...DarkTheme.colors, background: colors.bg, card: colors.bg },
+  colors: { ...DarkTheme.colors, background: colors.ground, card: colors.ground },
 };
 
 export default function App() {

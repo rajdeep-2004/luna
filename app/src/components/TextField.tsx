@@ -5,17 +5,20 @@ import { AppText } from './AppText';
 
 type Props = TextInputProps & { label: string; error?: string | null };
 
-/** Labelled input with an inline error. The label doubles as the accessibility label. */
+/**
+ * Labelled input on a tatami block with an amber underline when focused (DESIGN.md: Components).
+ * The label doubles as the accessibility label.
+ */
 export function TextField({ label, error, style, ...rest }: Props) {
   const [focused, setFocused] = useState(false);
   return (
     <View style={styles.wrap}>
-      <AppText variant="label" color="textMuted">
+      <AppText variant="label" color="muted">
         {label}
       </AppText>
       <TextInput
         accessibilityLabel={label}
-        placeholderTextColor={colors.textMuted}
+        placeholderTextColor={colors.muted}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         maxFontSizeMultiplier={1.3}
@@ -23,7 +26,7 @@ export function TextField({ label, error, style, ...rest }: Props) {
         {...rest}
       />
       {error ? (
-        <AppText variant="body" color="emberSoft" accessibilityLiveRegion="polite">
+        <AppText variant="body" color="primary" accessibilityLiveRegion="polite">
           {error}
         </AppText>
       ) : null}
@@ -35,15 +38,15 @@ const styles = StyleSheet.create({
   wrap: { gap: spacing.sm },
   input: {
     minHeight: layout.buttonHeight,
-    borderRadius: radii.card,
+    borderRadius: radii.md,
     paddingHorizontal: spacing.lg,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.tatami,
     color: colors.text,
-    fontFamily: fontFamily.sans,
+    fontFamily: fontFamily.sansMedium,
     fontSize: 16,
-    borderWidth: 1,
-    borderColor: 'transparent',
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
   },
-  focused: { borderColor: colors.moon },
-  errored: { borderColor: colors.ember },
+  focused: { borderBottomColor: colors.primary },
+  errored: { borderBottomColor: colors.seal },
 });

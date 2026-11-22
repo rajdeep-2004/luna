@@ -10,7 +10,7 @@ const Stack = createNativeStackNavigator<AuthStackParams>();
 export function AuthStack() {
   return (
     <Stack.Navigator
-      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
+      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ground } }}
     >
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />

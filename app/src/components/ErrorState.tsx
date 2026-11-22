@@ -12,7 +12,7 @@ export function ErrorState({ message, onRetry, retrying = false }: Props) {
       <AppText variant="title" style={styles.center}>
         Something went wrong
       </AppText>
-      <AppText color="textMuted" style={styles.center}>
+      <AppText color="muted" style={styles.center}>
         {message}
       </AppText>
       {onRetry ? (

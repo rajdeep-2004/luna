@@ -1,7 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 import type { AssessmentScore, BonusAward, SessionSummary } from '@luna/shared';
-import { AppText, Card } from '../../components';
-import { spacing } from '../../theme';
+import { AppText } from '../../components';
+import { colors, spacing } from '../../theme';
 
 const BONUS_LABEL: Record<BonusAward['kind'], (b: BonusAward) => string> = {
   DAILY_KATA: () => 'Daily Kata complete',
@@ -11,38 +11,38 @@ const BONUS_LABEL: Record<BonusAward['kind'], (b: BonusAward) => string> = {
   DUEL_WIN: () => 'Duel won',
 };
 
-/** progression.md §7: "Achievement unlocked", shown once, on the completion that earned it. */
-export function AchievementsCard({ summary }: { summary: SessionSummary }) {
+/** progression.md §7: "Achievement unlocked", shown once, on the completion that earned it. No emoji (DESIGN.md). */
+export function Achievements({ summary }: { summary: SessionSummary }) {
   const unlocked = summary.newAchievements ?? [];
   if (!unlocked.length) return null;
   return (
-    <Card style={styles.card}>
-      <AppText variant="label" color="moon" accessibilityRole="alert">
+    <View style={styles.block}>
+      <AppText variant="label" color="primary" accessibilityRole="alert" style={styles.center}>
         Achievement unlocked
       </AppText>
       {unlocked.map((a) => (
-        <AppText key={a.key} variant="title">
-          {a.icon} {a.name}
+        <AppText key={a.key} variant="title" style={styles.center}>
+          {a.name}
         </AppText>
       ))}
-    </Card>
+    </View>
   );
 }
 
 /** Bonuses, the lantern and fixed mistakes: what this session did for progress. */
-export function ProgressCard({ summary }: { summary: SessionSummary }) {
+export function ProgressNotes({ summary }: { summary: SessionSummary }) {
   const { bonuses, streak, fixedMistakes } = summary;
   if (!bonuses.length && !streak && !fixedMistakes) return null;
   return (
-    <Card style={styles.card}>
+    <View style={[styles.block, styles.ruled]}>
       {streak ? (
-        <AppText color="moon">
+        <AppText color="primary" style={styles.center}>
           {streak.current === 1 ? 'Lantern lit: day 1' : `Lantern lit: ${streak.current} days`}
           {streak.current > 1 && streak.current === streak.longest ? ' · your longest yet' : ''}
         </AppText>
       ) : null}
       {fixedMistakes > 0 ? (
-        <AppText color="textSoft">
+        <AppText color="muted" style={styles.center}>
           {fixedMistakes === 1
             ? 'You fixed a past mistake.'
             : `You fixed ${fixedMistakes} past mistakes.`}
@@ -50,11 +50,11 @@ export function ProgressCard({ summary }: { summary: SessionSummary }) {
       ) : null}
       {bonuses.map((b) => (
         <View key={`${b.kind}${b.days ?? ''}`} style={styles.row}>
-          <AppText color="textSoft">{BONUS_LABEL[b.kind](b)}</AppText>
-          <AppText color="moon">+{b.xp} XP</AppText>
+          <AppText color="muted">{BONUS_LABEL[b.kind](b)}</AppText>
+          <AppText color="primary">+{b.xp} XP</AppText>
         </View>
       ))}
-    </Card>
+    </View>
   );
 }
 
@@ -68,20 +68,23 @@ export function CheckpointComparison({
 }) {
   const now = `${summary.correctAnswers}/${summary.totalAnswers}`;
   return (
-    <Card style={styles.card}>
-      <AppText variant="label" color="textMuted">
+    <View style={[styles.block, styles.ruled]}>
+      <AppText variant="label" color="muted" style={styles.center}>
         How far you&apos;ve come
       </AppText>
-      <AppText variant="button">
+      <AppText variant="title" style={styles.center}>
         {baseline
           ? `Baseline ${baseline.correct}/${baseline.total} → Checkpoint ${now}`
           : `Checkpoint ${now}`}
       </AppText>
-    </Card>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { gap: spacing.sm },
+  block: { gap: spacing.sm },
+  /** A thin wood rule instead of a card: sections sit on the ground, not in boxes (DESIGN.md). */
+  ruled: { borderTopWidth: 1, borderTopColor: colors.wood, paddingTop: spacing.lg },
+  center: { textAlign: 'center' },
   row: { flexDirection: 'row', justifyContent: 'space-between' },
 });

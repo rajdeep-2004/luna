@@ -1,21 +1,32 @@
 import { StyleSheet, View } from 'react-native';
-import { DUEL_TIMER_MS, type AnswerResult } from '@luna/shared';
-import { AppText, Stamp } from '../../components';
+import type { AnswerResult } from '@luna/shared';
+import { HankoStrike } from '../../art/HankoStrike';
+import { AppText } from '../../components';
 import { spacing } from '../../theme';
 
-/** The short duel verdict: the stamp and one word. Explanations wait for practice. */
-export function DuelVerdict({ result }: { result: AnswerResult }) {
-  const timedOut = !result.isCorrect && result.timeTakenMs >= DUEL_TIMER_MS;
+type Props = {
+  result: AnswerResult;
+  /** The format's per-question timer: an answer that took all of it timed out. */
+  timerMs: number;
+  /** Sudden Death: this miss ends the run. */
+  endsRun?: boolean;
+};
+
+/** The short duel verdict: the hanko strike and one word. Explanations wait for practice. */
+export function DuelVerdict({ result, timerMs, endsRun = false }: Props) {
+  const timedOut = !result.isCorrect && result.timeTakenMs >= timerMs;
+  const miss = timedOut ? "Time's up" : 'Wrong';
+  const word = result.isCorrect ? 'Correct' : endsRun ? `${miss}. Run over` : miss;
   return (
     <View style={styles.row} accessibilityLiveRegion="polite">
-      <Stamp correct={result.isCorrect} />
-      <AppText color={result.isCorrect ? 'moon' : 'emberSoft'}>
-        {result.isCorrect ? 'Correct' : timedOut ? "Time's up" : 'Wrong'}
+      <HankoStrike correct={result.isCorrect} size={52} label={word} />
+      <AppText variant="title" color={result.isCorrect ? 'text' : 'muted'}>
+        {word}
       </AppText>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.md },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.lg },
 });

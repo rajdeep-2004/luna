@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
-import { AppText, ProgressLine } from '../../components';
+import { Alert, StyleSheet, View } from 'react-native';
+import { AppText, BrushMarks, PressableSink } from '../../components';
 import { layout, spacing } from '../../theme';
 
 type Props = {
@@ -13,7 +13,7 @@ type Props = {
   leaveMessage?: string;
 };
 
-/** Top of every game screen: leave button, "n / total", elapsed clock, and the 3 pt progress line. */
+/** Top of every game screen: leave, "n / total", the clock, and one brush mark per answer (DESIGN.md: no progress bars). */
 const DEFAULT_LEAVE = 'Your answers are saved. You can pick it up again later.';
 
 export function SessionHeader({
@@ -27,7 +27,7 @@ export function SessionHeader({
   return (
     <View style={styles.wrap}>
       <View style={styles.row}>
-        <Pressable
+        <PressableSink
           onPress={() =>
             Alert.alert('Leave this session?', leaveMessage, [
               { text: 'Keep playing', style: 'cancel' },
@@ -38,14 +38,14 @@ export function SessionHeader({
           accessibilityLabel="Leave session"
           style={styles.leave}
         >
-          <AppText color="textMuted">✕</AppText>
-        </Pressable>
-        <AppText variant="label" color="textMuted">
+          <AppText color="muted">✕</AppText>
+        </PressableSink>
+        <AppText variant="label" color="muted">
           {Math.min(position, total)} / {total}
         </AppText>
         {clock}
       </View>
-      <ProgressLine value={progress} />
+      <BrushMarks total={total} done={Math.round(progress * total)} />
     </View>
   );
 }

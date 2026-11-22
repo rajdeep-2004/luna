@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { JoinDuelRequest } from '@luna/shared';
+import { CreateDuelRequest, JoinDuelRequest } from '@luna/shared';
 import { requireAuth, authedUserId } from '../../middleware/requireAuth';
 import { validateBody, validateObjectIdParam } from '../../middleware/validate';
 import { duelJoinLimiter } from '../../middleware/rateLimit';
@@ -12,7 +12,9 @@ duelsRouter.use(requireAuth);
 duelsRouter.param('id', (req, res, next) => validateObjectIdParam('id')(req, res, next));
 
 duelsRouter.get('/', async (req, res) => ok(res, await duels.listDuels(authedUserId(req))));
-duelsRouter.post('/', async (req, res) => ok(res, await duels.createDuel(authedUserId(req)), 201));
+duelsRouter.post('/', validateBody(CreateDuelRequest), async (req, res) =>
+  ok(res, await duels.createDuel(authedUserId(req), req.body.format), 201),
+);
 duelsRouter.post('/join', duelJoinLimiter, validateBody(JoinDuelRequest), async (req, res) => {
   ok(res, await duels.joinDuel(authedUserId(req), req.body.code));
 });

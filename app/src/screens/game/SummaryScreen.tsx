@@ -2,43 +2,36 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
 import type { SessionSummary } from '@luna/shared';
+import { HankoStrike } from '../../art/HankoStrike';
+import type { KanjiGlyph } from '../../art/kanjiPaths';
+import { Lantern } from '../../art/Lantern';
 import { sessionsApi, usersApi, userMessage } from '../../api';
 import { PROGRESS_KEY } from '../../lib/useProgress';
-import {
-  AppText,
-  Button,
-  Card,
-  ErrorState,
-  MoonPhase,
-  ProgressLine,
-  Screen,
-  type MoonPhaseName,
-} from '../../components';
-import { haptic } from '../../lib/haptics';
+import { AppText, Button, ErrorState, Screen } from '../../components';
+import { useReduceMotion } from '../../lib/motion';
+import { useCountUp } from '../../lib/useCountUp';
 import { useTopicNames } from '../../lib/useTopicNames';
 import type { AppStackParams } from '../../navigation/types';
 import { useAuthStore } from '../../store/auth';
-import { colors, spacing } from '../../theme';
+import { colors, radii, spacing } from '../../theme';
 import { useStartSession } from '../explore/useStartSession';
 import { DUELS_KEY } from '../duel/useDuelActions';
 import { RankUpOverlay } from './RankUpOverlay';
-import { AchievementsCard, CheckpointComparison, ProgressCard } from './SummaryExtras';
+import { Achievements, CheckpointComparison, ProgressNotes } from './SummaryExtras';
 
 type Props = NativeStackScreenProps<AppStackParams, 'Summary'>;
 
-const GRADES: Record<SessionSummary['grade'], { word: string; phase: MoonPhaseName }> = {
-  KANPEKI: { word: 'Kanpeki', phase: 'full' },
-  SUGOI: { word: 'Sugoi', phase: 'gibbous' },
-  YOSHI: { word: 'Yoshi', phase: 'half' },
-  MADA_MADA: { word: 'Mada mada', phase: 'crescent' },
+/** The grade is a seal stamped on the result (DESIGN.md): 正 for a strong round, 道 ("the way") otherwise. */
+type Grade = { word: string; glyph: KanjiGlyph; tone: 'seal' | 'ink' };
+const GRADES: Record<SessionSummary['grade'], Grade> = {
+  KANPEKI: { word: 'Kanpeki', glyph: '正', tone: 'seal' },
+  SUGOI: { word: 'Sugoi', glyph: '正', tone: 'seal' },
+  YOSHI: { word: 'Yoshi', glyph: '道', tone: 'seal' },
+  MADA_MADA: { word: 'Mada mada', glyph: '道', tone: 'ink' },
 };
+const XP_COUNT_MS = 900;
+const LANTERN_W = 52;
 
 const HEADING: Partial<Record<SessionSummary['type'], string>> = {
   INCIDENT: 'Incident report',
@@ -93,7 +86,7 @@ export function SummaryScreen({ route, navigation }: Props) {
     return (
       <Screen>
         <View style={styles.center}>
-          <ActivityIndicator color={colors.moon} />
+          <ActivityIndicator color={colors.primary} />
         </View>
       </Screen>
     );
@@ -111,31 +104,13 @@ export function SummaryScreen({ route, navigation }: Props) {
       </Screen>
     );
 
-  const isIncident = summary.type === 'INCIDENT';
-  const grade = GRADES[summary.grade];
-
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
-        <GradeMoon phase={grade.phase} />
-        <AppText variant="label" color="textMuted" style={styles.centerText}>
-          {HEADING[summary.type] ?? 'Session complete'}
-        </AppText>
-        <AppText variant="display" style={styles.centerText}>
-          {grade.word}
-        </AppText>
+        <Result summary={summary} />
 
-        <View style={styles.stats}>
-          <Stat
-            label={isIncident ? 'Stages correct' : 'Correct'}
-            value={`${summary.correctAnswers} / ${summary.totalAnswers}`}
-          />
-          <Stat label="XP" value={`+${summary.xpEarned}`} />
-          <Stat label="Time" value={formatTime(summary.totalTimeMs)} />
-        </View>
-
-        <AchievementsCard summary={summary} />
-        <ProgressCard summary={summary} />
+        <Achievements summary={summary} />
+        <ProgressNotes summary={summary} />
         {summary.type === 'CHECKPOINT' ? (
           <CheckpointComparison
             baseline={progress.data?.assessments.baseline ?? null}
@@ -143,48 +118,29 @@ export function SummaryScreen({ route, navigation }: Props) {
           />
         ) : null}
         {summary.type === 'BASELINE' ? (
-          <AppText color="textSoft" style={styles.centerText}>
-            Your starting difficulty is set for each topic. It keeps adapting as you play.
+          <AppText color="muted" style={styles.centerText}>
+            Your starting difficulty is set. It keeps adapting as you play.
           </AppText>
         ) : null}
 
-        {isIncident && rootCause ? (
-          <Card>
-            <AppText variant="label" color="moon">
+        {summary.type === 'INCIDENT' && rootCause ? (
+          <View style={styles.slip}>
+            <AppText variant="label" color="wood">
               Root cause
             </AppText>
-            <AppText>{rootCause}</AppText>
-          </Card>
-        ) : null}
-
-        {!isIncident && summary.perTopic.length > 0 ? (
-          <Card>
-            <AppText variant="label" color="textMuted">
-              By topic
-            </AppText>
-            {summary.perTopic.map((t) => (
-              <View key={t.topicSlug} style={styles.topicRow}>
-                <View style={styles.topicHead}>
-                  <AppText color="textSoft">{topicName(t.topicSlug)}</AppText>
-                  <AppText color="textMuted">
-                    {t.correct} / {t.total}
-                  </AppText>
-                </View>
-                <ProgressLine value={t.total > 0 ? t.correct / t.total : 0} />
-              </View>
-            ))}
-          </Card>
+            <AppText color="onShoji">{rootCause}</AppText>
+          </View>
         ) : null}
 
         {summary.weakTopics.length > 0 ? (
-          <Card>
-            <AppText variant="label" color="emberSoft">
-              Worth another look
+          <View style={styles.again}>
+            <AppText variant="label" color="muted" style={styles.centerText}>
+              Train again
             </AppText>
             {summary.weakTopics.map((slug) => (
               <Button
                 key={slug}
-                label={`Practise ${topicName(slug)}`}
+                label={topicName(slug)}
                 variant="ghost"
                 pending={startPractice.pendingKey === slug}
                 disabled={startPractice.pendingKey !== null}
@@ -194,11 +150,11 @@ export function SummaryScreen({ route, navigation }: Props) {
               />
             ))}
             {startPractice.error ? (
-              <AppText color="emberSoft" accessibilityRole="alert">
+              <AppText color="primary" accessibilityRole="alert" style={styles.centerText}>
                 {startPractice.error}
               </AppText>
             ) : null}
-          </Card>
+          </View>
         ) : null}
       </ScrollView>
       <View style={styles.actions}>
@@ -221,19 +177,65 @@ export function SummaryScreen({ route, navigation }: Props) {
   );
 }
 
-/** The grade moon grows from a smaller size on arrival (700 ms). With Reduce Motion it appears at full size. */
-function GradeMoon({ phase }: { phase: MoonPhaseName }) {
-  const reduce = useReducedMotion();
-  const scale = useSharedValue(reduce ? 1 : 0.6);
-  useEffect(() => {
-    if (!reduce) scale.value = withTiming(1, { duration: 700 });
-    haptic.success();
-  }, [reduce, scale]);
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+/**
+ * The top of the result: the grade seal strikes, the XP counts up in Dela Gothic, and when the
+ * Kata grew the streak the lantern relights beside the numbers (DESIGN.md motions 3 and 4).
+ */
+function Result({ summary }: { summary: SessionSummary }) {
+  const reduce = useReduceMotion();
+  const grade = GRADES[summary.grade];
+  const xp = useCountUp(summary.xpEarned, XP_COUNT_MS, reduce);
+  const isIncident = summary.type === 'INCIDENT';
+  const streak = summary.streak;
+
   return (
-    <Animated.View style={[styles.moon, style]}>
-      <MoonPhase phase={phase} size={112} />
-    </Animated.View>
+    <View style={styles.result}>
+      <AppText variant="label" color="muted" style={styles.centerText}>
+        {HEADING[summary.type] ?? 'Round complete'}
+      </AppText>
+      <HankoStrike
+        correct={summary.grade !== 'MADA_MADA'}
+        glyph={grade.glyph}
+        tone={grade.tone}
+        size={112}
+        label={`Grade: ${grade.word}`}
+      />
+      <AppText variant="display" style={styles.centerText}>
+        {grade.word}
+      </AppText>
+      <AppText
+        variant="number"
+        color="primary"
+        accessibilityLabel={`${summary.xpEarned} experience points earned`}
+      >
+        +{xp} XP
+      </AppText>
+
+      <View style={styles.stats}>
+        <Stat
+          label={isIncident ? 'Stages' : 'Correct'}
+          value={`${summary.correctAnswers}/${summary.totalAnswers}`}
+        />
+        {streak ? (
+          <View
+            style={styles.stat}
+            accessible
+            accessibilityLabel={`Streak: ${streak.current} ${streak.current === 1 ? 'day' : 'days'}${
+              streak.extended ? ', lantern relit' : ''
+            }`}
+          >
+            <Lantern
+              streak={streak.current}
+              state="lit"
+              width={LANTERN_W}
+              showCaption={false}
+              relightKey={streak.extended ? streak.current : null}
+            />
+          </View>
+        ) : null}
+        <Stat label="Time" value={formatTime(summary.totalTimeMs)} />
+      </View>
+    </View>
   );
 }
 
@@ -241,7 +243,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.stat} accessible accessibilityLabel={`${label}: ${value}`}>
       <AppText variant="title">{value}</AppText>
-      <AppText variant="label" color="textMuted">
+      <AppText variant="label" color="muted">
         {label}
       </AppText>
     </View>
@@ -249,13 +251,24 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  content: { gap: spacing.lg, paddingVertical: spacing.xxl },
-  center: { flex: 1, justifyContent: 'center', gap: spacing.md, textAlign: 'center' },
+  content: { gap: spacing.xl, paddingVertical: spacing.xxl },
+  center: { flex: 1, justifyContent: 'center', gap: spacing.md },
   centerText: { textAlign: 'center' },
-  moon: { alignItems: 'center' },
-  stats: { flexDirection: 'row', justifyContent: 'space-around' },
+  result: { alignItems: 'center', gap: spacing.md },
+  stats: {
+    flexDirection: 'row',
+    alignSelf: 'stretch',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
   stat: { alignItems: 'center', gap: spacing.xs },
-  topicRow: { gap: spacing.sm },
-  topicHead: { flexDirection: 'row', justifyContent: 'space-between' },
+  slip: {
+    backgroundColor: colors.shoji,
+    borderRadius: radii.md,
+    padding: spacing.lg,
+    gap: spacing.xs,
+  },
+  again: { gap: spacing.sm },
   actions: { gap: spacing.sm, paddingBottom: spacing.lg },
 });

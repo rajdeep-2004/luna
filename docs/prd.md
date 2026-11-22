@@ -4,6 +4,10 @@
 > Source: `docs/luna-idea.md` (the original brainstorm, kept unchanged). Scope confirmed in chat on
 > 2026-11-22: **P0 + P1** from the brainstorm (see `decisions.md` D-001).
 
+> **Positioning (P7, D-037):** Luna is played as a game, not studied: a "samurai of code" dojo that a tired
+> engineer opens in the evening instead of scrolling. The scope below is unchanged. The presentation is now
+> game-first (Kiri-e Den, `DESIGN.md`), with topic + mode rounds and three duel formats.
+
 Luna is a mobile app that helps computer science students build engineering intuition
 through short, game-like technical challenges: predicting code output, finding bugs, choosing
 between engineering trade-offs, and investigating simulated production incidents.
@@ -141,6 +145,8 @@ Status: `todo` | `building` | `shipped`.
 | P4 | Progression: XP, levels, streaks, Daily Kata, adaptivity, checkpoint | F-02 baseline, F-03, F-10, F-13, F-14, F-21–F-25 | shipped |
 | P5 | Competition and profile: Dojo Board, duels, achievements | F-17–F-20 | shipped |
 | P6 | Polish, deploy and demo prep | Acceptance criteria 1–12 | building |
+| P7 | Game redesign: design system, game-first screens, Explore mode picker, duel formats | D-037–D-043 | shipped |
+| P8 | New mini-games for Explore (e.g. blitz, swipe rounds) | D-037 | todo |
 
 ## 10. Open questions
 

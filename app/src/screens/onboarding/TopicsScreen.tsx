@@ -26,7 +26,7 @@ export function TopicsScreen({
       onAction={() => navigation.navigate('Level')}
       onBack={() => navigation.goBack()}
     >
-      {query.isPending ? <ActivityIndicator color={colors.moon} /> : null}
+      {query.isPending ? <ActivityIndicator color={colors.primary} /> : null}
       {query.isError ? (
         <ErrorState
           message={userMessage(query.error)}

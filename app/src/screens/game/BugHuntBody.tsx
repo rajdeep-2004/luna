@@ -14,7 +14,7 @@ export function BugHuntBody({ step, selected, result, onSelect, locked }: BodyPr
   }
   return (
     <View style={styles.wrap}>
-      <AppText variant="label" color="textMuted">
+      <AppText variant="label" color="muted">
         Bug Hunt
       </AppText>
       <AppText variant="question">{step.prompt}</AppText>

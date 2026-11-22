@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet, View } from 'react-native';
-import { AppText } from '../../components';
+import { StyleSheet, View } from 'react-native';
+import { HankoStamp } from '../../art/HankoStamp';
+import { AppText, PressableSink } from '../../components';
 import { colors, layout, radii, spacing } from '../../theme';
 
 type Props = {
@@ -11,10 +12,10 @@ type Props = {
   kind: 'radio' | 'checkbox';
 };
 
-/** Selectable row. Selected = raised surface + 1 px moon ring + a filled marker (never colour alone). */
+/** Selectable row: tatami when idle, shoji with a 正 stamp when chosen (never colour alone). */
 export function ChoiceRow({ title, description, selected, onPress, kind }: Props) {
   return (
-    <Pressable
+    <PressableSink
       onPress={onPress}
       accessibilityRole={kind}
       accessibilityState={{ checked: selected }}
@@ -22,13 +23,15 @@ export function ChoiceRow({ title, description, selected, onPress, kind }: Props
       style={[styles.row, selected && styles.selected]}
     >
       <View style={styles.text}>
-        <AppText variant="button">{title}</AppText>
-        {description ? <AppText color="textMuted">{description}</AppText> : null}
+        <AppText variant="button" color={selected ? 'onShoji' : 'text'}>
+          {title}
+        </AppText>
+        {description ? <AppText color={selected ? 'wood' : 'muted'}>{description}</AppText> : null}
       </View>
-      <View style={[styles.marker, selected && styles.markerOn]}>
-        {selected ? <AppText color="onMoon">✓</AppText> : null}
+      <View style={styles.marker}>
+        {selected ? <HankoStamp glyph="正" size={28} /> : <View style={styles.empty} />}
       </View>
-    </Pressable>
+    </PressableSink>
   );
 }
 
@@ -39,20 +42,17 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     minHeight: layout.buttonHeight,
     padding: spacing.lg,
-    borderRadius: radii.card,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: 'transparent',
+    borderRadius: radii.md,
+    backgroundColor: colors.tatami,
   },
-  selected: { backgroundColor: colors.surfaceRaised, borderColor: colors.moon },
+  selected: { backgroundColor: colors.shoji },
   text: { flex: 1, gap: spacing.xs },
-  marker: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.track,
+  marker: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
+  empty: {
+    width: 22,
+    height: 22,
+    borderRadius: radii.sm,
+    borderWidth: 2,
+    borderColor: colors.wallLight,
   },
-  markerOn: { backgroundColor: colors.moon },
 });

@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Luna — Kiri-e Den design preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=JetBrains+Mono:wght@400;500&family=Source+Sans+3:wght@400;500;600;700&family=Yuji+Boku&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ground: #3B2418;
+    --tatami: #2A1910;
+    --wood: #5C3A27;
+    --washi: #F3E6CC;
+    --shoji: #E9DCC0;
+    --muted: #B39A78;
+    --amber: #F2A93B;
+    --amber-deep: #C9831F;
+    --shu: #D9442B;
+    --night: #23305C;
+    --night-deep: #18213F;
+    --display: 'Dela Gothic One', sans-serif;
+    --body: 'Source Sans 3', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+    --brush: 'Yuji Boku', serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--tatami);
+    color: var(--washi);
+    font-family: var(--body);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1760px; margin: 0 auto; padding: 56px 40px 96px; }
+  header.page { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 24px; margin-bottom: 48px; }
+  header.page h1 { font-family: var(--display); font-weight: 400; font-size: 56px; line-height: 1; letter-spacing: 0.01em; }
+  header.page h1 span { color: var(--amber); }
+  header.page p { color: var(--muted); font-size: 18px; max-width: 640px; margin-top: 14px; line-height: 1.5; }
+  header.page .seal { width: 84px; height: 84px; }
+
+  .phones { display: flex; flex-wrap: wrap; gap: 40px; justify-content: flex-start; }
+  .phone-col { display: flex; flex-direction: column; gap: 14px; }
+  .phone-col h2 { font-family: var(--display); font-weight: 400; font-size: 20px; }
+  .phone-col p.note { color: var(--muted); font-size: 14px; max-width: 390px; line-height: 1.45; }
+
+  .phone {
+    width: 390px; height: 844px; border-radius: 44px; overflow: hidden; position: relative;
+    background: var(--ground);
+    box-shadow: 0 30px 60px rgba(0,0,0,0.45), 0 0 0 10px #120B07;
+    display: flex; flex-direction: column;
+  }
+  .grain::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.07; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+  .status { height: 44px; display: flex; justify-content: space-between; align-items: center; padding: 0 28px; font-size: 15px; font-weight: 600; color: var(--washi); flex: none; z-index: 2; }
+  .screen { flex: 1; position: relative; overflow: hidden; }
+
+  /* tab bar */
+  nav.tabs {
+    flex: none; height: 86px; background: var(--tatami); position: relative; z-index: 2;
+    display: grid; grid-template-columns: repeat(4, 1fr); padding: 10px 8px 22px;
+  }
+  nav.tabs::before { /* woven tatami heri border */
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px;
+    background: repeating-linear-gradient(90deg, #4A2E1F 0 6px, #2A1910 6px 9px, #6B4530 9px 12px, #2A1910 12px 15px);
+  }
+  .tab { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.02em; }
+  .tab svg { width: 28px; height: 28px; }
+  .tab.on { color: var(--washi); }
+  .tab .hanko { width: 6px; height: 6px; background: var(--shu); margin-top: 1px; }
+  .tab:not(.on) .hanko { visibility: hidden; }
+
+  .btn-amber {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    height: 56px; border-radius: 10px; background: var(--amber); color: var(--tatami);
+    font-family: var(--body); font-weight: 700; font-size: 18px; letter-spacing: 0.01em;
+    box-shadow: 0 4px 0 var(--amber-deep);
+  }
+
+  /* ---------- Explore ---------- */
+  .ex { padding: 8px 22px 0; }
+  .ex h3 { font-family: var(--display); font-weight: 400; font-size: 30px; line-height: 1.1; }
+  .banners { display: flex; gap: 12px; margin: 18px -22px 0; padding: 0 22px 8px; overflow: hidden; }
+  .banner { flex: none; width: 66px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .banner .flag { width: 66px; height: 132px; position: relative; display: flex; align-items: center; justify-content: center; clip-path: polygon(0 0, 100% 0, 100% 88%, 50% 100%, 0 88%); }
+  .banner .flag span { font-family: var(--mono); font-weight: 500; font-size: 20px; }
+  .banner small { font-size: 11px; color: var(--muted); font-weight: 600; text-align: center; line-height: 1.2; }
+  .banner.on small { color: var(--washi); }
+  .banner.on .flag { transform: translateY(-6px); }
+  .ex .topic { font-family: var(--display); font-weight: 400; font-size: 22px; margin-top: 18px; }
+  .ex .ask { color: var(--muted); font-size: 15px; margin-top: 4px; }
+  .modes { margin-top: 14px; display: flex; flex-direction: column; }
+  .mode { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid rgba(179,154,120,0.18); }
+  .mode b { font-family: var(--display); font-weight: 400; font-size: 18px; display: block; }
+  .mode em { font-style: normal; color: var(--muted); font-size: 14px; }
+  .mode .time { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .boss { margin-top: 16px; height: 128px; border-radius: 14px; background: var(--night); position: relative; overflow: hidden; display: flex; align-items: flex-end; padding: 16px; }
+  .boss b { font-family: var(--display); font-weight: 400; font-size: 22px; position: relative; z-index: 1; }
+  .boss em { font-style: normal; display: block; color: var(--shoji); font-size: 13px; font-weight: 600; letter-spacing: 0.04em; position: relative; z-index: 1; }
+
+  /* ---------- Duel ---------- */
+  .duel-top { height: 300px; position: relative; }
+  .duel-body { padding: 0 22px; }
+  .formats { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+  .fmt { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 12px; height: 60px; padding: 0 14px; border-radius: 10px; background: var(--tatami); }
+  .fmt .k { font-family: var(--brush); font-size: 30px; color: var(--muted); text-align: center; }
+  .fmt b { font-family: var(--display); font-weight: 400; font-size: 17px; }
+  .fmt em { font-style: normal; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .fmt.on { background: var(--shoji); color: var(--ground); }
+  .fmt.on .k { color: var(--shu); }
+  .fmt.on em { color: var(--wood); }
+  .code { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+  .code label { color: var(--muted); font-size: 14px; font-weight: 600; flex: none; }
+  .cells { display: flex; gap: 6px; }
+  .cells i { width: 32px; height: 40px; border-radius: 6px; background: var(--tatami); display: flex; align-items: center; justify-content: center; font-style: normal; font-family: var(--mono); font-size: 18px; font-weight: 500; }
+  .cells i.cur { box-shadow: inset 0 -3px 0 var(--amber); }
+  .dtabs { display: flex; gap: 18px; margin-top: 18px; font-size: 14px; font-weight: 600; color: var(--muted); }
+  .dtabs span.on { color: var(--washi); }
+  .dtabs b { font-family: var(--display); font-weight: 400; color: var(--amber); margin-left: 4px; }
+
+  /* ---------- Profile ---------- */
+  .pro-top { height: 250px; position: relative; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); padding: 6px 14px 0; }
+  .stat { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .stat svg { width: 44px; height: 44px; }
+  .stat b { font-family: var(--display); font-weight: 400; font-size: 22px; line-height: 1.1; margin-top: 4px; }
+  .stat em { font-style: normal; font-size: 12px; color: var(--muted); font-weight: 600; }
+  .sect { padding: 0 22px; margin-top: 16px; }
+  .sect h4 { font-family: var(--display); font-weight: 400; font-size: 16px; color: var(--muted); }
+  .crests { display: flex; justify-content: space-between; margin-top: 12px; }
+  .crests svg { width: 58px; height: 58px; }
+  .runs { margin-top: 8px; }
+  .run { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px solid rgba(179,154,120,0.18); }
+  .run .st { width: 30px; height: 30px; border: 2px solid var(--shu); color: var(--shu); font-family: var(--brush); font-size: 18px; display: flex; align-items: center; justify-content: center; transform: rotate(-6deg); border-radius: 4px; }
+  .run .st.grey { border-color: var(--muted); color: var(--muted); }
+  .run b { font-weight: 600; font-size: 15px; }
+  .run em { font-style: normal; font-size: 13px; color: var(--muted); display: block; }
+  .run span { font-family: var(--display); font-weight: 400; font-size: 15px; color: var(--amber); }
+
+  /* ---------- system sections ---------- */
+  section.sys { margin-top: 88px; }
+  section.sys h2 { font-family: var(--display); font-weight: 400; font-size: 32px; margin-bottom: 8px; }
+  section.sys > p { color: var(--muted); font-size: 16px; max-width: 720px; line-height: 1.5; margin-bottom: 28px; }
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 16px; }
+  .sw { border-radius: 12px; overflow: hidden; background: var(--ground); }
+  .sw div { height: 96px; }
+  .sw p { padding: 12px 14px; font-size: 14px; line-height: 1.4; }
+  .sw p b { display: block; font-weight: 600; }
+  .sw p code { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .type { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 32px; }
+  .type .cell { background: var(--ground); border-radius: 14px; padding: 28px; }
+  .type .lab { font-size: 13px; color: var(--muted); font-weight: 600; margin-bottom: 14px; }
+  .type .d1 { font-family: var(--display); font-size: 48px; line-height: 1.05; }
+  .type .d2 { font-family: var(--display); font-size: 64px; color: var(--amber); line-height: 1; margin-top: 10px; }
+  .type .b1 { font-size: 21px; font-weight: 500; line-height: 1.4; }
+  .type .b2 { font-size: 16px; color: var(--muted); line-height: 1.5; margin-top: 10px; }
+  .type pre { font-family: var(--mono); font-size: 14px; line-height: 1.7; background: var(--tatami); border-radius: 8px; padding: 14px; color: var(--shoji); margin-top: 6px; }
+  .type pre .ln { color: var(--muted); margin-right: 14px; }
+  .type pre .bug { background: rgba(217,68,43,0.22); display: block; margin: 0 -14px; padding: 0 14px; }
+  .type .brush { font-family: var(--brush); font-size: 64px; line-height: 1.1; }
+
+  .motion { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .mo { background: var(--ground); border-radius: 14px; padding: 22px; position: relative; overflow: hidden; }
+  .mo h3 { font-family: var(--display); font-weight: 400; font-size: 19px; }
+  .mo p { color: var(--muted); font-size: 14px; margin-top: 6px; line-height: 1.45; }
+  .stage { height: 220px; margin-top: 16px; border-radius: 10px; background: var(--tatami); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+
+  .stamp { width: 120px; height: 120px; border: 6px solid var(--shu); border-radius: 12px; color: var(--shu); font-family: var(--brush); font-size: 84px; display: flex; align-items: center; justify-content: center; animation: strike 2.6s infinite; }
+  @keyframes strike {
+    0%, 12% { transform: scale(1.5) rotate(-6deg); opacity: 0; }
+    20% { transform: scale(1) rotate(-6deg); opacity: 1; }
+    23% { transform: scale(1.04) rotate(-6deg); }
+    26%, 80% { transform: scale(1) rotate(-6deg); opacity: 1; }
+    100% { opacity: 0; transform: scale(1) rotate(-6deg); }
+  }
+  .bleed { position: absolute; width: 150px; height: 150px; border-radius: 50%; background: var(--shu); opacity: 0; animation: bleed 2.6s infinite; }
+  @keyframes bleed { 0%, 19% { opacity: 0; transform: scale(0.6); } 22% { opacity: 0.16; } 40% { opacity: 0; transform: scale(1.2); } 100% { opacity: 0; } }
+
+  .lan { width: 96px; height: 132px; position: relative; }
+  .lan .body { position: absolute; inset: 14px 0; border-radius: 48px / 56px; background: #6B4530; overflow: hidden; }
+  .lan .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: var(--amber); animation: fill 3.2s infinite; }
+  @keyframes fill { 0%, 10% { height: 0; } 55%, 90% { height: 100%; } 100% { height: 100%; } }
+  .lan .num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--display); font-size: 44px; color: var(--ground); z-index: 2; }
+  .lan .num i { font-style: normal; animation: numA 3.2s infinite; position: absolute; }
+  .lan .num i + i { animation-name: numB; }
+  @keyframes numA { 0%, 50% { opacity: 1; transform: translateY(0); } 58%, 100% { opacity: 0; transform: translateY(-10px); } }
+  @keyframes numB { 0%, 50% { opacity: 0; transform: translateY(10px); } 58%, 96% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; } }
+  .lan .cap { position: absolute; left: 24px; right: 24px; height: 16px; background: var(--tatami); border-radius: 3px; z-index: 3; }
+  .lan .cap.t { top: 4px; } .lan .cap.b { bottom: 4px; }
+  .lan .rib { position: absolute; left: 0; right: 0; height: 2px; background: rgba(42,25,16,0.35); z-index: 1; }
+
+  .shoji { position: absolute; inset: 0; display: flex; }
+  .shoji .panel { flex: 1; background: var(--shoji); position: relative;
+    background-image: linear-gradient(var(--muted) 2px, transparent 2px), linear-gradient(90deg, var(--muted) 2px, transparent 2px);
+    background-size: 100% 44px, 36px 100%; }
+  .shoji .l { animation: openL 3.4s infinite ease-out; border-right: 4px solid var(--wood); }
+  .shoji .r { animation: openR 3.4s infinite ease-out; border-left: 4px solid var(--wood); }
+  @keyframes openL { 0%, 15% { transform: translateX(0); } 45%, 85% { transform: translateX(-100%); } 100% { transform: translateX(0); } }
+  @keyframes openR { 0%, 15% { transform: translateX(0); } 45%, 85% { transform: translateX(100%); } 100% { transform: translateX(0); } }
+  .behind { position: absolute; inset: 0; background: var(--night); display: flex; align-items: center; justify-content: center; }
+
+  .rules { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .rules ul { list-style: none; background: var(--ground); border-radius: 14px; padding: 24px 26px; }
+  .rules li { font-size: 16px; line-height: 1.5; padding: 8px 0; border-bottom: 1px solid rgba(179,154,120,0.15); }
+  .rules li:last-child { border: 0; }
+  .rules h3 { font-family: var(--display); font-weight: 400; font-size: 18px; margin-bottom: 6px; }
+  .rules .do h3 { color: var(--amber); } .rules .dont h3 { color: var(--shu); }
+  footer { margin-top: 72px; color: var(--muted); font-size: 14px; }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+  @media (max-width: 900px) {
+    .wrap { padding: 32px 18px 64px; }
+    header.page { grid-template-columns: 1fr; }
+    header.page h1 { font-size: 40px; }
+    .type, .motion, .rules { grid-template-columns: 1fr; }
+    .phones { justify-content: center; }
+    .phone { transform: scale(0.86); transform-origin: top center; margin-bottom: -118px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="page">
+    <div>
+      <h1>Luna <span>·</span> Kiri-e Den</h1>
+      <p>You come home after a long day and slide the shoji open. The lantern is lit. Every screen is a small stage built from flat cut-paper layers, lit warm from inside, and you are the master of this dojo.</p>
+    </div>
+    <svg class="seal" viewBox="0 0 84 84" aria-hidden="true"><rect x="4" y="4" width="76" height="76" rx="6" fill="none" stroke="#D9442B" stroke-width="5" transform="rotate(-5 42 42)"/><text x="42" y="58" text-anchor="middle" font-family="Yuji Boku" font-size="44" fill="#D9442B" transform="rotate(-5 42 42)">月</text></svg>
+  </header>
+
+  <div class="phones">
+
+    <!-- ================= DOJO ================= -->
+    <div class="phone-col">
+      <h2>Dojo — the den</h2>
+      <div class="phone grain">
+        <div class="status"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="screen">
+          <svg viewBox="0 0 390 714" width="390" height="714" style="position:absolute;inset:0" role="img" aria-label="A samurai's den at night: a half-open shoji window with the moon, a fox mask resting on a stand, a hanging scroll with the rank kanji, a lit paper lantern, and a low table with the sealed Daily Kata scroll.">
+            <!-- wall -->
+            <rect width="390" height="714" fill="#3B2418"/>
+            <!-- flat lantern light patch on the wall (cut paper, not a glow) -->
+            <circle cx="326" cy="178" r="118" fill="#43291C"/><circle cx="326" cy="178" r="82" fill="#4A2E1F"/>
+            <!-- beam and posts -->
+            <rect x="0" y="22" width="390" height="18" fill="#2A1910"/>
+            <rect x="0" y="40" width="14" height="420" fill="#2A1910"/>
+            <rect x="376" y="40" width="14" height="420" fill="#2A1910"/>
+            <!-- shoji window -->
+            <rect x="112" y="78" width="168" height="178" fill="#2A1910"/>
+            <rect x="120" y="86" width="76" height="162" fill="#23305C"/>
+            <!-- moon arc + moon -->
+            <path d="M128 228 Q160 84 192 150" fill="none" stroke="#F3E6CC" stroke-opacity="0.18" stroke-width="1.5" stroke-dasharray="3 5"/>
+            <circle cx="164" cy="128" r="19" fill="#F3E6CC"/>
+            <circle cx="173" cy="122" r="17" fill="#23305C"/>
+            <circle cx="140" cy="200" r="1.4" fill="#F3E6CC" opacity="0.6"/><circle cx="182" cy="176" r="1.2" fill="#F3E6CC" opacity="0.5"/><circle cx="132" cy="112" r="1" fill="#F3E6CC" opacity="0.5"/>
+            <!-- shoji paper with lattice -->
+            <rect x="196" y="86" width="76" height="162" fill="#E9DCC0"/>
+            <g stroke="#B39A78" stroke-width="2">
+              <line x1="221" y1="86" x2="221" y2="248"/><line x1="247" y1="86" x2="247" y2="248"/>
+              <line x1="196" y1="126" x2="272" y2="126"/><line x1="196" y1="166" x2="272" y2="166"/><line x1="196" y1="206" x2="272" y2="206"/>
+            </g>
+            <rect x="192" y="86" width="6" height="162" fill="#5C3A27"/>
+            <!-- sill -->
+            <rect x="100" y="256" width="192" height="10" fill="#5C3A27"/>
+            <!-- mask stand + kitsune mask (the master is home) -->
+            <rect x="182" y="356" width="28" height="44" fill="#5C3A27"/>
+            <rect x="166" y="398" width="60" height="8" fill="#2A1910"/>
+            <g transform="translate(196 318)">
+              <path d="M-30 -30 L-20 -58 L-6 -34 L6 -34 L20 -58 L30 -30 L22 10 L0 36 L-22 10 Z" fill="#F3E6CC"/>
+              <path d="M-20 -50 L-14 -36 L-22 -34 Z M20 -50 L14 -36 L22 -34 Z" fill="#D9442B"/>
+              <path d="M-19 -8 Q-12 -15 -5 -9" stroke="#2A1910" stroke-width="3" fill="none" stroke-linecap="round"/>
+              <path d="M19 -8 Q12 -15 5 -9" stroke="#2A1910" stroke-width="3" fill="none" stroke-linecap="round"/>
+              <path d="M-6 -26 L0 -18 L6 -26" stroke="#D9442B" stroke-width="3" fill="none"/>
+              <path d="M-4 24 L0 30 L4 24 Z" fill="#2A1910"/>
+              <path d="M-22 4 L-12 8 M22 4 L12 8" stroke="#D9442B" stroke-width="3"/>
+            </g>
+            <!-- kakejiku scroll: rank kanji + ensō XP -->
+            <line x1="60" y1="40" x2="60" y2="96" stroke="#B39A78" stroke-width="1.5"/>
+            <rect x="24" y="96" width="72" height="8" rx="3" fill="#2A1910"/>
+            <rect x="30" y="104" width="60" height="196" fill="#E9DCC0"/>
+            <rect x="24" y="300" width="72" height="9" rx="3" fill="#2A1910"/>
+            <path d="M60 148 m-24 0 a24 24 0 1 1 18 23.3" fill="none" stroke="#2A1910" stroke-width="5" stroke-linecap="round"/>
+            <text x="60" y="161" text-anchor="middle" font-family="Yuji Boku" font-size="34" fill="#2A1910">侍</text>
+            <text x="60" y="206" text-anchor="middle" font-family="Dela Gothic One" font-size="9" letter-spacing="0.5" fill="#3B2418">SAMURAI</text>
+            <text x="60" y="224" text-anchor="middle" font-family="Source Sans 3" font-weight="700" font-size="11" fill="#5C3A27">LVL 5</text>
+            <rect x="46" y="250" width="28" height="28" fill="none" stroke="#D9442B" stroke-width="2.5" transform="rotate(-6 60 264)"/>
+            <text x="60" y="271" text-anchor="middle" font-family="Yuji Boku" font-size="18" fill="#D9442B" transform="rotate(-6 60 264)">道</text>
+            <!-- lantern: streak -->
+            <line x1="326" y1="40" x2="326" y2="112" stroke="#B39A78" stroke-width="1.5"/>
+            <rect x="306" y="112" width="40" height="12" rx="3" fill="#2A1910"/>
+            <ellipse cx="326" cy="178" rx="40" ry="56" fill="#F2A93B"/>
+            <g stroke="#C9831F" stroke-width="2" fill="none">
+              <path d="M288 150 Q326 142 364 150"/><path d="M286 178 Q326 170 366 178"/><path d="M288 206 Q326 198 364 206"/>
+            </g>
+            <rect x="306" y="232" width="40" height="12" rx="3" fill="#2A1910"/>
+            <line x1="326" y1="244" x2="326" y2="262" stroke="#D9442B" stroke-width="3"/>
+            <text x="326" y="196" text-anchor="middle" font-family="Dela Gothic One" font-size="46" fill="#3B2418">4</text>
+            <text x="326" y="282" text-anchor="middle" font-family="Source Sans 3" font-weight="700" font-size="11" fill="#B39A78" letter-spacing="1">DAY STREAK</text>
+            <!-- floor -->
+            <path d="M0 460 L390 460 L390 714 L0 714 Z" fill="#8A7354"/>
+            <g fill="#7C6649">
+              <path d="M0 470 L130 470 L104 600 L0 600 Z"/><path d="M262 470 L390 470 L390 600 L288 600 Z"/>
+              <path d="M0 612 L100 612 L86 714 L0 714 Z"/><path d="M292 612 L390 612 L390 714 L306 714 Z"/>
+            </g>
+            <g stroke="#2A1910" stroke-width="5">
+              <line x1="0" y1="606" x2="390" y2="606"/>
+              <line x1="134" y1="462" x2="96" y2="714"/><line x1="258" y1="462" x2="296" y2="714"/>
+            </g>
+            <ellipse cx="195" cy="640" rx="170" ry="26" fill="#2A1910" opacity="0.35"/>
+            <rect x="0" y="456" width="390" height="6" fill="#5C3A27"/>
+            <!-- ema plaque: weekly rank -->
+            <line x1="52" y1="372" x2="52" y2="392" stroke="#B39A78" stroke-width="1.5"/>
+            <circle cx="52" cy="370" r="3" fill="#B39A78"/>
+            <path d="M22 404 L52 390 L82 404 L82 446 L22 446 Z" fill="#B39A78"/>
+            <text x="52" y="428" text-anchor="middle" font-family="Dela Gothic One" font-size="18" fill="#2A1910">#12</text>
+            <text x="52" y="441" text-anchor="middle" font-family="Source Sans 3" font-weight="700" font-size="8.5" fill="#3B2418">THIS WEEK</text>
+            <!-- low table -->
+            <path d="M70 548 L320 548 L340 572 L50 572 Z" fill="#5C3A27"/>
+            <rect x="50" y="572" width="290" height="10" fill="#3B2418"/>
+            <rect x="70" y="582" width="14" height="40" fill="#3B2418"/><rect x="306" y="582" width="14" height="40" fill="#3B2418"/>
+            <!-- sealed kata scroll -->
+            <rect x="108" y="514" width="174" height="34" rx="17" fill="#E9DCC0"/>
+            <ellipse cx="108" cy="531" rx="9" ry="17" fill="#B39A78"/>
+            <ellipse cx="282" cy="531" rx="9" ry="17" fill="#B39A78"/>
+            <rect x="180" y="512" width="30" height="38" fill="#D9442B"/>
+            <text x="195" y="536" text-anchor="middle" font-family="Yuji Boku" font-size="13" fill="#F3E6CC">今日</text>
+          </svg>
+          <div style="position:absolute;left:22px;right:22px;bottom:24px">
+            <div class="btn-amber">Begin kata</div>
+          </div>
+        </div>
+        <nav class="tabs" aria-label="Main">
+          <div class="tab on"><svg viewBox="0 0 28 28"><path d="M2 12 L14 4 L26 12 L22 12 L22 24 L6 24 L6 12 Z" fill="#D9442B"/><rect x="11" y="16" width="6" height="8" fill="#2A1910"/></svg>Dojo<i class="hanko"></i></div>
+          <div class="tab"><svg viewBox="0 0 28 28" fill="none" stroke="#B39A78" stroke-width="2"><path d="M14 24 L3 10 Q14 2 25 10 Z"/><path d="M14 24 L9 6 M14 24 L14 5 M14 24 L19 6"/></svg>Explore<i class="hanko"></i></div>
+          <div class="tab"><svg viewBox="0 0 28 28" fill="none" stroke="#B39A78" stroke-width="2.2" stroke-linecap="round"><path d="M5 23 L23 5 M5 5 L23 23"/><path d="M3 19 L9 25 M19 3 L25 9 M3 9 L9 3 M19 25 L25 19"/></svg>Duel<i class="hanko"></i></div>
+          <div class="tab"><svg viewBox="0 0 28 28" fill="none" stroke="#B39A78" stroke-width="2"><path d="M6 8 L9 2 L12 7 L16 7 L19 2 L22 8 L20 18 L14 26 L8 18 Z"/></svg>Profile<i class="hanko"></i></div>
+        </nav>
+      </div>
+      <p class="note">Six short labels on the whole screen. The lantern is the streak, the scroll is your rank (the ensō closes as XP grows), the ema shows this week's place, and the sealed scroll is the one thing to do.</p>
+    </div>
+
+    <!-- ================= EXPLORE ================= -->
+    <div class="phone-col">
+      <h2>Explore — pick a banner, pick a game</h2>
+      <div class="phone grain">
+        <div class="status"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="screen ex">
+          <h3>Explore</h3>
+          <div class="banners">
+            <div class="banner on"><div class="flag" style="background:#F2A93B;color:#2A1910"><span>=&gt;</span></div><small>JS &amp;<br>Async</small></div>
+            <div class="banner"><div class="flag" style="background:#5C3A27;color:#F3E6CC"><span>200</span></div><small>HTTP &amp;<br>APIs</small></div>
+            <div class="banner"><div class="flag" style="background:#23305C;color:#F3E6CC"><svg width="28" height="32" viewBox="0 0 28 32" fill="none" stroke="#F3E6CC" stroke-width="2.4"><ellipse cx="14" cy="6" rx="11" ry="4"/><path d="M3 6 V26 Q14 32 25 26 V6"/><path d="M3 16 Q14 22 25 16"/></svg></div><small>Data-<br>bases</small></div>
+            <div class="banner"><div class="flag" style="background:#E9DCC0;color:#3B2418"><svg width="30" height="30" viewBox="0 0 30 30" fill="#3B2418"><rect x="3" y="3" width="24" height="6"/><rect x="3" y="12" width="24" height="6" opacity="0.7"/><rect x="3" y="21" width="24" height="6" opacity="0.45"/></svg></div><small>Caching &amp;<br>Queues</small></div>
+            <div class="banner"><div class="flag" style="background:#D9442B;color:#F3E6CC"><svg width="26" height="32" viewBox="0 0 26 32" fill="#F3E6CC"><path d="M13 2 Q22 2 22 14 L24 24 L2 24 L4 14 Q4 2 13 2 Z"/><circle cx="13" cy="28" r="3"/></svg></div><small>Debug<br>Prod</small></div>
+          </div>
+          <div class="topic">JavaScript &amp; Async</div>
+          <div class="ask">How do you want to play?</div>
+          <div class="modes">
+            <div class="mode">
+              <svg width="64" height="56" viewBox="0 0 64 56" aria-hidden="true"><path d="M6 44 C18 44 14 12 30 12 S42 40 58 30" fill="none" stroke="#F2A93B" stroke-width="6" stroke-linecap="round"/><circle cx="58" cy="30" r="5" fill="#D9442B"/></svg>
+              <div><b>Trace the Stack</b><em>What does it print?</em></div><span class="time">2 min</span>
+            </div>
+            <div class="mode">
+              <svg width="64" height="56" viewBox="0 0 64 56" aria-hidden="true"><ellipse cx="32" cy="32" rx="14" ry="18" fill="#E9DCC0"/><line x1="32" y1="14" x2="32" y2="50" stroke="#3B2418" stroke-width="2.5"/><circle cx="32" cy="12" r="7" fill="#E9DCC0"/><path d="M18 24 L8 18 M18 34 L6 34 M18 44 L8 50 M46 24 L56 18 M46 34 L58 34 M46 44 L56 50" stroke="#B39A78" stroke-width="3" stroke-linecap="round"/><path d="M28 6 L24 0 M36 6 L40 0" stroke="#B39A78" stroke-width="2.5"/></svg>
+              <div><b>Bug Hunt</b><em>Tap the broken line.</em></div><span class="time">2 min</span>
+            </div>
+            <div class="mode">
+              <svg width="64" height="56" viewBox="0 0 64 56" aria-hidden="true"><path d="M32 52 V28 L12 8 M32 28 L52 8" fill="none" stroke="#B39A78" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><rect x="5" y="2" width="14" height="10" fill="#D9442B" transform="rotate(-45 12 7)"/><rect x="45" y="2" width="14" height="10" fill="#F2A93B" transform="rotate(45 52 7)"/></svg>
+              <div><b>Engineer's Choice</b><em>Pick the better path.</em></div><span class="time">3 min</span>
+            </div>
+          </div>
+          <div class="boss">
+            <svg width="390" height="128" viewBox="0 0 390 128" style="position:absolute;right:-30px;top:0" aria-hidden="true">
+              <path d="M200 128 L240 40 L260 70 L290 10 L320 64 L340 36 L380 128 Z" fill="#18213F"/>
+              <path d="M300 128 Q306 92 318 96 Q312 72 330 60 Q326 84 342 88 Q338 104 350 128 Z" fill="#D9442B"/>
+              <path d="M314 128 Q318 104 328 106 Q326 92 336 86 Q334 104 342 110 L340 128 Z" fill="#F2A93B"/>
+              <g transform="translate(250 30)"><path d="M0 0 Q14 0 14 18 L18 34 L-18 34 L-14 18 Q-14 0 0 0 Z" fill="#E9DCC0"/><rect x="-4" y="-8" width="8" height="8" fill="#B39A78"/><circle cx="0" cy="40" r="5" fill="#E9DCC0"/></g>
+            </svg>
+            <div><em>BOSS · 3 STAGES</em><b>Incident Room</b></div>
+          </div>
+        </div>
+        <nav class="tabs" aria-label="Main">
+          <div class="tab"><svg viewBox="0 0 28 28" fill="none" stroke="#B39A78" stroke-width="2"><path d="M2 12 L14 4 L26 12 L22 12 L22 24 L6 24 L6 12 Z"/></svg>Dojo<i class="hanko"></i></div>
+          <div class="tab on"><svg viewBox="0 0 28 28"><path d="M14 24 L3 10 Q14 2 25 10 Z" fill="#D9442B"/><path d="M14 24 L9 6 M14 24 L14 5 M14 24 L19 6" stroke="#2A1910" stroke-width="1.6"/></svg>Explore<i class="hanko"></i></div>
+          <div class="tab"><svg viewBox="0 0 28 28" fill="none" stroke="#B39A78" stroke-width="2.2" stroke-linecap="round"><path d="M5 23 L23 5 M5 5 L23 23"/><path d="M3 19 L9 25 M19 3 L25 9 M3 9 L9 3 M19 25 L25 19"/></svg>Duel<i class="hanko"></i></div>
+          <div class="tab"><svg viewBox="0 0 28 28" fill="none" stroke="#B39A78" stroke-width="2"><path d="M6 8 L9 2 L12 7 L16 7 L19 2 L22 8 L20 18 L14 26 L8 18 Z"/></svg>Profile<i class="hanko"></i></div>
+        </nav>
+      </div>
+      <p class="note">Topics are hanging nobori banners, one tap each. A topic opens its games, each with its own art. Incident Room is the boss fight, so it gets the biggest stage. New mini-games join this list in P8.</p>
+    </div>
+
+    <!-- ================= DUEL ================= -->
+    <div class="phone-col">
+      <h2>Duel — choose your blade</h2>
+      <div class="phone grain">
+        <div class="status"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="screen">
+          <div class="duel-top">
+            <svg viewBox="0 0 390 300" width="390" height="300" role="img" aria-label="Your fox mask faces an unknown rival across a vermilion slash.">
+              <rect width="390" height="300" fill="#3B2418"/>
+              <path d="M0 0 L240 0 L150 300 L0 300 Z" fill="#4A2E1F"/>
+              <path d="M240 0 L390 0 L390 300 L150 300 Z" fill="#23305C"/>
+              <path d="M228 -10 L252 -10 L162 310 L138 310 Z" fill="#D9442B"/>
+              <!-- your mask -->
+              <g transform="translate(92 150) scale(1.5)">
+                <path d="M-30 -30 L-20 -58 L-6 -34 L6 -34 L20 -58 L30 -30 L22 10 L0 36 L-22 10 Z" fill="#F3E6CC"/>
+                <path d="M-20 -50 L-14 -36 L-22 -34 Z M20 -50 L14 -36 L22 -34 Z" fill="#D9442B"/>
+                <path d="M-19 -8 Q-12 -15 -5 -9 M19 -8 Q12 -15 5 -9" stroke="#2A1910" stroke-width="3" fill="none" stroke-linecap="round"/>
+                <path d="M-6 -26 L0 -18 L6 -26" stroke="#D9442B" stroke-width="3" fill="none"/>
+                <path d="M-4 24 L0 30 L4 24 Z" fill="#2A1910"/>
+              </g>
+              <!-- rival unknown -->
+              <g transform="translate(300 152) scale(1.4)">
+                <path d="M-28 -34 Q0 -52 28 -34 L24 14 Q0 40 -24 14 Z" fill="none" stroke="#F3E6CC" stroke-width="3" stroke-dasharray="6 6"/>
+                <text x="0" y="8" text-anchor="middle" font-family="Dela Gothic One" font-size="30" fill="#F3E6CC" opacity="0.8">?</text>
+              </g>
+              <text x="195" y="168" text-anchor="middle" font-family="Dela Gothic One" font-size="38" fill="#F3E6CC" stroke="#2A1910" stroke-width="6" paint-order="stroke">VS</text>
+              <text x="24" y="276" font-family="Source Sans 3" font-weight="700" font-size="13" fill="#F3E6CC">YOU · SAMURAI</text>
+              <text x="366" y="276" text-anchor="end" font-family="Source Sans 3" font-weight="700" font-size="13" fill="#B39A78">A FRIEND</text>
+            </svg>
+          </div>
+          <div class="duel-body">
+            <div class="formats">
+              <div class="fmt"><span class="k">刀</span><b>Classic</b><em>5 × 60s</em></div>
+              <div class="fmt on"><span class="k">雷</span><b>Blitz</b><em>10 × 10s</em></div>
+              <div class="fmt"><span class="k">一</span><b>Sudden Death</b><em>1 miss ends it</em></div>
+            </div>
+            <div class="btn-amber" style="margin-top:16px">Challenge a friend</div>
+            <div class="code">
+              <label>Have a code?</label>
+              <div class="cells"><i>K</i><i>X</i><i>7</i><i class="cur"></i><i></i><i></i></div>
+            </div>
+            <div class="dtabs"><span class="on">Your turn<b>2</b></span><span>Waiting<b>1</b></span><span>Finished</span></div>
+          </div>
+        </div>
+        <nav class="tabs" aria-label="Main">
+          <div class="tab"><svg viewBox="0 0 28 28" fill="none" stroke="#B39A78" stroke-width="2"><path d="M2 12 L14 4 L26 12 L22 12 L22 24 L6 24 L6 12 Z"/></svg>Dojo<i class="hanko"></i></div>
+          <div class="tab"><svg viewBox="0 0 28 28" fill="none" stroke="#B39A78" stroke-width="2"><path d="M14 24 L3 10 Q14 2 25 10 Z"/><path d="M14 24 L9 6 M14 24 L14 5 M14 24 L19 6"/></svg>Explore<i class="hanko"></i></div>
+          <div class="tab on"><svg viewBox="0 0 28 28" fill="none" stroke="#D9442B" stroke-width="3" stroke-linecap="round"><path d="M5 23 L23 5 M5 5 L23 23"/><path d="M3 19 L9 25 M19 3 L25 9 M3 9 L9 3 M19 25 L25 19"/></svg>Duel<i class="hanko"></i></div>
+          <div class="tab"><svg viewBox="0 0 28 28" fill="none" stroke="#B39A78" stroke-width="2"><path d="M6 8 L9 2 L12 7 L16 7 L19 2 L22 8 L20 18 L14 26 L8 18 Z"/></svg>Profile<i class="hanko"></i></div>
+        </nav>
+      </div>
+      <p class="note">The face-off is the hero: your mask against a dashed "?" until someone joins. Each format is a blade with a brush kanji: 刀 katana, 雷 lightning, 一 one strike. Joining is six cells you can type straight into.</p>
+    </div>
+
+    <!-- ================= PROFILE ================= -->
+    <div class="phone-col">
+      <h2>Profile — the warrior, not the report card</h2>
+      <div class="phone grain">
+        <div class="status"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="screen">
+          <div class="pro-top">
+            <svg viewBox="0 0 390 290" width="390" height="250" preserveAspectRatio="xMidYMin slice" role="img" aria-label="Your fox mask on a vermilion banner beside the rank kanji 侍 inside a nearly closed ensō.">
+              <rect width="390" height="290" fill="#3B2418"/>
+              <!-- banner -->
+              <path d="M30 0 L150 0 L150 250 L90 222 L30 250 Z" fill="#D9442B"/>
+              <g transform="translate(90 118) scale(1.6)">
+                <path d="M-30 -30 L-20 -58 L-6 -34 L6 -34 L20 -58 L30 -30 L22 10 L0 36 L-22 10 Z" fill="#F3E6CC"/>
+                <path d="M-20 -50 L-14 -36 L-22 -34 Z M20 -50 L14 -36 L22 -34 Z" fill="#D9442B"/>
+                <path d="M-19 -8 Q-12 -15 -5 -9 M19 -8 Q12 -15 5 -9" stroke="#2A1910" stroke-width="3" fill="none" stroke-linecap="round"/>
+                <path d="M-6 -26 L0 -18 L6 -26" stroke="#D9442B" stroke-width="3" fill="none"/>
+                <path d="M-4 24 L0 30 L4 24 Z" fill="#2A1910"/>
+              </g>
+              <!-- rank with ensō -->
+              <path d="M268 96 m-58 0 a58 58 0 1 1 44 56.3" fill="none" stroke="#F2A93B" stroke-width="9" stroke-linecap="round"/>
+              <text x="268" y="122" text-anchor="middle" font-family="Yuji Boku" font-size="72" fill="#F3E6CC">侍</text>
+              <text x="186" y="198" font-family="Dela Gothic One" font-size="30" fill="#F3E6CC">Samurai</text>
+              <text x="186" y="222" font-family="Source Sans 3" font-weight="600" font-size="15" fill="#B39A78">@rajdeep · Lvl 5</text>
+              <text x="186" y="248" font-family="Source Sans 3" font-weight="700" font-size="13" fill="#F2A93B">640 XP · 110 to Hatamoto</text>
+            </svg>
+          </div>
+          <div class="stats">
+            <div class="stat"><svg viewBox="0 0 44 44"><rect x="15" y="4" width="14" height="5" fill="#2A1910"/><ellipse cx="22" cy="22" rx="15" ry="14" fill="#F2A93B"/><rect x="15" y="35" width="14" height="5" fill="#2A1910"/></svg><b>4</b><em>day streak</em></div>
+            <div class="stat"><svg viewBox="0 0 44 44" stroke-linecap="round"><path d="M8 36 L36 8" stroke="#E9DCC0" stroke-width="4"/><path d="M8 8 L36 36" stroke="#D9442B" stroke-width="4"/><path d="M5 31 L13 39 M31 5 L39 13" stroke="#B39A78" stroke-width="3"/></svg><b>7–3</b><em>duels</em></div>
+            <div class="stat"><svg viewBox="0 0 44 44"><rect x="8" y="14" width="28" height="16" rx="8" fill="#E9DCC0"/><ellipse cx="8" cy="22" rx="4" ry="8" fill="#B39A78"/><ellipse cx="36" cy="22" rx="4" ry="8" fill="#B39A78"/><rect x="18" y="12" width="8" height="20" fill="#D9442B"/></svg><b>23</b><em>katas</em></div>
+            <div class="stat"><svg viewBox="0 0 44 44"><path d="M8 16 L22 8 L36 16 L36 36 L8 36 Z" fill="#B39A78"/><text x="22" y="31" text-anchor="middle" font-family="Dela Gothic One" font-size="11" fill="#2A1910">12</text></svg><b>#12</b><em>this week</em></div>
+          </div>
+          <div class="sect">
+            <h4>Crests</h4>
+            <div class="crests">
+              <svg viewBox="0 0 58 58" aria-label="First Strike, earned"><circle cx="29" cy="29" r="27" fill="#F2A93B"/><circle cx="29" cy="29" r="21" fill="none" stroke="#3B2418" stroke-width="2"/><path d="M18 40 L40 18" stroke="#3B2418" stroke-width="4" stroke-linecap="round"/><path d="M15 37 L21 43" stroke="#3B2418" stroke-width="3"/></svg>
+              <svg viewBox="0 0 58 58" aria-label="Bug Slayer, earned"><circle cx="29" cy="29" r="27" fill="#D9442B"/><ellipse cx="29" cy="31" rx="9" ry="12" fill="#F3E6CC"/><path d="M29 19 V43 M20 24 L13 20 M20 32 L12 32 M20 39 L13 43 M38 24 L45 20 M38 32 L46 32 M38 39 L45 43" stroke="#F3E6CC" stroke-width="2.5"/></svg>
+              <svg viewBox="0 0 58 58" aria-label="Seven Katas, locked: complete 7 Daily Katas"><circle cx="29" cy="29" r="26" fill="none" stroke="#B39A78" stroke-width="2" stroke-dasharray="4 4"/><ellipse cx="29" cy="29" rx="9" ry="12" fill="none" stroke="#B39A78" stroke-width="2"/></svg>
+              <svg viewBox="0 0 58 58" aria-label="Incident Commander, locked"><circle cx="29" cy="29" r="26" fill="none" stroke="#B39A78" stroke-width="2" stroke-dasharray="4 4"/><path d="M29 16 Q38 16 38 27 L40 36 L18 36 L20 27 Q20 16 29 16 Z" fill="none" stroke="#B39A78" stroke-width="2"/></svg>
+              <svg viewBox="0 0 58 58" aria-label="Kanpeki, locked"><circle cx="29" cy="29" r="26" fill="none" stroke="#B39A78" stroke-width="2" stroke-dasharray="4 4"/><circle cx="29" cy="29" r="12" fill="none" stroke="#B39A78" stroke-width="2"/></svg>
+            </div>
+          </div>
+          <div class="sect">
+            <h4>Recent</h4>
+            <div class="runs">
+              <div class="run"><span class="st">正</span><div><b>Daily Kata</b><em>Kanpeki · 7 / 7</em></div><span>+85</span></div>
+              <div class="run"><span class="st">勝</span><div><b>Blitz vs @meera</b><em>Won · 8 – 6</em></div><span>+70</span></div>
+              <div class="run"><span class="st grey">誤</span><div><b>Bug Hunt · Databases</b><em>Mada mada · 2 / 5</em></div><span>+20</span></div>
+            </div>
+          </div>
+        </div>
+        <nav class="tabs" aria-label="Main">
+          <div class="tab"><svg viewBox="0 0 28 28" fill="none" stroke="#B39A78" stroke-width="2"><path d="M2 12 L14 4 L26 12 L22 12 L22 24 L6 24 L6 12 Z"/></svg>Dojo<i class="hanko"></i></div>
+          <div class="tab"><svg viewBox="0 0 28 28" fill="none" stroke="#B39A78" stroke-width="2"><path d="M14 24 L3 10 Q14 2 25 10 Z"/><path d="M14 24 L9 6 M14 24 L14 5 M14 24 L19 6"/></svg>Explore<i class="hanko"></i></div>
+          <div class="tab"><svg viewBox="0 0 28 28" fill="none" stroke="#B39A78" stroke-width="2.2" stroke-linecap="round"><path d="M5 23 L23 5 M5 5 L23 23"/><path d="M3 19 L9 25 M19 3 L25 9 M3 9 L9 3 M19 25 L25 19"/></svg>Duel<i class="hanko"></i></div>
+          <div class="tab on"><svg viewBox="0 0 28 28"><path d="M6 8 L9 2 L12 7 L16 7 L19 2 L22 8 L20 18 L14 26 L8 18 Z" fill="#D9442B"/></svg>Profile<i class="hanko"></i></div>
+        </nav>
+      </div>
+      <p class="note">No topic accuracy. You see the warrior: mask on a banner, the rank kanji inside the ensō, four trophies (streak, duel record, katas, weekly place), crests for achievements (locked ones are dashed outlines), and recent runs stamped like a scroll.</p>
+    </div>
+
+  </div>
+
+  <!-- ================= SYSTEM ================= -->
+  <section class="sys">
+    <h2>Palette</h2>
+    <p>Warm, lamplit and dark, because Luna is played at night, on the couch, after work. Amber means "go" (buttons, XP, the lantern). Vermilion is the seal: correct answers, the active tab, the winner. It is never used for body text.</p>
+    <div class="swatches">
+      <div class="sw"><div style="background:#3B2418;border-bottom:1px solid #4A2E1F"></div><p><b>Kakishibu</b><code>#3B2418 · ground</code></p></div>
+      <div class="sw"><div style="background:#2A1910"></div><p><b>Tatami shadow</b><code>#2A1910 · bars, floor</code></p></div>
+      <div class="sw"><div style="background:#5C3A27"></div><p><b>Lacquer wood</b><code>#5C3A27 · furniture</code></p></div>
+      <div class="sw"><div style="background:#F3E6CC"></div><p><b>Washi</b><code>#F3E6CC · text · 11.7:1</code></p></div>
+      <div class="sw"><div style="background:#E9DCC0"></div><p><b>Shoji paper</b><code>#E9DCC0 · lit panels</code></p></div>
+      <div class="sw"><div style="background:#B39A78"></div><p><b>Muted wood</b><code>#B39A78 · secondary · 5.4:1</code></p></div>
+      <div class="sw"><div style="background:#F2A93B"></div><p><b>Lantern amber</b><code>#F2A93B · action, XP · dark text 8.4:1</code></p></div>
+      <div class="sw"><div style="background:#D9442B"></div><p><b>Shu vermilion</b><code>#D9442B · seals, active, correct</code></p></div>
+      <div class="sw"><div style="background:#23305C"></div><p><b>Night</b><code>#23305C · only through windows</code></p></div>
+    </div>
+  </section>
+
+  <section class="sys">
+    <h2>Type</h2>
+    <p>Dela Gothic One is chunky, arcade-like and has full kanji, so titles, scores and ranks read as a game. Source Sans 3 keeps questions calm and readable at 1.3x Dynamic Type. Code is always JetBrains Mono. Brush kanji (stamps, grades, rank-up) are drawn from Yuji Boku once and shipped as SVG, so the app never loads an 8.6 MB brush font.</p>
+    <div class="type">
+      <div class="cell">
+        <div class="lab">Display · Dela Gothic One</div>
+        <div class="d1">Kanpeki.<br>Rank up: Ronin 浪人</div>
+        <div class="d2">+85 XP</div>
+      </div>
+      <div class="cell">
+        <div class="lab">Questions & UI · Source Sans 3</div>
+        <div class="b1">Which line logs last when this runs?</div>
+        <div class="b2">The microtask queue drains before the next macrotask, so the promise callback runs before the timeout.</div>
+        <div class="lab" style="margin-top:22px">Brush stamps · Yuji Boku, baked to SVG</div>
+        <div class="brush"><span style="color:#D9442B">正</span> <span style="color:#B39A78">誤</span> 侍</div>
+      </div>
+      <div class="cell">
+        <div class="lab">Code · JetBrains Mono · Bug Hunt</div>
+<pre><span class="ln">1</span>async function saveAll(items) {
+<span class="bug"><span class="ln">2</span>  items.forEach(async (item) =&gt; {</span><span class="ln">3</span>    await db.save(item);
+<span class="ln">4</span>  });
+<span class="ln">5</span>  console.log('All saved');
+<span class="ln">6</span>}</pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="sys">
+    <h2>Motion</h2>
+    <p>Six authored moments; three are shown here. Every one has a Reduce Motion fallback (a crossfade or nothing), and haptics ride on the strike, the relight and the duel reveal.</p>
+    <div class="motion">
+      <div class="mo"><h3>Hanko strike</h3><p>Every answer. The seal drops from 1.5× onto the paper and the ink bleeds. 正 in red ink means correct, as on Japanese answer sheets.</p><div class="stage"><div class="bleed"></div><div class="stamp">正</div></div></div>
+      <div class="mo"><h3>Lantern relight</h3><p>When the streak grows. Amber fills the paper from the bottom and the new number cuts itself in.</p><div class="stage"><div class="lan"><div class="cap t"></div><div class="body"><div class="fill"></div><div class="rib" style="top:30%"></div><div class="rib" style="top:55%"></div><div class="rib" style="top:78%"></div></div><div class="num"><i>4</i><i>5</i></div><div class="cap b"></div></div></div></div>
+      <div class="mo"><h3>Coming home</h3><p>On opening the app. The shoji slide apart onto the night and the moon, then the den settles.</p><div class="stage"><div class="behind"><svg width="80" height="80" viewBox="0 0 80 80"><circle cx="40" cy="40" r="26" fill="#F3E6CC"/><circle cx="52" cy="32" r="24" fill="#23305C"/></svg></div><div class="shoji"><div class="panel l"></div><div class="panel r"></div></div></div></div>
+    </div>
+  </section>
+
+  <section class="sys">
+    <h2>Rules that keep it from turning into slop again</h2>
+    <div class="rules">
+      <ul class="do">
+        <h3>Do</h3>
+        <li>One line of copy per element. Objects and numbers before words.</li>
+        <li>One amber action per screen. Everything else is secondary.</li>
+        <li>Build scenes from 3–4 flat paper layers with real depth (offset shapes), lit from one warm source.</li>
+        <li>Give unequal things unequal weight: the boss fight gets a stage, the kata gets the table.</li>
+        <li>Every press reacts: the icon sinks 2 pt, a haptic fires, nothing ever ripples grey.</li>
+      </ul>
+      <ul class="dont">
+        <h3>Don't</h3>
+        <li>No cards on the main screens, and never a card inside a card.</li>
+        <li>No progress bars or percentages. The ensō, the lantern and stamps carry progress.</li>
+        <li>No glows, gradients or neon. Light is a flat, lighter paper shape.</li>
+        <li>No emoji as icons, and no generic icon set. Every icon is a cut-paper object from the den.</li>
+        <li>No paragraphs outside the answer explanation, and that one starts collapsed.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>Luna design preview · Kiri-e Den · light and dark is fixed to the use scene (night play at home), so there is no light-mode toggle. Fonts load from Google Fonts here; the app loads the same faces through @expo-google-fonts.</footer>
+</div>
+</body>
+</html>

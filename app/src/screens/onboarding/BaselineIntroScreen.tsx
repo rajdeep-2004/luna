@@ -16,18 +16,18 @@ export function BaselineIntroScreen({ navigation }: Props) {
   return (
     <Screen>
       <View style={styles.body}>
-        <AppText variant="label" color="moon">
+        <AppText variant="label" color="primary">
           Before your first kata
         </AppText>
         <AppText variant="title">One quick check?</AppText>
-        <AppText color="textSoft">
+        <AppText color="text">
           Five beginner questions, one per topic, about two minutes. There&apos;s no XP and no wrong
           way to do it: it only tunes where each topic starts for you.
         </AppText>
       </View>
       <View style={styles.actions}>
         {error ? (
-          <AppText color="emberSoft" accessibilityRole="alert">
+          <AppText color="primary" accessibilityRole="alert">
             {error}
           </AppText>
         ) : null}

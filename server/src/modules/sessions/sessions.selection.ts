@@ -1,4 +1,4 @@
-import { TOPIC_SLUGS, type TopicSlug } from '@luna/shared';
+import { TOPIC_SLUGS, type PracticeMode, type TopicSlug } from '@luna/shared';
 import { AnswerAttemptModel } from '../../models/AnswerAttempt';
 import type { ChallengeDoc } from '../../models/Challenge';
 import { AppError } from '../../lib/errors';
@@ -35,14 +35,19 @@ function rank(pool: ChallengeDoc[], seen: Set<string>, difficulty: number): Chal
     .map((x) => x.c);
 }
 
-/** Topic Practice: up to one due revisit, then the best-ranked fresh picks (progression.md §5). */
+/**
+ * Topic Practice: up to one due revisit, then the best-ranked fresh picks (progression.md §5).
+ * With a `mode` it is a mode round (D-039): only that challenge kind, this topic's first, then
+ * topped up to the round size from the same kind in other topics, so a thin topic still fills.
+ */
 export async function pickPractice(
   userId: string,
   topicSlug: TopicSlug,
   timezone: string,
+  mode?: PracticeMode,
 ): Promise<PickedItem[]> {
   const [pool, seen, difficulty, revisitIds] = await Promise.all([
-    challengesRepo.findActive({ topicSlug, type: { $ne: 'INCIDENT' } }),
+    challengesRepo.findActive(mode ? { type: mode } : { topicSlug, type: { $ne: 'INCIDENT' } }),
     seenIds(userId),
     getDifficulty(userId, topicSlug),
     dueRevisits(userId, {
@@ -52,17 +57,35 @@ export async function pickPractice(
       limit: REVISIT.perPractice,
     }),
   ]);
-  if (pool.length === 0) throw new AppError('NOT_FOUND', 'No challenges for this topic yet');
-  const revisits = pool.filter((c) => revisitIds.includes(c._id.toString()));
-  const rest = rank(
-    pool.filter((c) => !revisits.includes(c)),
+  const inTopic = pool.filter((c) => c.topicSlug === topicSlug);
+  if (inTopic.length === 0)
+    throw new AppError('NOT_FOUND', 'No challenges of this kind in this topic yet');
+  const revisits = inTopic.filter((c) => revisitIds.includes(c._id.toString()));
+  const ownPicks = rank(
+    inTopic.filter((c) => !revisits.includes(c)),
     seen,
     difficulty,
-  ).slice(0, SESSION.practiceSize - revisits.length);
+  );
+  const others = mode
+    ? rank(
+        pool.filter((c) => c.topicSlug !== topicSlug),
+        seen,
+        difficulty,
+      )
+    : [];
+  const rest = [...ownPicks, ...others].slice(0, SESSION.practiceSize - revisits.length);
   return [...revisits.map((challenge) => ({ challenge, isRevisit: true })), ...rest.map(fresh)];
 }
 
-export async function pickIncident(userId: string, challengeId?: string): Promise<PickedItem[]> {
+/**
+ * An Incident Room run. `challengeId` replays a chosen incident; `topicSlug` picks that topic's boss
+ * (unseen first, D-039), falling back to any incident when the topic has none yet.
+ */
+export async function pickIncident(
+  userId: string,
+  challengeId?: string,
+  topicSlug?: TopicSlug,
+): Promise<PickedItem[]> {
   if (challengeId) {
     const c = await challengesRepo.findById(challengeId);
     if (!c || c.type !== 'INCIDENT' || !c.isActive)
@@ -73,7 +96,8 @@ export async function pickIncident(userId: string, challengeId?: string): Promis
     challengesRepo.findActive({ type: 'INCIDENT' }),
     seenIds(userId),
   ]);
-  const first = rank(pool, seen, 1)[0];
+  const inTopic = topicSlug ? pool.filter((c) => c.topicSlug === topicSlug) : [];
+  const first = rank(inTopic.length ? inTopic : pool, seen, 1)[0];
   if (!first) throw new AppError('NOT_FOUND', 'No incidents available');
   return [fresh(first)];
 }

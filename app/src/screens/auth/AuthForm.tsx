@@ -30,10 +30,10 @@ export function AuthForm({
         style={styles.flex}
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <AppText variant="title">{title}</AppText>
+          <AppText variant="display">{title}</AppText>
           <View style={styles.fields}>{children}</View>
           {formError ? (
-            <AppText color="emberSoft" accessibilityRole="alert">
+            <AppText color="primary" accessibilityRole="alert">
               {formError}
             </AppText>
           ) : null}

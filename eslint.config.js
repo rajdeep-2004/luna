@@ -13,4 +13,10 @@ export default tseslint.config(
       'no-console': 'error',
     },
   },
+  {
+    // Dev-only Node scripts (e.g. the kanji bake, D-039): Node globals, and they report to the terminal.
+    files: ['app/scripts/**/*.mjs'],
+    languageOptions: { globals: { console: 'readonly', process: 'readonly' } },
+    rules: { 'no-console': 'off' },
+  },
 );

@@ -26,6 +26,12 @@
       "package": "com.rajdeep.luna",
       "versionCode": 1
     },
-    "plugins": ["expo-font", "expo-secure-store"]
+    "plugins": ["expo-font", "expo-secure-store"],
+    "extra": {
+      "eas": {
+        "projectId": "e681eac5-a07a-4ecf-b08a-ba3179567582"
+      }
+    },
+    "owner": "rajdeep_04"
   }
 }

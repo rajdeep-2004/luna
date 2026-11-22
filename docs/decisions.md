@@ -453,3 +453,122 @@ The reviewer reported 1 question and 7 medium risks, and no critical or high one
   confuse real users who forgot they signed up.
 
 ---
+
+### D-019 — App scaffold: Expo SDK 58 in the `app` workspace, theme tokens in one folder
+- **Date:** 2026-11-22 · **Step:** P2 task 1 · **Status:** Active · **Type:** technical
+
+**Context.** P2 starts the mobile app. We needed a project that runs in Expo Go, shares the Zod
+types in `shared/`, and keeps every colour, size and font in one place so screens never hardcode them.
+
+**Decision.** `app/` is a new npm workspace (`@luna/app`) on the latest stable Expo SDK (58, React
+Native 0.88, React 19.3). It was created from the `blank-typescript` template and then trimmed by hand,
+because the template's own `package.json` and git folder do not fit a monorepo. Theme tokens
+live in `app/src/theme/` (`colors`, `spacing`, `typography`, `fonts`) and mirror `ui-design.md`
+exactly. `ui-design.md` already says values live there "and nowhere else".
+
+**Dependencies added, and why.** `expo-font` plus the three `@expo-google-fonts/*` packages load
+Shippori Mincho, Inter and JetBrains Mono (the design system's fonts). `react-native-svg` draws the
+moon phases and yokai masks as vectors. `react-native-reanimated` and `react-native-worklets`
+power the motion in `ui-design.md` §6 (used from P3). `expo-haptics` gives the tap feedback.
+`expo-secure-store` keeps the login token in the phone's keychain, not in plain storage.
+`@react-navigation/*` with `react-native-screens` and `react-native-safe-area-context` is the
+navigation stack chosen in D-003. `@tanstack/react-query` handles server state and `zustand` the
+small auth store. The device timezone for the streak logic comes from the built-in `Intl` API, so no extra package is needed.
+
+**Alternatives rejected.** Expo Router (already rejected in D-003). A bare React Native project
+(needs native build tooling; Expo Go avoids it). A custom `babel.config.js`: SDK 58's default preset
+already includes the Reanimated plugin, so we ship none.
+
+**How it works.** Fonts are loaded with `useFonts` and the app renders nothing until they are ready,
+so there is no flash of the wrong font. Spacing, radii and type roles are plain objects, so a screen
+writes `typography.title` instead of repeating a font size.
+
+**Files.** `app/*`, `package.json` (workspace added), `docs/prd.md` (P2 → building).
+**Concepts.** npm workspaces + Metro monorepo resolution; Expo Go vs. development builds.
+**Revisit if** a feature needs a native module Expo Go does not ship (then switch to a dev build).
+
+### D-020 — Core UI components: small, token-only, accessible by default
+- **Date:** 2026-11-22 · **Step:** P2 task 2 · **Status:** Active · **Type:** technical
+
+**Decision.** Twelve components live in `app/src/components/` (Screen, Button, TextField, Card,
+ProgressLine, MoonPhase, YokaiAvatar, Lantern, EmptyState, ErrorState, WakingServer, plus an `AppText`
+wrapper). None hardcodes a colour, size or font: they read `src/theme`. `AppText` takes a `variant`
+(not `role`, which React Native's own `Text` already uses for accessibility) and caps Dynamic Type at 1.3x.
+
+**Edge cases handled.** `Button` ignores taps while `pending` (the double-submit rule) and exposes
+`busy`/`disabled` to screen readers. `ProgressLine` clamps its value to 0..1 and treats NaN as 0.
+`TextField` shows its error in a live region. Moons and avatars are SVG, so they stay sharp at any size.
+
+**Alternatives rejected.** A UI kit such as React Native Paper: it would bring its own look and fight the
+"calm night, one moon" design. Bitmap avatars: heavier and blurry when scaled.
+
+**Revisit if** the masks need to be redrawn by a designer. Each is one entry in `YokaiAvatar.tsx`.
+
+### D-021 — API client, auth store and the cold-start notice
+- **Date:** 2026-11-22 · **Step:** P2 task 3 · **Status:** Active · **Type:** technical
+
+**Decision.** `app/src/api/client.ts` is a thin wrapper over `fetch`. It sets a 15 s timeout,
+unwraps the `{ data }` / `{ error }` envelope into either a value or an `ApiError`, and retries
+**GET requests only**, twice, with 500 ms then 1 s backoff, and only for transient failures (network,
+timeout, 503, 5xx gateway). POSTs and PATCHes are never replayed automatically, as `architecture.md` §9
+says. A 401 on an authenticated call signs the user out.
+
+**Cold start.** Render's free tier sleeps and wakes in about 30 s. If a request is still pending after
+4 s, a small Zustand store flips `waking` to true and the UI shows the `WakingServer` notice, so the
+user sees an explanation instead of a frozen screen. A counter handles several slow requests at once.
+
+**Auth store.** Zustand holds `status`, `token` and `user`. The token is saved with `expo-secure-store`
+(the phone's keychain), never AsyncStorage. On launch `hydrate()` reads the token and calls
+`GET /users/me`: a 401 signs out; a network failure sets `error` and offers Retry instead of logging
+the user out because their train had no signal. The client and store connect through `configureApi`, which
+avoids a circular import. Logout also clears the React Query cache so the next user never sees old data.
+
+**Config.** `src/config/env.ts` is the only file that reads `process.env`, mirroring the server's rule.
+It fails fast with a clear message when `EXPO_PUBLIC_API_URL` is missing. `.env.example` documents it.
+
+**Alternatives rejected.** Axios (extra dependency for what `fetch` does). Retrying POSTs (risks
+duplicates; server idempotency exists but the user should choose). Storing the token in AsyncStorage (unencrypted).
+**Revisit if** the JWT expiry (7 days, no refresh token) annoys testers; then add refresh tokens.
+
+### D-022 — Navigation, auth and onboarding screens
+- **Date:** 2026-11-22 · **Step:** P2 tasks 4–5 · **Status:** Active · **Type:** product + technical
+
+**Decision.** `RootNavigator` chooses what to show from the auth store: a spinner while the saved
+token is checked, an `ErrorState` with Retry if the server was unreachable, `AuthStack` (Welcome,
+Register, Login) when signed out, `OnboardingStack` (Avatar, Topics, Level) when signed in but
+`onboarded` is false, and `MainTabs` (Dojo, Explore, Duel, Profile) otherwise. The stack is *swapped*
+rather than pushed, so a finished user cannot press Back into onboarding, and logging out drops them
+straight onto Welcome. Onboarding is "resumable" for free: if the app is closed halfway, `onboarded` is
+still false on the server and the user lands on the same flow.
+
+**Product deviation: no separate username step.** `build-plan.md` lists username as an onboarding step, but
+the register endpoint already requires a username (and validates it is unique), so asking again would be
+redundant friction. The username is collected on Register, and onboarding has three steps: avatar, topics,
+level. Fewer steps before the first challenge supports the activation goal in `prd.md`.
+
+**How the forms work.** Inputs are validated on the device with the same Zod schemas the server uses
+(`RegisterRequest`, `LoginRequest` from `shared/`), so error text is identical and never drifts. Server
+errors (wrong password, email taken, locked account, rate limit) show in one message above the button. The
+submit button shows a spinner and ignores taps while the request is in flight. The three onboarding answers
+are kept in a small Zustand draft store and sent in one `PATCH /users/me` on the last step, with the
+device timezone and `completeOnboarding: true`. Success updates the auth store, and the root navigator
+swaps to the tabs by itself.
+
+**Tabs.** Dojo, Explore and Duel are `EmptyState` placeholders that show the user's avatar, name and
+lantern so P2 auth can be checked by eye. Profile has a Log out button. Tab icons are left out on purpose
+(labels only) to avoid an icon dependency; they can be added when the real screens land.
+
+**Alternatives rejected.** Collecting onboarding answers across separate API calls (a half-finished profile
+would be possible). Expo Router (D-003).
+**Files.** `app/App.tsx`, `app/src/navigation/*`, `app/src/screens/*`, `app/src/store/onboarding.ts`, `app/src/lib/*`.
+**Concepts.** Conditional navigators (auth flow pattern in React Navigation); controlled inputs; schema reuse across client and server.
+**Revisit if** testers want to change avatar or topics later; that belongs in the Profile screen (P5).
+
+### D-023 — P2 closed after manual test
+- **Date:** 2026-11-22 · **Step:** P2 — manual review · **Status:** Active · **Type:** process
+
+Rajdeep clicked through the P2 checklist in Expo Go and approved it. The only problem found was that the
+app showed "Cannot reach the server" because the API was not reachable on the configured port. After
+the port setting was corrected, register and onboarding worked. This was setup, not a code bug.
+Native Expo Go requests send no `Origin` header, so CORS only matters for Expo web. As P2 is frontend-only,
+no automated review ran, following the project rules. P2 is marked `shipped` in `prd.md` and merged into `main`.

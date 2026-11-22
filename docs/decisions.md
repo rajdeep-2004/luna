@@ -453,3 +453,36 @@ The reviewer reported 1 question and 7 medium risks, and no critical or high one
   confuse real users who forgot they signed up.
 
 ---
+
+### D-019 — App scaffold: Expo SDK 58 in the `app` workspace, theme tokens in one folder
+- **Date:** 2026-11-22 · **Step:** P2 task 1 · **Status:** Active · **Type:** technical
+
+**Context.** P2 starts the mobile app. We needed a project that runs in Expo Go, shares the Zod
+types in `shared/`, and keeps every colour, size and font in one place so screens never hardcode them.
+
+**Decision.** `app/` is a new npm workspace (`@luna/app`) on the latest stable Expo SDK (58, React
+Native 0.88, React 19.3). It was created from the `blank-typescript` template and then trimmed by hand,
+because the template's own `package.json` and git folder do not fit a monorepo. Theme tokens
+live in `app/src/theme/` (`colors`, `spacing`, `typography`, `fonts`) and mirror `ui-design.md`
+exactly. `ui-design.md` already says values live there "and nowhere else".
+
+**Dependencies added, and why.** `expo-font` plus the three `@expo-google-fonts/*` packages load
+Shippori Mincho, Inter and JetBrains Mono (the design system's fonts). `react-native-svg` draws the
+moon phases and yokai masks as vectors. `react-native-reanimated` and `react-native-worklets`
+power the motion in `ui-design.md` §6 (used from P3). `expo-haptics` gives the tap feedback.
+`expo-secure-store` keeps the login token in the phone's keychain, not in plain storage.
+`@react-navigation/*` with `react-native-screens` and `react-native-safe-area-context` is the
+navigation stack chosen in D-003. `@tanstack/react-query` handles server state and `zustand` the
+small auth store. `expo-localization` supplies the device timezone for the streak logic.
+
+**Alternatives rejected.** Expo Router (already rejected in D-003). A bare React Native project
+(needs native build tooling; Expo Go avoids it). A custom `babel.config.js`: SDK 58's default preset
+already includes the Reanimated plugin, so we ship none.
+
+**How it works.** Fonts are loaded with `useFonts` and the app renders nothing until they are ready,
+so there is no flash of the wrong font. Spacing, radii and type roles are plain objects, so a screen
+writes `typography.title` instead of repeating a font size.
+
+**Files.** `app/*`, `package.json` (workspace added), `docs/prd.md` (P2 → building).
+**Concepts.** npm workspaces + Metro monorepo resolution; Expo Go vs. development builds.
+**Revisit if** a feature needs a native module Expo Go does not ship (then switch to a dev build).

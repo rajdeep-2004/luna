@@ -1005,3 +1005,14 @@ win-bonus cap and both cursors. It raised three findings, all fixed:
    for it before building the summary.
 
 Full API suite after the fixes: 55 tests, all passing.
+
+---
+
+### D-034 — P5 accepted and merged
+- **Date:** 2026-11-22 · **Step:** P5 — manual review · **Status:** Active · **Type:** process
+
+Rajdeep tested P5 (Duel tab, duel play and result, Dojo Board, Profile, achievements) and accepted it with no
+changes. The assumptions in D-032 (forfeit in both directions with no bonus, Incident Commander counting Daily
+Katas, no feedback sheet in duels) stand as built. P5 is marked `shipped` in `prd.md` and merged into `main`
+with `--no-ff`. Reminder carried forward: run `npm run seed -w server` once against each existing database so
+the new duel and history indexes are built. Next is P6: deploy, polish and demo prep.

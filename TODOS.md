@@ -17,6 +17,7 @@ Backlog, deferred ideas and known debt. Scope changes go here first; nothing her
 - Move `.scratch/api-tests` into the repo if the course requires visible tests (D-002).
 
 ## Product backlog (from docs/product/)
+- **Visual and micro-interaction polish pass after V1** (Rajdeep: "looks boring"). Session, feedback and summary screens are functional but plain. Fits the P6 polish task: livelier copy, richer motion, petals, rank-up banner, tab icons.
 - **Grow the question bank.** V1's 50 + 8 items run out of new content after ~12 days of daily play (game-modes.md §5). This is the first post-V1 priority.
 - Streak freeze (progression.md §6).
 - Daily leaderboard and promotion/relegation leagues, once there are about 30+ active users per group (competition.md).

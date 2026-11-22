@@ -621,3 +621,13 @@ new moon for every topic because mastery phases arrive in P4. The petals and the
 the OS Reduce Motion setting.
 **Revisit if** the first-correct-XP rule makes repeat practice feel unrewarding, or testers lose their Incident
 root cause on resume.
+
+### D-025 — P3 accepted; visual polish deferred to after V1
+- **Date:** 2026-11-22 · **Step:** P3 — manual review · **Status:** Active · **Type:** product
+
+Rajdeep reviewed P3 in Expo Go. The Explore page was approved as is. The feedback was that the game screens
+look plain (UI and copy). Decision: do not polish now. The point of V1 is the complete loop (progression,
+daily kata, duels, profile), and polish is cheaper and better judged once every screen exists, so the
+whole app can be given one consistent set of micro-interactions. The idea is logged in `TODOS.md` and
+belongs to the P6 polish pass. This is a deliberate trade-off: function first, delight second, with a date
+on the second. P3 is marked `shipped` in `prd.md` and merged into `main`.

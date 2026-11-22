@@ -2,27 +2,29 @@
   "expo": {
     "name": "Luna",
     "slug": "luna",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "backgroundColor": "#0A0D1A",
+    "backgroundColor": "#3B2418",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0A0D1A"
+      "backgroundColor": "#3B2418"
     },
     "ios": {
       "supportsTablet": false
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0A0D1A",
+        "backgroundColor": "#3B2418",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.rajdeep.luna",
+      "versionCode": 1
     },
     "plugins": ["expo-font", "expo-secure-store"]
   }

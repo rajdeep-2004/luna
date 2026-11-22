@@ -1434,3 +1434,30 @@ the crash. The other points checked out: validation at the boundary (`mode`, `fo
 updates, bounded indexed counts, and no `answerKey` in any new response. Accepted as they are: Blitz's clock
 includes the client's short verdict and refetch time, as in Classic. Classic duels now fall back to any kind
 when a slot's kind runs out, where they used to fail.
+
+### D-044 — Ship V1 as an Android APK through EAS Build
+
+**Context.** Rajdeep asked to release an APK so people can install Luna without Expo Go. The delivery setup
+said "Expo Go, no store builds". This Mac has no Android SDK, and its Java (25) is newer than the Android
+Gradle toolchain supports.
+
+**Decision.** Build with **EAS Build** (Expo's cloud build service, free tier), using an `apk` profile in
+`app/eas.json` (`buildType: apk`, internal distribution). The profile sets `EXPO_PUBLIC_API_URL` to the
+production Render API, because Expo inlines `EXPO_PUBLIC_*` values at build time. It is a public URL, not a
+secret. EAS generates and stores the Android signing keystore. The APK is attached to a GitHub Release
+(`v1.0.0`). App identity: `com.rajdeep.luna`, version `1.0.0`, versionCode 1.
+
+Before release, the Expo template icon was replaced with a Luna icon, generated from the baked brush kanji:
+月 in washi on dojo brown with a vermilion 道 seal. This covers the adaptive foreground, background and
+monochrome layers and the splash image. The launch and splash background moved from the old navy to the
+Kiri-e Den ground colour.
+
+**Alternatives rejected.** A local Gradle build: it needs the Android SDK (several GB) and a second JDK,
+installed only for this. A Play Store release: it needs a developer account, a review and a privacy policy,
+which is out of V1 scope.
+
+**Trade-offs.** EAS keeps the signing key, so future updates must also be built by EAS (or the key exported
+first). Sideloading needs "install unknown apps" on the phone. A free Render cold start still applies on the
+first open.
+
+**Revisit** for a Play Store release (switch to an `.aab` build and a production profile).

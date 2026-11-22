@@ -10,7 +10,7 @@
 2. Build, one commit per task (conventional commits). Before each commit: `npm run lint`,
    `npm run typecheck`, and for backend work the API tests in `.scratch/api-tests/` (gitignored).
 3. **Check:**
-   - Backend phases (P1, P3, P5 server part, P6 server part): **one backend code review** of the
+   - Backend phases (P1, and the server part of P4 and P5): **one backend code review** of the
      branch diff. Fix critical and high findings.
    - Frontend phases: no automated UI reviewer on backend code. Claude gives Rajdeep a click-through
      checklist and Rajdeep tests on Expo Go.
@@ -28,20 +28,20 @@
 | POST | `/auth/login` | — | P1 | return token + user |
 | GET | `/users/me` | ✓ | P1 | current profile |
 | PATCH | `/users/me` | ✓ | P1 | onboarding: username, avatarId, preferredTopicIds, experienceLevel, timezone |
-| GET | `/topics` | ✓ | P3 | topic list |
-| POST | `/sessions` | ✓ | P3 | start PRACTICE (`topicId`) or BASELINE session → challenges without answer keys |
-| GET | `/sessions/:id` | ✓ | P3 | resume a session (items, answered state) |
-| POST | `/sessions/:id/answers` | ✓ | P3 | submit an answer (`challengeId`, `stageIndex?`, `answer`) → evaluation + next stage |
-| POST | `/sessions/:id/complete` | ✓ | P3 | finish → summary (idempotent) |
-| GET | `/daily` | ✓ | P5 | today's circuit (creates it once) + its session |
-| GET | `/users/me/progress` | ✓ | P5 | XP, level, streaks, per-topic mastery, weakest topic, recommendation |
-| GET | `/users/me/sessions` | ✓ | P6 | paginated session history |
-| GET | `/users/me/achievements` | ✓ | P6 | earned and locked achievements |
-| GET | `/leaderboard/weekly` | ✓ | P6 | `?cursor=&limit=` ranking + `me` row |
-| POST | `/duels` | ✓ | P6 | create duel → code + creator session |
-| POST | `/duels/:code/join` | ✓ | P6 | join → opponent session |
-| GET | `/duels/:id` | ✓ | P6 | status (participants only) |
-| GET | `/duels/:id/result` | ✓ | P6 | scores + winner once both are done |
+| GET | `/topics` | ✓ | P1 | topic list |
+| POST | `/sessions` | ✓ | P1 | start PRACTICE (`topicId`) or BASELINE session → challenges without answer keys |
+| GET | `/sessions/:id` | ✓ | P1 | resume a session (items, answered state) |
+| POST | `/sessions/:id/answers` | ✓ | P1 | submit an answer (`challengeId`, `stageIndex?`, `answer`) → evaluation + next stage |
+| POST | `/sessions/:id/complete` | ✓ | P1 | finish → summary (idempotent) |
+| GET | `/daily` | ✓ | P4 | today's circuit (creates it once) + its session |
+| GET | `/users/me/progress` | ✓ | P4 | XP, level, streaks, per-topic mastery, weakest topic, recommendation |
+| GET | `/users/me/sessions` | ✓ | P5 | paginated session history |
+| GET | `/users/me/achievements` | ✓ | P5 | earned and locked achievements |
+| GET | `/leaderboard/weekly` | ✓ | P5 | `?cursor=&limit=` ranking + `me` row |
+| POST | `/duels` | ✓ | P5 | create duel → code + creator session |
+| POST | `/duels/:code/join` | ✓ | P5 | join → opponent session |
+| GET | `/duels/:id` | ✓ | P5 | status (participants only) |
+| GET | `/duels/:id/result` | ✓ | P5 | scores + winner once both are done |
 
 Changes from the brainstorm: endpoints are versioned under `/api/v1`. `POST /sessions/:id/answer`
 became `/answers`. `GET /challenges/daily` became `GET /daily`, because it returns a circuit plus a
@@ -54,54 +54,47 @@ session, not a challenge. `PATCH /users/me` was added for onboarding. See D-009.
 - [x] Move `luna-idea.md` into `docs/` unchanged.
 - [x] Product design spec in `docs/product/` (approved).
 
-## P1 — Backend foundation and auth  *(backend review)*
-1. Root npm workspaces (`app`, `server`, `shared`), shared ESLint + Prettier + tsconfig base, root scripts `lint`, `typecheck`.
-2. `shared/`: Zod schemas for auth requests/responses and the envelope types.
-3. `server/` skeleton: config (Zod env parsing), pino logger, requestId, helmet, cors, JSON body limit (100 kb),
-   error envelope + `AppError`, 404 handler, `/health` with DB ping, graceful shutdown.
-4. Mongo connection (timeouts, retry on boot) + `User` model with indexes.
-5. Auth module: register, login (bcrypt, JWT), `requireAuth`, rate limits, `GET/PATCH /users/me`.
-6. `.scratch/api-tests/` harness (MongoMemoryReplSet + Supertest) with auth tests: happy path, duplicate
-   email/username, bad password, rate limit, missing/expired token, no passwordHash in responses.
+## P1 — Backend core: foundation, auth, content, challenge engine  *(backend review)*
+Lean backend (D-015): correct where it matters, without the extra hardening.
+1. Root npm workspaces (`app`, `server`, `shared`), ESLint + Prettier + tsconfig base, root `lint` and `typecheck` scripts.
+2. `shared/`: Zod schemas + types for the auth, topics, sessions and answers contracts, plus the envelope.
+3. `server/` skeleton: config (Zod env), pino, helmet, cors, JSON limit, error envelope + `AppError`, 404, `/health`.
+4. Mongo connection + models: User, Topic, Challenge (incl. incident stages), Session, AnswerAttempt, XpEvent, UserTopicProgress.
+5. Auth: register, login (bcrypt + JWT), `requireAuth`, rate limit on `/auth/*`, `GET/PATCH /users/me`.
+6. Question bank: 5 topics, 50 single challenges + 8 incidents (`docs/product/game-modes.md` §5), with an idempotent seed.
+7. Session engine: start PRACTICE / INCIDENT / BASELINE, submit answer (server evaluation, public projection without answer keys,
+   unique attempt index, first-correct XP ledger), complete (idempotent summary).
+8. `.scratch/api-tests/` smoke tests: auth happy path + duplicate, answer key never in responses, double submit → 409, XP not awarded twice.
 
-## P2 — App foundation, auth and onboarding UI  *(manual test)*
-1. Expo app (TypeScript) in `app/`, wired to `shared/`. Theme tokens and base components (Button with pending/disabled state, TextField with label + error, Card, Loading, ErrorState with Retry).
-2. API client: base URL from `EXPO_PUBLIC_API_URL`, 15 s timeout, GET retry with backoff, envelope parsing, typed errors, "waking server" detection.
-3. Auth store (Zustand + SecureStore) and React Navigation: `RootNavigator` switches AuthStack / OnboardingStack / MainTabs (Home, Explore, Leaderboard, Profile) on auth + onboarding state.
-4. Screens: Welcome, Register, Login (validation, double-submit protection, server error messages), Logout.
-5. Onboarding: username, preset avatar grid, preferred topics, experience level, timezone captured from the device. Placeholder tab screens.
+## P2 — App foundation, design system, auth and onboarding UI  *(manual test)*
+1. Expo app (TypeScript) in `app/`, wired to `shared/`. Fonts (Shippori Mincho, Inter, JetBrains Mono), theme tokens from `docs/product/ui-design.md`.
+2. Core components: Screen, Button, TextField, Card, ProgressLine, MoonPhase, YokaiAvatar (8 masks), Lantern, EmptyState, ErrorState, WakingServer.
+3. API client (timeout, GET retry, envelope parsing, cold-start detection) + TanStack Query + auth store (Zustand + SecureStore).
+4. React Navigation: RootNavigator → AuthStack / OnboardingStack / MainTabs (Dojo, Explore, Duel, Profile).
+5. Screens: Welcome, Register, Login, onboarding (username, avatar, topics, level), placeholder tabs.
 
-## P3 — Content and challenge engine API  *(backend review)*
-1. `Topic` + `Challenge` models (incl. incident `stages`) and a public projection that strips `answerKey` everywhere.
-2. Question bank in `server/src/seed/content/`: 5 topics, **≥50 challenges** (≥10 per topic, all 3 difficulties, all 4 types) + **≥4 Incident Room scenarios** (3 stages each). Content is validated against a Zod schema at seed time. Seed is idempotent (upsert by `slug`).
-3. Session service: start PRACTICE (5 challenges for a topic at the user's difficulty) and BASELINE (1 beginner per topic).
-4. Answer evaluation: per type (option id, bug line number, incident stage option). Server-measured time, unique attempt index, transaction, incident stage reveal.
-5. Complete session: idempotent, summary (correct, accuracy, time, per-topic results, weak areas).
-6. API tests: answer key never leaks (deep-scan responses), double submit → 409, wrong session owner → 404, incident stage order enforced, complete twice → same summary.
+## P3 — Game UI  *(manual test)*
+1. Explore: 5 topic moons → Topic Practice. Solo Incident Room entry.
+2. Challenge screen shell (progress line, leave, resume via `GET /sessions/:id`), OptionRow, CodeBlock/CodeLine.
+3. Modes: Trace, Bug Hunt, Engineer's Choice, Incident Room (stages, evidence reveal, Incident Report).
+4. Feedback sheet (stamp, XP count-up, explanation, misconception), haptics, Reduce Motion support.
+5. Session summary (grade moon, per-topic rows, revisits). Error, empty and offline states.
 
-## P4 — Game UI  *(manual test)*
-1. Explore screen: 5 topic cards → start a practice session.
-2. Game screen shell: title, difficulty, progress (n/5), optional timer, hint, resume after an app restart (`GET /sessions/:id`).
-3. Challenge components: `TraceChallenge`, `BugHuntChallenge` (tappable code lines, monospace, horizontal scroll), `ChoiceChallenge`, `IncidentChallenge` (stage stepper, evidence panel, incident report).
-4. Feedback screen: correct/incorrect, correct answer, explanation, misconception, XP, Next. Submit button disabled while in flight.
-5. Session summary screen. Error, empty and offline states throughout.
+## P4 — Progression  *(backend review for the server part, manual test for the UI)*
+1. Server: level calculation, bonuses (Kata, perfect, first incident, streak milestones), streak manager (timezone).
+2. Server: mastery phases, adaptive difficulty, revisit queue, weakest topic, `GET /users/me/progress`.
+3. Server: Daily Kata (`GET /daily`, unique per user per day, composition, fallbacks), baseline effect, Checkpoint session.
+4. UI: Dojo home (moon, Begin kata, weakest blade), rank-up moment, lantern, baseline step in onboarding, Checkpoint card.
+5. Smoke tests: streak (same day, next day, gap), daily kata created once, XP bonus once.
 
-## P5 — Progression  *(backend review for the server part, manual test for the UI)*
-1. XP ledger (`xpevents`), level thresholds, first-completion rule, daily bonus, first-incident bonus.
-2. Streak manager (timezone-aware) + tests: same day, next day, gap, timezone edge, double complete.
-3. Topic progress: mastery labels, adaptive difficulty (last 5), weakest topic, mistake revisiting queue.
-4. Daily Kata service + `GET /daily` (unique per user per day, composition, personalisation, fallbacks) + tests incl. concurrent first open.
-5. `GET /users/me/progress`. Baseline sets the initial difficulty per topic. Checkpoint session (F-25). Revisit queue.
-6. UI: Home dashboard (all F-03 widgets), Start Daily Kata, baseline step at the end of onboarding, streak/XP updates on the summary.
+## P5 — Competition and profile  *(backend review for the server part, manual test for the UI)*
+1. Server: Dojo Board (weekly aggregation, pagination, `me` row, last week's top 3), achievements, session history.
+2. Server: Duels (create + code, atomic join, not your own, expiry/forfeit, result, win bonus cap).
+3. UI: Dojo Board, Duel tab (create/share, join by code, list tabs, waiting), Duel Result (clash animation), Profile.
+4. Smoke tests: duel join race (only one opponent), non-participant → 404, tie-break by time.
 
-## P6 — Competition and profile  *(backend review for the server part, manual test for the UI)*
-1. Weekly leaderboard aggregation (paginated + `me` row, tier = level title) + tests (week boundary, ties).
-2. Duels: create (code generation), join (atomic, not your own, not expired), DUEL sessions, result + tests (join race, expiry, tie-break by time, non-participant → 404).
-3. Achievements engine (5 badges, awarded once) + session history endpoint.
-4. UI: Leaderboard tab, Duel create/share (`Share` API)/join/waiting/result screens, Profile (stats, topic table, achievements, recent activity).
-
-## P7 — Polish, deploy and demo prep  *(manual test)*
-1. Deploy the API to Render + Atlas prod DB. Run the seed on prod. Verify `/health`.
-2. App polish: transitions, haptics on answer, accessibility labels, contrast check, small-screen layout.
-3. Network failure pass: airplane mode, Render cold start, token expiry → back to login.
-4. Run the full acceptance checklist (PRD acceptance criteria 1–12) with two accounts. Write `README.md` with setup + demo script.
+## P6 — Polish, deploy and demo prep  *(manual test)*
+1. Deploy the API to Render + Atlas prod. Seed prod. Check `/health`.
+2. Motion and polish pass against `ui-design.md` §6, accessibility labels, small-screen check.
+3. Network failure pass: airplane mode, Render cold start, token expiry → login.
+4. Full acceptance checklist (PRD criteria 1–12) with two accounts. `README.md` with setup + demo script. Metrics script.

@@ -18,6 +18,8 @@ Confirmed in chat on 2026-11-22 (see `decisions.md` D-002, D-005, D-006).
 - **Git flow:** one branch per phase (`phase/p<n>-<slug>`). When the phase is done, merge it into `main`
   and push. **No pull requests.** Backend phases get one backend code review before the merge.
 
+> UI design system: `docs/product/ui-design.md` (approved). Game rules: `docs/product/`.
+
 ## 1. Overview
 
 An Expo (React Native, TypeScript) app talks over HTTPS/JSON to a stateless Express API
@@ -50,11 +52,11 @@ flowchart LR
 | Token storage | expo-secure-store | Keychain/Keystore, not plain AsyncStorage (D-003) |
 | Backend | Node.js (LTS), Express 5, TypeScript | From the brainstorm. Express 5 forwards async errors (D-003) |
 | Validation | Zod, shared between app and server | One schema validates on the server and types on the client (D-004) |
-| Database | MongoDB Atlas + Mongoose | From the brainstorm. Atlas is a replica set, so transactions work (D-003) |
+| Database | MongoDB Atlas + Mongoose | From the brainstorm (D-003). No multi-document transactions (D-015) |
 | Auth | JWT (HS256) + bcrypt | From the brainstorm (D-008) |
 | Security middleware | helmet, cors, express-rate-limit | Engineering baseline |
 | Logging | pino + pino-http | Structured JSON logs, cheap |
-| API tests | Vitest, Supertest, mongodb-memory-server (replica set) | Gitignored `.scratch/` (D-005) |
+| API tests | Vitest, Supertest, mongodb-memory-server | Smoke tests in gitignored `.scratch/` (D-005, D-015) |
 | Hosting | Render + Atlas M0 | Free, auto-deploy from `main` (D-006) |
 | Package manager | npm workspaces | No extra tool. Expo supports npm monorepos (D-004) |
 
@@ -103,7 +105,7 @@ luna/
 ## 6. Layering rules
 
 `routes` (path + middleware) → `controller` (parse validated input, call a service, send the envelope)
-→ `service` (business rules, transactions) → `repository` (Mongoose queries) → `models`.
+→ `service` (business rules) → `repository` (Mongoose queries) → `models`.
 Controllers never import models. Services never touch `req`/`res`. Only `src/config` reads
 `process.env`. In the app: screens → query hooks (`src/api`) → fetch client. Screens never call
 `fetch` directly.
@@ -181,10 +183,12 @@ not as magic numbers. Their values come from `docs/product/` (approved).
 2. Check that the challenge is part of the session (and the stage index is valid for incidents).
 3. Evaluate against `answerKey` on the server. `timeTakenMs` = now − (previous attempt time or
    `startedAt`), capped at 10 minutes. Client time is ignored.
-4. In one **transaction**: insert the AnswerAttempt (the unique index makes a double tap a 409 that the
-   app treats as "already answered" and re-fetches), update UserTopicProgress atomically with `$inc`
-   and `$push` with `$slice: -10`, and, if correct, insert an XpEvent `challenge:<id>`. A duplicate key
-   means "already earned", so no XP; otherwise `$inc users.totalXP` and recompute the level.
+4. Ordered single-document writes, **no multi-document transaction** (D-015): first insert the
+   AnswerAttempt (the unique index makes a double tap a 409 that the app treats as "already answered"
+   and re-fetches). Then update UserTopicProgress atomically with `$inc` and `$push` + `$slice: -10`. If the
+   answer is correct, insert an XpEvent `challenge:<id>`: a duplicate key means "already earned", so no XP;
+   otherwise `$inc users.totalXP`. Because the attempt is written first, a crash between steps can at
+   worst lose a progress update. It can never double-award XP.
 5. Return `{ isCorrect, correctAnswerId, explanation, misconception, xpEarned, nextStage? }`.
 
 **Complete session** (`POST /sessions/:id/complete`): `findOneAndUpdate({status: ACTIVE} → COMPLETED)`,
@@ -217,14 +221,14 @@ scale with the `{weekKey, userId}` index. Later: a cached `weeklyXP` counter per
 
 | Layer | Covers | Tool | Command |
 |---|---|---|---|
-| API (gitignored) | auth, session/answer/complete, XP idempotency, streak edge cases, daily circuit uniqueness, duel join race, answer-key leakage, rate limits | Vitest + Supertest + MongoMemoryReplSet | `cd .scratch/api-tests && npx vitest run` |
+| API smoke tests (gitignored) | critical paths only: auth, answer-key leakage, double submit, XP once, streak, daily kata once, duel join race | Vitest + Supertest + MongoMemoryReplSet | `cd .scratch/api-tests && npx vitest run` |
 | Frontend | each phase's click-through checklist | manual on Expo Go (Rajdeep) | — |
 | Static | lint + typecheck all workspaces | ESLint, tsc | `npm run lint && npm run typecheck` |
 
 ## 14. Infrastructure
 
 ### CD / deployment
-- **Render web service** (set up in P7): root `server/`, build `npm ci && npm run build`, start
+- **Render web service** (set up in P6): root `server/`, build `npm ci && npm run build`, start
   `node dist/index.js`, health check `/api/v1/health`. Auto-deploys on push to `main`.
   Env vars: `MONGODB_URI`, `JWT_SECRET`, `NODE_ENV=production`, `CORS_ORIGINS`.
 - **MongoDB Atlas M0:** one cluster, separate databases `luna_dev` and `luna_prod`.

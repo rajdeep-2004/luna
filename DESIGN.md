@@ -3,23 +3,23 @@
 name: Luna
 description: A lamplit cut-paper samurai den at night, warm and quiet, where every tap answers like a game.
 colors:
-  ground: "#3B2418"
-  tatami: "#2A1910"
-  lacquer-wood: "#5C3A27"
-  wall-light: "#4A2E1F"
-  text: "#F3E6CC"
-  shoji: "#E9DCC0"
-  text-on-shoji: "#3B2418"
-  text-muted: "#B39A78"
-  primary: "#F2A93B"
-  primary-pressed: "#C9831F"
-  on-primary: "#2A1910"
-  seal: "#D9442B"
-  night: "#23305C"
-  night-deep: "#18213F"
-  success: "#D9442B"
-  error: "#B39A78"
-  warning: "#F2A93B"
+  ground: '#3B2418'
+  tatami: '#2A1910'
+  lacquer-wood: '#5C3A27'
+  wall-light: '#4A2E1F'
+  text: '#F3E6CC'
+  shoji: '#E9DCC0'
+  text-on-shoji: '#3B2418'
+  text-muted: '#B39A78'
+  primary: '#F2A93B'
+  primary-pressed: '#C9831F'
+  on-primary: '#2A1910'
+  seal: '#D9442B'
+  night: '#23305C'
+  night-deep: '#18213F'
+  success: '#D9442B'
+  error: '#B39A78'
+  warning: '#F2A93B'
 typography:
   display:
     fontFamily: Dela Gothic One
@@ -72,26 +72,26 @@ spacing:
   3xl: 48px
 components:
   button-primary:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.on-primary}"
-    rounded: "{rounded.md}"
+    backgroundColor: '{colors.primary}'
+    textColor: '{colors.on-primary}'
+    rounded: '{rounded.md}'
     height: 56px
   button-primary-pressed:
-    backgroundColor: "{colors.primary-pressed}"
+    backgroundColor: '{colors.primary-pressed}'
   tab-bar:
-    backgroundColor: "{colors.tatami}"
+    backgroundColor: '{colors.tatami}'
     height: 86px
   tab-active:
-    iconColor: "{colors.seal}"
-    textColor: "{colors.text}"
+    iconColor: '{colors.seal}'
+    textColor: '{colors.text}'
   tab-inactive:
-    iconColor: "{colors.text-muted}"
-    textColor: "{colors.text-muted}"
+    iconColor: '{colors.text-muted}'
+    textColor: '{colors.text-muted}'
   input-cell:
-    backgroundColor: "{colors.tatami}"
-    rounded: "{rounded.sm}"
+    backgroundColor: '{colors.tatami}'
+    rounded: '{rounded.sm}'
   list-row:
-    textColor: "{colors.text}"
+    textColor: '{colors.text}'
 ---
 
 # Luna
@@ -105,6 +105,7 @@ components:
 **The one thing to remember (approved 2026-11-22):** a tired engineer comes home and, instead of reels, opens Luna. It feels like a real game, they are the samurai of code, and the Dojo is their den where the master has come home to rest. Every decision below serves this.
 
 **Mode per surface:**
+
 - Dojo, Duel face-off, results and rank-up: Experience (immersive scenes).
 - Challenge screens: Operate (fast, legible, one decision at a time).
 - Answer explanations: Read (the only place paragraphs are allowed).
@@ -112,6 +113,7 @@ components:
 **Reference sites:** none; competitive research was declined, and the direction comes from design knowledge plus an independent second proposal (D-038).
 
 **Key characteristics:**
+
 - Opening the app feels like coming home to a lamplit room.
 - Stats are objects in the room (lantern, scroll, ema plaque), not tiles.
 - Very little text: one line per element, numbers and shapes before words.
@@ -193,11 +195,15 @@ Mostly straight cuts: paper, wood, scrolls and plaques. Radii are small and purp
   4. Lantern relight: amber fills the lantern from the bottom and the new streak number cuts itself in.
   5. Rank-up: a katana draws across the screen, the new kanji is brushed stroke by stroke, and the ensō closes.
   6. Duel face-off: both masks slide in from the edges and clash with a paper-cut spark; the winner takes the seal.
+  7. Entering the Dojo: on every return to the room (focus or app foreground) the rank scroll unrolls downward, the lantern drops on its cord and swings to rest, the ema sways, the mask rises onto its stand and the kata scroll settles, staggered over about 900 ms.
+  8. The cut (correct answer): an ink slash crosses the screen, 見事 is brushed in, a 正 seal strikes and the XP counts up. No answer and no paragraph; "Why it works" opens the shoji sheet with the explanation unfolded. A wrong answer keeps the shoji sheet, which shows the right answer.
 - **Reduce Motion:** every moment becomes a crossfade or appears instantly. Haptics stay.
 
 ## Decisions Log
-| Date | Decision | Rationale |
-|------|----------|-----------|
-| 2026-11-22 | Initial design system created (Kiri-e Den) | Created by /design-consultation after the previous UI was rejected as text-heavy "AI slop" and Luna was repositioned as a game (D-037). Direction merged from my draft and an independent second proposal; approved by Rajdeep after an HTML preview of Dojo, Explore, Duel and Profile (D-038). |
-| 2026-11-22 | Amber, not vermilion, for buttons | Washi text on vermilion is only 3.5:1; amber with dark text is 8.4:1, and the lantern already means "go". |
-| 2026-11-22 | Brush kanji shipped as SVG, not a font | Yuji Boku is 8.6 MB; only about 20 brush glyphs are needed. |
+
+| Date       | Decision                                                     | Rationale                                                                                                                                                                                                                                                                                        |
+| ---------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-11-22 | Initial design system created (Kiri-e Den)                   | Created by /design-consultation after the previous UI was rejected as text-heavy "AI slop" and Luna was repositioned as a game (D-037). Direction merged from my draft and an independent second proposal; approved by Rajdeep after an HTML preview of Dojo, Explore, Duel and Profile (D-038). |
+| 2026-11-22 | Amber, not vermilion, for buttons                            | Washi text on vermilion is only 3.5:1; amber with dark text is 8.4:1, and the lantern already means "go".                                                                                                                                                                                        |
+| 2026-11-23 | Dojo entrance and the correct-answer "cut" (motions 7 and 8) | Rajdeep's feedback at the P7 checkpoint: the room should come alive each time you return, and a correct answer should feel like a samurai win rather than a lesson (D-040).                                                                                                                      |
+| 2026-11-22 | Brush kanji shipped as SVG, not a font                       | Yuji Boku is 8.6 MB; only about 20 brush glyphs are needed.                                                                                                                                                                                                                                      |

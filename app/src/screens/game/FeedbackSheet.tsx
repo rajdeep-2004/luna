@@ -20,6 +20,8 @@ type Props = {
   nextLabel: string;
   advancing: boolean;
   onNext: () => void;
+  /** Opened from the correct-answer celebration's "Why it works": unfold the explanation at once. */
+  startOpen?: boolean;
 };
 
 const RISE_MS = 420;
@@ -38,11 +40,18 @@ function answerText(result: AnswerResult, options: PublicOption[]): string {
  * behind "Why?" so the game keeps moving (DESIGN.md: paragraphs only here, collapsed by default).
  * With Reduce Motion it fades in instead of rising.
  */
-export function FeedbackSheet({ result, options, nextLabel, advancing, onNext }: Props) {
+export function FeedbackSheet({
+  result,
+  options,
+  nextLabel,
+  advancing,
+  onNext,
+  startOpen = false,
+}: Props) {
   const reduce = useReduceMotion();
   const progress = useSharedValue(0);
   const xp = useCountUp(result.xpEarned, 600, reduce);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
 
   useEffect(() => {
     progress.value = withDelay(

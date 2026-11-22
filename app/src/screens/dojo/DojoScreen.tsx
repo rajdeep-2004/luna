@@ -31,6 +31,7 @@ import { useOnboardingStore } from '../../store/onboarding';
 import { colors, layout, spacing } from '../../theme';
 import { useStartSession } from '../explore/useStartSession';
 import { ComingHome } from './ComingHome';
+import { Entrance, useEntranceKey } from './Entrance';
 import { useBeginKata } from './useBeginKata';
 import { useWeeklyRank } from './useWeeklyRank';
 
@@ -103,6 +104,7 @@ export function DojoScreen() {
   const { homecomingPlayed, markHomecoming, seenStreak, setSeenStreak } = useDojoMoments();
   const [relightKey, setRelightKey] = useState<number | null>(null);
   const { scale, gridH, roomW, top } = useRoomFrame();
+  const enter = useEntranceKey();
   const u = (n: number) => n * scale;
 
   useEffect(() => {
@@ -143,13 +145,15 @@ export function DojoScreen() {
                 : `${p.level.nextLevelXP - p.level.totalXP} XP to the next rank.`
             } Opens your profile.`}
           >
-            <RankScroll
-              glyphs={toGlyphs(p.level.kanji)}
-              rankName={p.level.rankName}
-              level={p.level.level}
-              progress={rankProgress(p.level)}
-              width={u(DOJO_ANCHORS.scroll.w)}
-            />
+            <Entrance kind="unroll" playKey={enter}>
+              <RankScroll
+                glyphs={toGlyphs(p.level.kanji)}
+                rankName={p.level.rankName}
+                level={p.level.level}
+                progress={rankProgress(p.level)}
+                width={u(DOJO_ANCHORS.scroll.w)}
+              />
+            </Entrance>
           </PressableSink>
         ) : null}
 
@@ -163,12 +167,14 @@ export function DojoScreen() {
           }.`}
         >
           {p ? (
-            <Lantern
-              streak={streak}
-              state={lanternState(p)}
-              width={u(DOJO_ANCHORS.lantern.w)}
-              relightKey={relightKey}
-            />
+            <Entrance kind="drop" playKey={enter} delay={140} height={u(252)}>
+              <Lantern
+                streak={streak}
+                state={lanternState(p)}
+                width={u(DOJO_ANCHORS.lantern.w)}
+                relightKey={relightKey}
+              />
+            </Entrance>
           ) : (
             <Breathing>
               <Lantern
@@ -188,7 +194,9 @@ export function DojoScreen() {
             accessibilityRole="button"
             accessibilityLabel={`Your ${user.avatarId} mask, resting. Opens your profile.`}
           >
-            <MaskStand avatarId={user.avatarId} width={u(DOJO_ANCHORS.mask.w)} />
+            <Entrance kind="rise" playKey={enter} delay={260}>
+              <MaskStand avatarId={user.avatarId} width={u(DOJO_ANCHORS.mask.w)} />
+            </Entrance>
           </PressableSink>
         ) : null}
 
@@ -202,7 +210,9 @@ export function DojoScreen() {
               : 'Dojo Board: not on it yet this week.'
           }
         >
-          <EmaPlaque rank={weekly.rank} width={u(DOJO_ANCHORS.ema.w)} />
+          <Entrance kind="sway" playKey={enter} delay={200}>
+            <EmaPlaque rank={weekly.rank} width={u(DOJO_ANCHORS.ema.w)} />
+          </Entrance>
         </PressableSink>
 
         {p?.assessments.checkpointAvailable ? (
@@ -213,7 +223,9 @@ export function DojoScreen() {
             accessibilityRole="button"
             accessibilityLabel="A letter: your Checkpoint is ready. Five unseen questions, one per topic."
           >
-            <Letter width={u(LETTER.w)} />
+            <Entrance kind="fade" playKey={enter} delay={420}>
+              <Letter width={u(LETTER.w)} />
+            </Entrance>
           </PressableSink>
         ) : null}
 
@@ -231,7 +243,9 @@ export function DojoScreen() {
               : "Today's kata scroll, sealed. Begin kata."
           }
         >
-          <KataScroll state={done ? 'done' : 'sealed'} width={u(KATA.w)} />
+          <Entrance kind="rise" playKey={enter} delay={340}>
+            <KataScroll state={done ? 'done' : 'sealed'} width={u(KATA.w)} />
+          </Entrance>
         </PressableSink>
 
         <View style={[styles.actions, { bottom: u(22), left: u(22), right: u(22) }]}>

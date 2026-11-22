@@ -17,7 +17,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
  * Yuji Boku's 勝 is a composite that opentype.js reassembles wrongly, so it is left out and set in
  * Dela Gothic One where needed.
  */
-const GLYPHS = [...'弟子足軽浪人武士侍旗本剣先生大名将軍', ...'正誤負引今日道刀雷一月'];
+const GLYPHS = [...'弟子足軽浪人武士侍旗本剣先生大名将軍', ...'正誤負引今日道刀雷一月見事斬'];
 
 const ttf = require.resolve('@expo-google-fonts/yuji-boku/400Regular/YujiBoku_400Regular.ttf');
 const buf = readFileSync(ttf);

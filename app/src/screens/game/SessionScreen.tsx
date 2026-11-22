@@ -12,6 +12,7 @@ import { colors, spacing } from '../../theme';
 import { BugHuntBody } from './BugHuntBody';
 import { ChoiceBody } from './ChoiceBody';
 import { DuelCountdown } from './DuelCountdown';
+import { CorrectCelebration } from './CorrectCelebration';
 import { DuelVerdict } from './DuelVerdict';
 import { ElapsedClock } from './ElapsedClock';
 import { FeedbackSheet } from './FeedbackSheet';
@@ -37,6 +38,8 @@ export function SessionScreen({ route, navigation }: Props) {
   const step = session ? findStep(session) : null;
   const flow = useAnswerFlow(sessionId, step);
   const [advancing, setAdvancing] = useState(false);
+  // A correct answer celebrates first; "Why it works" swaps in the full sheet for that answer.
+  const [explain, setExplain] = useState(false);
   const rootCause = useRef<string | undefined>(undefined);
 
   const isDuel = session?.type === 'DUEL';
@@ -58,6 +61,7 @@ export function SessionScreen({ route, navigation }: Props) {
     try {
       await query.refetch();
       flow.reset();
+      setExplain(false);
     } finally {
       setAdvancing(false);
     }
@@ -172,13 +176,22 @@ export function SessionScreen({ route, navigation }: Props) {
         />
       </View>
 
-      {flow.result && !isDuel ? (
+      {flow.result && !isDuel && flow.result.isCorrect && !explain ? (
+        <CorrectCelebration
+          xpEarned={flow.result.xpEarned}
+          nextLabel={flow.result.sessionReadyToComplete ? 'Finish' : 'Next'}
+          advancing={advancing}
+          onNext={() => void next()}
+          onExplain={() => setExplain(true)}
+        />
+      ) : flow.result && !isDuel ? (
         <FeedbackSheet
           result={flow.result}
           options={step.options}
           nextLabel={flow.result.sessionReadyToComplete ? 'Finish' : 'Next'}
           advancing={advancing}
           onNext={() => void next()}
+          startOpen={explain}
         />
       ) : null}
     </Screen>

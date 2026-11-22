@@ -1,6 +1,6 @@
 # Architecture — Luna
 
-> Last updated: 2026-11-22 — Written at planning time (P0). Update whenever the build diverges.
+> Last updated: 2026-11-22 — Planned in P0, brought in line with the code in P6. Update whenever the build diverges.
 
 ## 0. Delivery setup
 
@@ -64,27 +64,32 @@ flowchart LR
 
 ```
 luna/
-├── app/                    Expo app (React Native). UI only, no business rules
-│   ├── src/navigation/     RootNavigator, AuthStack, MainTabs, typed route params
-│   ├── src/screens/        one folder per screen (auth, onboarding, home, explore, game, summary, leaderboard, duel, profile)
-│   ├── src/features/game/  challenge renderer + one component per challenge type
-│   ├── src/api/            fetch client (timeout, retry, envelope parsing) + TanStack Query hooks
-│   ├── src/store/          Zustand stores (auth, active session)
-│   ├── src/components/     shared UI (Button, Card, ErrorState, Loading...)
-│   └── src/theme/          colours, spacing, typography
-├── server/                 Express API
-│   ├── src/config/         env parsing (Zod). The only place that reads process.env
-│   ├── src/modules/<name>/ routes → controller → service → repository, per feature:
-│   │                       auth, users, topics, challenges, sessions, progress, daily,
-│   │                       leaderboard, duels, achievements
-│   ├── src/models/         Mongoose schemas + indexes
-│   ├── src/middleware/     auth, validate, rateLimit, errorHandler, requestId
-│   ├── src/lib/            logger, errors, time (timezone/week helpers), codes
-│   └── src/seed/           seed script + content/*.ts (the question bank)
-├── shared/                 Zod schemas + TS types for API requests and responses (no runtime deps besides zod)
-├── docs/                   prd, architecture, build-plan, decisions, luna-idea (brainstorm)
-├── .scratch/               GITIGNORED. API tests and throwaway scripts, never pushed
-└── package.json            npm workspaces: app, server, shared
+├── app/                      Expo app (React Native). UI only, no game rules
+│   ├── App.tsx               fonts, providers, RootNavigator
+│   └── src/
+│       ├── navigation/       RootNavigator, AuthStack, OnboardingStack, MainTabs, AppStack, typed params
+│       ├── screens/          one folder per area: auth, onboarding, dojo, explore, game, duel, board, profile
+│       ├── api/              fetch client (timeout, GET retries, envelope parsing), endpoints, query client
+│       ├── store/            Zustand: auth (token in SecureStore), onboarding, connection (cold start)
+│       ├── components/       design-system pieces: Button, Card, MoonPhase, YokaiAvatar, Stamp...
+│       ├── lib/              session position, haptics, durations, small hooks
+│       ├── config/env.ts     the only module that reads process.env in the app
+│       └── theme/            colours, spacing, typography, fonts
+├── server/                   Express API
+│   └── src/
+│       ├── config/           env (Zod), game.ts (every game rule as data), security.ts (auth + rate limits)
+│       ├── modules/<name>/   <name>.routes.ts → <name>.service.ts (+ helpers, repository where shared):
+│       │                     auth, users, topics, challenges, sessions, progress, daily,
+│       │                     leaderboard, duels, achievements, health
+│       ├── models/           Mongoose schemas + indexes
+│       ├── middleware/       requireAuth, validate (body, ObjectId param, query), rateLimit, errorHandler
+│       ├── lib/              logger, errors, http envelope, time (timezone and week helpers), random
+│       ├── db/               connect, syncIndexes
+│       └── seed/             seed script, content schema check, content/*.ts (the question bank)
+├── shared/                   Zod schemas + TS types for the API contract (runtime dependency: zod only)
+├── docs/                     prd, architecture, build-plan, decisions, product/ (game rules), luna-idea
+├── .scratch/                 GITIGNORED. API smoke tests and throwaway scripts, never pushed
+└── package.json              npm workspaces: shared, server, app
 ```
 
 ## 5. Modules and responsibilities (server)
@@ -104,18 +109,18 @@ luna/
 
 ## 6. Layering rules
 
-`routes` (path + middleware) → `controller` (parse validated input, call a service, send the envelope)
-→ `service` (business rules) → `repository` (Mongoose queries) → `models`.
-Controllers never import models. Services never touch `req`/`res`. Only `src/config` reads
-`process.env`. In the app: screens → query hooks (`src/api`) → fetch client. Screens never call
-`fetch` directly.
+`routes` (path, auth, validation, then one service call and the envelope) → `service` (business rules)
+→ repository or model (Mongoose queries) → `models`. There is no separate controller layer: the route
+handlers are one-liners, so a controller file would only forward arguments. Route handlers never touch
+models; services never touch `req`/`res`. Only `src/config` reads `process.env`. In the app: screens → TanStack
+Query (`src/api` endpoints) → fetch client. Screens never call `fetch` directly.
 
 ## 7. External services
 
 | Service | Used for | Failure impact |
 |---|---|---|
 | MongoDB Atlas M0 | all data | API returns 503 `DB_UNAVAILABLE`, the app shows the error state with Retry |
-| Render free web service | hosting the API | sleeps after idle. The first request is slow (~50 s). The app shows "Waking up the server..." after 5 s and keeps waiting up to 60 s on `/health` |
+| Render free web service | hosting the API | sleeps after idle. The first request is slow (up to ~50 s). The app shows "Waking the server" after 4 s; each request times out at 15 s and GETs retry twice with backoff |
 
 ## 8. Auth and authorization
 
@@ -126,19 +131,21 @@ Controllers never import models. Services never touch `req`/`res`. Only `src/con
 - `requireAuth` middleware on every route except `/health`, `/auth/register` and `/auth/login`.
 - AuthZ per resource: sessions, attempts and progress are always queried with `userId = req.user.id`.
   Duels can only be read by the creator or the opponent.
-- Rate limits: `/auth/*` 10 requests per 15 min per IP+email. Writes 60/min per user. Global 300/min per IP.
+- Rate limits (`config/security.ts`): `/auth/*` 10 requests per 15 min per IP, plus a per-account lock
+  after 5 failed logins for 15 min. Duel join 30 per 15 min per IP. Global 300/min per IP.
 - No cookies, so no CSRF surface. CORS: the app is native and sends no Origin, so CORS only allows
   configured origins (Expo web dev), and everything else is refused by default.
 
 ## 9. Error handling and logging
 
-- Success envelope: `{ "data": ... }`. Lists: `{ "data": [...], "page": { "cursor": "...", "hasMore": true } }`.
+- Success envelope: `{ "data": ... }`. Paginated lists: `{ "data": { "items": [...], "nextCursor": "..." | null } }`
+  (the Dojo Board uses `rows` + `nextCursor`, plus its `me` row).
 - Error envelope: `{ "error": { "code": "VALIDATION_ERROR", "message": "Human-readable", "details"?: [...] } }`.
 - Codes: `VALIDATION_ERROR` 400, `UNAUTHORIZED` 401, `FORBIDDEN` 403, `NOT_FOUND` 404,
   `CONFLICT` 409, `RATE_LIMITED` 429, `INTERNAL` 500, `DB_UNAVAILABLE` 503.
 - A central error handler maps an `AppError` to the envelope. Unknown errors are logged with the stack
   and returned as `INTERNAL` with no internal details.
-- pino logs JSON with `requestId`. Never log passwords, tokens or `answerKey`.
+- pino logs JSON; pino-http tags each request line with a request id. Never log passwords, tokens or `answerKey`.
 - App: the fetch client has a 15 s timeout, retries GETs twice with backoff, and never retries
   POSTs automatically. Writes are idempotent (see §12), so the user can retry by hand safely.
 
@@ -243,7 +250,7 @@ scale with the `{weekKey, userId}` index. Later: a cached `weeklyXP` counter per
 
 | Layer | Covers | Tool | Command |
 |---|---|---|---|
-| API smoke tests (gitignored) | critical paths only: auth, answer-key leakage, double submit, XP once, streak, daily kata once, duel join race | Vitest + Supertest + MongoMemoryReplSet | `cd .scratch/api-tests && npx vitest run` |
+| API smoke tests (gitignored) | critical paths: auth, answer-key leakage, double submit, XP once, streak, Daily Kata once, mastery, board, achievements, duel join race, timer, expiry (55 tests) | Vitest + Supertest + mongodb-memory-server | `cd .scratch/api-tests && npx vitest run` |
 | Frontend | each phase's click-through checklist | manual on Expo Go (Rajdeep) | — |
 | Static | lint + typecheck all workspaces | ESLint, tsc | `npm run lint && npm run typecheck` |
 

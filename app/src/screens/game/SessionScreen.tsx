@@ -117,6 +117,11 @@ export function SessionScreen({ route, navigation }: Props) {
         position={answeredCount(session) + 1}
         total={session.totalAnswers}
         onLeave={() => navigation.goBack()}
+        leaveMessage={
+          isDuel
+            ? 'Your answers are saved, but the 60-second clock keeps running on the server.'
+            : undefined
+        }
         clock={
           isDuel ? (
             <DuelCountdown

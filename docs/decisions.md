@@ -563,3 +563,12 @@ would be possible). Expo Router (D-003).
 **Files.** `app/App.tsx`, `app/src/navigation/*`, `app/src/screens/*`, `app/src/store/onboarding.ts`, `app/src/lib/*`.
 **Concepts.** Conditional navigators (auth flow pattern in React Navigation); controlled inputs; schema reuse across client and server.
 **Revisit if** testers want to change avatar or topics later; that belongs in the Profile screen (P5).
+
+### D-023 — P2 closed after manual test
+- **Date:** 2026-11-22 · **Step:** P2 — manual review · **Status:** Active · **Type:** process
+
+Rajdeep clicked through the P2 checklist in Expo Go and approved it. The only problem found was that the
+app showed "Cannot reach the server" because the API was not reachable on the configured port. After
+the port setting was corrected, register and onboarding worked. This was setup, not a code bug.
+Native Expo Go requests send no `Origin` header, so CORS only matters for Expo web. As P2 is frontend-only,
+no automated review ran, following the project rules. P2 is marked `shipped` in `prd.md` and merged into `main`.

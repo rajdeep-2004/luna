@@ -136,7 +136,7 @@ Status: `todo` | `building` | `shipped`.
 |---|---|---|---|
 | P0 | Docs, plan and product design | — | shipped |
 | P1 | Backend core: foundation, auth, content, challenge engine | F-01 (API), F-05, F-09 (API), F-11 (API), F-15, F-16 | shipped |
-| P2 | App foundation, design system, auth and onboarding UI | F-01 (UI), F-02 (without baseline) | building |
+| P2 | App foundation, design system, auth and onboarding UI | F-01 (UI), F-02 (without baseline) | shipped |
 | P3 | Game UI: 4 modes, feedback, summary, explore | F-04, F-06–F-09, F-11, F-12 | todo |
 | P4 | Progression: XP, levels, streaks, Daily Kata, adaptivity, checkpoint | F-02 baseline, F-03, F-10, F-13, F-14, F-21–F-25 | todo |
 | P5 | Competition and profile: Dojo Board, duels, achievements | F-17–F-20 | todo |

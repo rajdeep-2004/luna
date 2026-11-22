@@ -39,6 +39,12 @@ function optionOrdersFor(c: ChallengeDoc): string[][] {
   return [shuffle(c.options.map((o) => o.id))];
 }
 
+/** Ledger key for a correct answer: one per challenge, or one per incident stage. */
+function xpSourceKey(c: ChallengeDoc, stageIndex: number): string {
+  const id = c._id.toString();
+  return c.type === 'INCIDENT' ? `challenge:${id}:${stageIndex}` : `challenge:${id}`;
+}
+
 async function findOwnSession(userId: string, sessionId: string): Promise<SessionDoc> {
   const session = await SessionModel.findOne({ _id: sessionId, userId });
   if (!session) throw notFound('Session');
@@ -74,17 +80,31 @@ export async function startSession(
         ? await pickIncident(userId, input.challengeId)
         : await pickBaseline();
 
-  const session = await SessionModel.create({
-    userId,
-    type: input.type,
-    topicSlug,
-    items: picked.map((c, order) => ({
-      challengeId: c._id,
-      order,
-      optionOrders: optionOrdersFor(c),
-    })),
-    totalAnswers: picked.reduce((n, c) => n + answerCount(c), 0),
-  });
+  let session: SessionDoc;
+  try {
+    session = await SessionModel.create({
+      userId,
+      type: input.type,
+      topicSlug,
+      items: picked.map((c, order) => ({
+        challengeId: c._id,
+        order,
+        optionOrders: optionOrdersFor(c),
+      })),
+      totalAnswers: picked.reduce((n, c) => n + answerCount(c), 0),
+    });
+  } catch (err) {
+    // A concurrent start won the race: return the session it created.
+    if (!isDuplicateKey(err)) throw err;
+    const winner = await SessionModel.findOne({
+      userId,
+      type: input.type,
+      status: 'ACTIVE',
+      topicSlug,
+    });
+    if (!winner) throw err;
+    return getSession(userId, winner._id.toString());
+  }
   return buildView(session, picked);
 }
 
@@ -192,8 +212,16 @@ export async function submitAnswer(
     });
     attemptId = attempt._id;
   } catch (err) {
-    if (isDuplicateKey(err)) throw conflict('Already answered');
-    throw err;
+    if (!isDuplicateKey(err)) throw err;
+    // A retry after a partial failure: re-run the XP award (the ledger makes it a no-op if it
+    // already happened), then report the duplicate.
+    const prior = await AnswerAttemptModel.findOne({ sessionId, challengeId, stageIndex }).lean();
+    if (prior?.isCorrect && session.type !== 'BASELINE') {
+      const base = XP_BY_DIFFICULTY[challenge.difficulty as 1 | 2 | 3];
+      const amount = prior.usedHint ? Math.floor(base / HINT_XP_DIVISOR) : base;
+      await awardXP(userId, xpSourceKey(challenge, stageIndex), amount);
+    }
+    throw conflict('Already answered');
   }
 
   // 2) Topic progress, then 3) XP through the ledger (first correct only; none for the baseline).
@@ -209,11 +237,7 @@ export async function submitAnswer(
   if (result.isCorrect && session.type !== 'BASELINE') {
     const base = XP_BY_DIFFICULTY[challenge.difficulty as 1 | 2 | 3];
     const amount = usedHint ? Math.floor(base / HINT_XP_DIVISOR) : base;
-    xpEarned += await awardXP(
-      userId,
-      isIncident ? `challenge:${challengeId}:${stageIndex}` : `challenge:${challengeId}`,
-      amount,
-    );
+    xpEarned += await awardXP(userId, xpSourceKey(challenge, stageIndex), amount);
   }
   if (isIncident && isLastStage && session.type !== 'BASELINE') {
     xpEarned += await awardXP(userId, 'first-incident', BONUS_XP.firstIncident);

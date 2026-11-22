@@ -27,6 +27,7 @@ entry and mark the old one `Superseded by D-###`.
 | D-015 | 2026-11-22 | P0 design | Lean backend, UI first; phases merged from 7 to 6 | Active |
 | D-016 | 2026-11-22 | P1 | Backend build choices: bundling, bcryptjs, slugs, computed levels, hint endpoint | Active |
 | D-017 | 2026-11-22 | P1 | Question bank V1: 50 challenges + 8 incidents, validated at seed time | Active |
+| D-018 | 2026-11-22 | P1 review | Backend review findings: 5 fixed, 3 accepted | Active |
 
 ---
 
@@ -419,5 +420,36 @@ deactivated rather than deleted, so past attempts still point at real challenges
 sentences plus one misconception line; hints on intermediate and advanced items.
 
 **Revisit if** usability testers report confusing items. Edit the file and re-run `npm run seed -w server`.
+
+---
+
+### D-018 — Backend review findings: 5 fixed, 3 accepted
+- **Date:** 2026-11-22 · **Step:** P1 — backend code review (one reviewer) · **Status:** Active · **Type:** security / edge-case
+
+The reviewer reported 1 question and 7 medium risks, and no critical or high ones.
+
+**Fixed (each covered by a local smoke test):**
+1. **Bug Hunt compared lines as strings,** so "07" was marked wrong. It now compares numerically.
+2. **Concurrent session starts** could create two open baselines. There is now a partial unique
+   index on `{userId, type, topicSlug}` for ACTIVE PRACTICE and BASELINE sessions; the loser of a
+   race returns the winner's session.
+3. **Lost XP after a partial failure:** if the attempt was saved but XP wasn't awarded, a retry
+   hit 409 and the XP was gone. On a duplicate attempt, the server now re-runs the XP award, which
+   the ledger turns into a no-op if it already happened.
+4. **Concurrent first answers on a topic** could both try to insert the progress row. The loser
+   now retries as an update.
+5. **No per-account brute-force guard** (the per-IP limit can be dodged with many IPs). Five
+   consecutive failed logins now lock the account for 15 minutes (`config/security.ts`), and a
+   successful login resets the counter. A locked account answers 429 even with the right password.
+
+**Accepted, not changed:**
+- **The first-incident bonus pays on finishing, even with wrong stages.** That's intended:
+  `scoring.md` rewards completing your first Incident Room, not acing it.
+- **The ledger insert and `$inc totalXP` aren't atomic.** A crash between them loses that XP.
+  This is the trade-off D-015 accepted. *Revisit if* XP discrepancies appear: recompute
+  `totalXP` from the `xpevents` sum.
+- **Register says "An account with this email already exists".** Technically this allows account
+  enumeration, but it is standard UX, and the endpoint is rate-limited. A generic message would
+  confuse real users who forgot they signed up.
 
 ---

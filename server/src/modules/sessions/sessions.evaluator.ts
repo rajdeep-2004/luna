@@ -35,7 +35,9 @@ export function evaluate(c: ChallengeDoc, stageIndex: number, answer: string): E
 
   const feedback = c.optionFeedback ? Object.fromEntries(c.optionFeedback) : undefined;
   return {
-    isCorrect: answer === c.answerKey,
+    // Bug Hunt answers are line numbers: compare numerically so "07" matches 7.
+    isCorrect:
+      c.type === 'BUG_HUNT' ? Number(answer) === Number(c.answerKey) : answer === c.answerKey,
     correctAnswer: c.answerKey ?? '',
     explanation: c.explanation ?? '',
     misconception: c.misconception ?? '',

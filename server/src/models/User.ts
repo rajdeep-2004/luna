@@ -18,6 +18,9 @@ const userSchema = new Schema(
     longestStreak: { type: Number, default: 0, min: 0 },
     /** Local calendar date (YYYY-MM-DD, user's timezone) of the last completed Daily Kata. */
     lastDailyDate: { type: String, default: null },
+    /** Per-account brute-force guard: consecutive failures, and the lock end time. */
+    failedLogins: { type: Number, default: 0, select: false },
+    lockedUntil: { type: Date, default: null, select: false },
   },
   { timestamps: true },
 );

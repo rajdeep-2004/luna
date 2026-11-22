@@ -32,6 +32,15 @@ const sessionSchema = new Schema(
 
 sessionSchema.index({ userId: 1, createdAt: -1 });
 sessionSchema.index({ userId: 1, type: 1, status: 1 });
+// At most one open practice (per topic) or baseline session per user, so a double tap or two
+// concurrent starts can't create two. Completing a session drops it out of this index.
+sessionSchema.index(
+  { userId: 1, type: 1, topicSlug: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { status: 'ACTIVE', type: { $in: ['PRACTICE', 'BASELINE'] } },
+  },
+);
 
 export type Session = InferSchemaType<typeof sessionSchema>;
 export type SessionDoc = HydratedDocument<Session>;

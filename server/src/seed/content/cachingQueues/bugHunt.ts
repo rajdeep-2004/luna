@@ -16,7 +16,7 @@ export const CACHING_QUEUES_BUG_HUNT: ChallengeSeed[] = [
     prompt:
       'Login codes should be valid for 5 minutes, but a code from last week still works. Which line is the bug?',
     codeSnippet:
-      "async function sendLoginCode(phone) {\n  const code = randomInt(100000, 1000000).toString();\n  await redis.set(`otp:${phone}`, code);\n  await sms.send(phone, `Your code is ${code}`);\n}",
+      'async function sendLoginCode(phone) {\n  const code = randomInt(100000, 1000000).toString();\n  await redis.set(`otp:${phone}`, code);\n  await sms.send(phone, `Your code is ${code}`);\n}',
     answerKey: '3',
     explanation:
       'The code is stored without an expiry, so it lives until someone deletes it. Store it with a TTL: redis.set(key, code, { EX: 300 }).',
@@ -120,7 +120,7 @@ export const CACHING_QUEUES_BUG_HUNT: ChallengeSeed[] = [
     prompt:
       'Profiles include viewer-specific fields (like "you follow them"). Users sometimes see another viewer\'s version. Which line is the bug?',
     codeSnippet:
-      "async function getProfile(userId, viewerId) {\n  const key = `profile:${userId}`;\n  const cached = await redis.get(key);\n  if (cached) return JSON.parse(cached);\n  const profile = await buildProfile(userId, viewerId);\n  await redis.set(key, JSON.stringify(profile), { EX: 300 });\n  return profile;\n}",
+      'async function getProfile(userId, viewerId) {\n  const key = `profile:${userId}`;\n  const cached = await redis.get(key);\n  if (cached) return JSON.parse(cached);\n  const profile = await buildProfile(userId, viewerId);\n  await redis.set(key, JSON.stringify(profile), { EX: 300 });\n  return profile;\n}',
     answerKey: '2',
     explanation:
       "The result depends on both userId and viewerId, but the key only contains userId. The first viewer's version is served to everyone. The key must include every input that changes the result, or the viewer-specific parts must not be cached.",
@@ -247,7 +247,7 @@ export const CACHING_QUEUES_BUG_HUNT: ChallengeSeed[] = [
       "async function withLock(key, fn) {\n  const token = randomUUID();\n  const ok = await redis.set(key, token, { NX: true, PX: 10_000 });\n  if (!ok) throw new Error('lock busy');\n  try {\n    return await fn();\n  } finally {\n    await redis.del(key);\n  }\n}",
     answerKey: '8',
     explanation:
-      'If fn outlives the 10 s lease, the lock expires and another worker takes it. The finally block then deletes that worker\'s lock, letting a third one in. Release only if the stored value is still your token, atomically, with a small Lua script (GET, compare, DEL). Long jobs should also extend the lease or use a fencing token.',
+      "If fn outlives the 10 s lease, the lock expires and another worker takes it. The finally block then deletes that worker's lock, letting a third one in. Release only if the stored value is still your token, atomically, with a small Lua script (GET, compare, DEL). Long jobs should also extend the lease or use a fencing token.",
     misconception:
       'The token is generated for a reason: a lock must only be released by its owner, and a plain DEL does not check who that is.',
     hint: 'The token is written but never read.',
@@ -279,7 +279,7 @@ export const CACHING_QUEUES_BUG_HUNT: ChallengeSeed[] = [
     prompt:
       'Each uploaded video is transcoded several times, and the bill for compute has tripled. The handler itself never fails. Which line is the bug?',
     codeSnippet:
-      "const consumer = Consumer.create({\n  queueUrl: config.videoQueueUrl,\n  visibilityTimeout: 30, // seconds\n  handleMessage: async (msg) => {\n    await transcodeVideo(JSON.parse(msg.Body)); // takes 2–5 minutes\n  },\n});",
+      'const consumer = Consumer.create({\n  queueUrl: config.videoQueueUrl,\n  visibilityTimeout: 30, // seconds\n  handleMessage: async (msg) => {\n    await transcodeVideo(JSON.parse(msg.Body)); // takes 2–5 minutes\n  },\n});',
     answerKey: '3',
     explanation:
       'The queue hides a received message for only 30 s. Transcoding takes minutes, so the message reappears and other workers start the same job, several times over. Set the visibility timeout above the longest job (or extend it with a heartbeat while the job runs), and keep the handler idempotent.',
@@ -299,7 +299,7 @@ export const CACHING_QUEUES_BUG_HUNT: ChallengeSeed[] = [
       "let pending = 0;\nexport const recordView = () => { pending += 1; };\nasync function flush() {\n  const n = pending;\n  pending = 0;\n  if (n > 0) await db.query('UPDATE stats SET views = views + $1', [n]);\n}\nsetInterval(flush, 10_000);\nprocess.on('SIGTERM', () => process.exit(0));",
     answerKey: '9',
     explanation:
-      'A deploy sends SIGTERM, and the handler exits immediately, dropping whatever is still in pending. Flush before exiting: process.on(\'SIGTERM\', async () => { await flush(); process.exit(0); }), and stop accepting new requests first.',
+      "A deploy sends SIGTERM, and the handler exits immediately, dropping whatever is still in pending. Flush before exiting: process.on('SIGTERM', async () => { await flush(); process.exit(0); }), and stop accepting new requests first.",
     misconception:
       'Write-behind buffers trade durability for speed. Whatever is in memory at shutdown is lost unless shutdown flushes it.',
   },
@@ -316,7 +316,7 @@ export const CACHING_QUEUES_BUG_HUNT: ChallengeSeed[] = [
       'async function clearUserCache(userId) {\n  const keys = await redis.keys(`user:${userId}:*`);\n  if (keys.length > 0) await redis.del(keys);\n}',
     answerKey: '2',
     explanation:
-      'KEYS scans the entire keyspace, all 20 million keys, no matter how specific the pattern is. Redis runs commands one at a time, so every other client waits for it. Track a user\'s keys in a set, use a version number in the key, or at least use SCAN, which works in small steps.',
+      "KEYS scans the entire keyspace, all 20 million keys, no matter how specific the pattern is. Redis runs commands one at a time, so every other client waits for it. Track a user's keys in a set, use a version number in the key, or at least use SCAN, which works in small steps.",
     misconception:
       'A narrow pattern does not make KEYS cheap. Its cost is the size of the whole database, and it blocks the single command thread while it runs.',
   },

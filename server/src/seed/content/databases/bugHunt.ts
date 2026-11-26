@@ -68,7 +68,7 @@ export const DATABASES_BUG_HUNT: ChallengeSeed[] = [
       "app.post('/logout', async (req, res) => {\n  const { sessionId, userId } = req.auth;\n  await db.query('DELETE FROM sessions WHERE user_id = $1', [userId]);\n  res.status(204).end();\n});",
     answerKey: '3',
     explanation:
-      "The DELETE matches every session that belongs to the user, not only the current one. Logging out of one device should delete one row: WHERE id = $1 with sessionId. Deleting by user_id is the right query only for a deliberate \"log out everywhere\" button.",
+      'The DELETE matches every session that belongs to the user, not only the current one. Logging out of one device should delete one row: WHERE id = $1 with sessionId. Deleting by user_id is the right query only for a deliberate "log out everywhere" button.',
     misconception:
       'A WHERE clause can be present and still too broad. Ask which rows it matches, not only whether it exists.',
   },
@@ -260,13 +260,13 @@ export const DATABASES_BUG_HUNT: ChallengeSeed[] = [
     prompt:
       'The feed uses keyset pagination. A bulk import gave many posts the same created_at, and some of them never appear while scrolling. Which line is the bug?',
     codeSnippet:
-      "const { rows } = await db.query(\n  `SELECT id, title, created_at FROM posts\n   WHERE created_at < $1\n   ORDER BY created_at DESC, id DESC\n   LIMIT 20`,\n  [cursor.createdAt],\n);",
+      'const { rows } = await db.query(\n  `SELECT id, title, created_at FROM posts\n   WHERE created_at < $1\n   ORDER BY created_at DESC, id DESC\n   LIMIT 20`,\n  [cursor.createdAt],\n);',
     answerKey: '3',
     explanation:
       'If page 1 ends in the middle of a group of posts sharing one created_at, "created_at < cursor" skips the rest of that group. The cursor must include the tie-breaker: WHERE (created_at, id) < ($1, $2), with cursor.id as the second parameter, matching the ORDER BY. Passing that parameter is a companion edit; the bug is the WHERE clause that ignores the tie-breaker.',
     misconception:
       'A keyset cursor must be unique. Sorting by a tie-breaker is not enough if the WHERE clause ignores it.',
-    hint: 'What happens to rows that have exactly the cursor\'s created_at?',
+    hint: "What happens to rows that have exactly the cursor's created_at?",
   },
   {
     slug: 'db-replica-read-after-write',

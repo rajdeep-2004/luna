@@ -68,7 +68,7 @@ export const DEBUGGING_PROD_CHOICE: ChallengeSeed[] = [
       'A payment fails in production. Which log line will help most when you investigate it next week?',
     options: opts(
       "console.log('payment error')",
-      "logger.error(JSON.stringify(req.body)), so you have every input",
+      'logger.error(JSON.stringify(req.body)), so you have every input',
       "logger.debug({ err, orderId }, 'payment failed'), to keep the logs quiet",
       "logger.error({ err, orderId, userId }, 'payment failed')",
     ),
@@ -302,10 +302,10 @@ export const DEBUGGING_PROD_CHOICE: ChallengeSeed[] = [
     type,
     difficulty: 2,
     prompt:
-      "The product page calls a recommendations service. It usually answers in 100 ms but sometimes hangs for 60 s, and the gateway kills page requests after 10 s. Recommendations are optional on the page. What do you change?",
+      'The product page calls a recommendations service. It usually answers in 100 ms but sometimes hangs for 60 s, and the gateway kills page requests after 10 s. Recommendations are optional on the page. What do you change?',
     options: opts(
       'Retry the recommendations call up to 3 times when it is slow',
-      "Raise the gateway timeout to 60 s so the page can wait",
+      'Raise the gateway timeout to 60 s so the page can wait',
       'Give the pool more connections so hung calls do not block others',
       'A short timeout (about 300 ms) on the call; render the page without recommendations if it fires',
     ),

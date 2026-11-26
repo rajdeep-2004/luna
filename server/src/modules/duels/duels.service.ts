@@ -1,29 +1,28 @@
 import { randomInt } from 'node:crypto';
+import { Types } from 'mongoose';
 import {
   DUEL_CODE_ALPHABET,
-  DUEL_FORMAT_RULES,
+  PLAYING_PHASES,
+  PREGAME_PHASES,
   type DuelFormat,
-  type DuelListView,
-  type DuelPlayerResult,
-  type DuelStatus,
+  type DuelSnapshot,
   type DuelView,
-  type SessionView,
+  type Page,
+  type PageQuery,
 } from '@luna/shared';
 import { DUEL } from '../../config/game';
 import { shuffle } from '../../lib/random';
 import { AppError, conflict, isDuplicateKey, notFound } from '../../lib/errors';
-import { AnswerAttemptModel } from '../../models/AnswerAttempt';
-import { DuelModel, type DuelDoc } from '../../models/Duel';
-import { SessionModel } from '../../models/Session';
-import { challengesRepo } from '../challenges/challenges.repository';
-import { createSession, getSession } from '../sessions/sessions.service';
-import { usersRepo } from '../users/users.repository';
-import { toPlayerView } from '../users/users.mapper';
+import { DuelModel } from '../../models/Duel';
 import { duelDifficulty, pickDuelChallenges } from './duels.selection';
-import { settleDuel } from './duels.settle';
+import { toSnapshot, toViews } from './duels.view';
+import { cancelByCreator, participantDuel } from './live/room';
+import * as runtime from './live/runtime';
 
-const LIVE: DuelStatus[] = ['OPEN', 'ACTIVE'];
-const ENDED: DuelStatus[] = ['COMPLETED', 'EXPIRED'];
+/**
+ * The REST side of live duels (D-052): create, join, cancel, read. Thin by design; the match itself
+ * runs over the socket. No response ever carries an answer key (snapshots reveal only past rounds).
+ */
 
 function newCode(): string {
   return Array.from(
@@ -32,135 +31,30 @@ function newCode(): string {
   ).join('');
 }
 
-const isParticipant = (d: DuelDoc, userId: string) =>
-  d.creatorId.toString() === userId || d.opponentId?.toString() === userId;
+const oneLobbyMessage = 'You already have an open duel. Start or cancel it first.';
 
-/** Participants only: anyone else gets a 404, so duel ids don't leak (architecture §8). */
-async function findOwnDuel(userId: string, duelId: string): Promise<DuelDoc> {
-  const duel = await DuelModel.findById(duelId);
-  if (!duel || !isParticipant(duel, userId)) throw notFound('Duel');
-  return settleDuel(duel);
-}
-
-const formatOf = (d: DuelDoc): DuelFormat => (d.format ?? 'CLASSIC') as DuelFormat;
-
-/**
- * Per-challenge ✓/✗ and times for both players, in duel order. Only shown once a duel ends. In
- * Sudden Death a run stops at the first miss, so the questions after it are left off.
- */
-async function perQuestion(duel: DuelDoc) {
-  const rules = DUEL_FORMAT_RULES[formatOf(duel)];
-  const sessions = await SessionModel.find({ duelId: duel._id }).select('userId').lean();
-  const attempts = await AnswerAttemptModel.find({ sessionId: { $in: sessions.map((s) => s._id) } })
-    .select('sessionId challengeId isCorrect timeTakenMs isTimeout')
-    .lean();
-  const forUser = (userId: string | undefined) => {
-    const session = sessions.find((s) => s.userId.toString() === userId);
-    if (!session) return [];
-    const rows = duel.items.map((item) => {
-      const a = attempts.find(
-        (x) =>
-          x.sessionId.toString() === session._id.toString() &&
-          x.challengeId.toString() === item.challengeId.toString(),
-      );
-      return {
-        answered: Boolean(a),
-        isCorrect: a?.isCorrect ?? false,
-        timeTakenMs: a?.timeTakenMs ?? rules.timerMs,
-        timedOut: a ? a.isTimeout : true,
-      };
-    });
-    const kept = rules.endsOnMiss ? rows.filter((r) => r.answered) : rows;
-    return kept.map(({ answered: _a, ...r }) => r);
-  };
-  return {
-    creator: forUser(duel.creatorId.toString()),
-    opponent: forUser(duel.opponentId?.toString()),
-  };
-}
-
-/** Builds the caller's view of each duel with batched reads (no N+1). */
-async function toViews(userId: string, duels: DuelDoc[], detail = false): Promise<DuelView[]> {
-  if (!duels.length) return [];
-  const ids = duels.flatMap((d) => [d.creatorId, ...(d.opponentId ? [d.opponentId] : [])]);
-  const [players, mySessions] = await Promise.all([
-    usersRepo.findPlayers(ids),
-    SessionModel.find({ duelId: { $in: duels.map((d) => d._id) }, userId })
-      .select('duelId status')
-      .lean(),
-  ]);
-  const player = (id: { toString(): string } | null | undefined) => {
-    const p = id ? players.find((x) => x._id.toString() === id.toString()) : undefined;
-    return p ? toPlayerView(p) : null;
-  };
-  return Promise.all(
-    duels.map(async (d) => {
-      const isCreator = d.creatorId.toString() === userId;
-      const myResult = isCreator ? d.creatorResult : d.opponentResult;
-      const rivalResult = isCreator ? d.opponentResult : d.creatorResult;
-      const session = mySessions.find((s) => s.duelId?.toString() === d._id.toString());
-      const ended = ENDED.includes(d.status as DuelStatus);
-      const pq = ended && detail ? await perQuestion(d) : null;
-      const score = (
-        r: typeof myResult,
-        rows: DuelPlayerResult['perQuestion'],
-      ): DuelPlayerResult | null =>
-        r
-          ? {
-              correct: r.correct,
-              totalTimeMs: r.totalTimeMs,
-              ...(rows ? { perQuestion: rows } : {}),
-            }
-          : null;
-      return {
-        id: d._id.toString(),
-        code: d.code,
-        format: formatOf(d),
-        status: d.status as DuelStatus,
-        role: isCreator ? 'CREATOR' : 'OPPONENT',
-        me: player(userId)!,
-        rival: player(isCreator ? d.opponentId : d.creatorId),
-        myState: myResult ? 'FINISHED' : session ? 'PLAYING' : 'NOT_STARTED',
-        rivalFinished: Boolean(rivalResult),
-        sessionId: session?._id.toString() ?? null,
-        createdAt: d.createdAt.toISOString(),
-        expiresAt: d.expiresAt.toISOString(),
-        result: ended
-          ? {
-              endReason: (d.endReason ?? 'EXPIRED') as NonNullable<DuelView['result']>['endReason'],
-              winnerId: d.winnerId?.toString() ?? null,
-              mine: score(myResult, pq ? (isCreator ? pq.creator : pq.opponent) : undefined),
-              rivals: score(rivalResult, pq ? (isCreator ? pq.opponent : pq.creator) : undefined),
-              winBonusXP: d.winBonusXP,
-            }
-          : null,
-      } satisfies DuelView;
-    }),
-  );
+async function snapshot(userId: string, duelId: string): Promise<DuelSnapshot> {
+  const { duel } = await participantDuel(userId, duelId);
+  return toSnapshot(userId, duel, runtime.now());
 }
 
 /**
- * `POST /duels`. At most 5 live duels per creator (competition.md §2). The count and the insert
- * are two steps, so two simultaneous creates could make a sixth; that only weakens a spam guard,
- * so it is accepted (D-033). The code retries on the rare unique-index collision.
+ * `POST /duels`: a new LOBBY. One open duel (LOBBY or READY) per creator: checked first for a clear
+ * message, and enforced for LOBBY by a unique partial index, so two concurrent creates can't both
+ * succeed. The code retries on the rare collision.
  */
 export async function createDuel(
   userId: string,
   format: DuelFormat = 'CLASSIC',
-): Promise<DuelView> {
-  const open = await DuelModel.countDocuments({
-    creatorId: userId,
-    status: { $in: LIVE },
-    expiresAt: { $gt: new Date() },
-  });
-  if (open >= DUEL.maxOpenPerUser)
-    throw conflict(`You already have ${DUEL.maxOpenPerUser} open duels. Finish one first.`);
-
+): Promise<DuelSnapshot> {
+  if (await DuelModel.exists({ creatorId: userId, phase: { $in: PREGAME_PHASES } }))
+    throw conflict(oneLobbyMessage);
   const challenges = await pickDuelChallenges(await duelDifficulty(userId), format);
   const items = challenges.map((c) => ({
     challengeId: c._id,
     optionOrders: [shuffle(c.options.map((o) => o.id))],
   }));
+  const now = runtime.now();
   for (let i = 0; i < DUEL.codeRetries; i++) {
     try {
       const duel = await DuelModel.create({
@@ -168,100 +62,108 @@ export async function createDuel(
         creatorId: userId,
         format,
         items,
-        expiresAt: new Date(Date.now() + DUEL.expiryMs),
+        phase: 'LOBBY',
+        lobbyExpiresAt: new Date(now + runtime.timings().lobbyTtlMs),
+        creatorSeat: { connected: false, lastSeenAt: new Date(now), readyAt: null },
       });
-      return (await toViews(userId, [duel]))[0]!;
+      await runtime.tick(duel._id.toString());
+      return toSnapshot(userId, duel, now);
     } catch (err) {
       if (!isDuplicateKey(err)) throw err;
+      const key = (err as { keyPattern?: Record<string, unknown> }).keyPattern ?? {};
+      if (!('code' in key)) throw conflict(oneLobbyMessage);
     }
   }
   throw new AppError('INTERNAL', 'Could not create a duel code, please try again');
 }
 
 /**
- * `POST /duels/join`. One atomic conditional update: only an OPEN, unexpired duel with no
- * opponent, created by someone else, can be joined, so two people racing for one code get
- * exactly one winner. The loser is told why.
+ * `POST /duels/join`. One atomic conditional update: only an unexpired LOBBY with no opponent,
+ * created by someone else, can be joined, so two people racing for one code get exactly one
+ * winner. The loser is told why; a repeated tap by the joiner returns the same duel.
  */
-export async function joinDuel(userId: string, code: string): Promise<DuelView> {
+export async function joinDuel(userId: string, code: string): Promise<DuelSnapshot> {
+  const now = new Date(runtime.now());
+  // One live match at a time: not while already seated in another duel that has a rival.
+  const busy = await DuelModel.exists({
+    code: { $ne: code },
+    $or: [{ creatorId: userId }, { opponentId: userId }],
+    opponentId: { $ne: null },
+    phase: { $in: ['READY', ...PLAYING_PHASES] },
+  });
+  if (busy) throw conflict('Finish or leave your current duel first');
   const joined = await DuelModel.findOneAndUpdate(
     {
       code,
-      status: 'OPEN',
+      phase: 'LOBBY',
       opponentId: null,
-      creatorId: { $ne: userId },
-      expiresAt: { $gt: new Date() },
+      creatorId: { $ne: new Types.ObjectId(userId) },
+      lobbyExpiresAt: { $gt: now },
     },
-    { $set: { opponentId: userId, status: 'ACTIVE' } },
+    {
+      $set: {
+        opponentId: userId,
+        phase: 'READY',
+        opponentSeat: { connected: false, lastSeenAt: now, readyAt: null },
+      },
+    },
     { returnDocument: 'after' },
   );
-  if (joined) return (await toViews(userId, [joined]))[0]!;
+  if (joined) {
+    await runtime.pushState(joined);
+    await runtime.tick(joined._id.toString());
+    return toSnapshot(userId, joined, now.getTime());
+  }
 
   const duel = await DuelModel.findOne({ code });
   if (!duel) throw notFound('Duel');
   if (duel.creatorId.toString() === userId) throw conflict("You can't join your own duel");
-  // A repeated tap on "Join" by the same person: return the duel they already joined.
-  if (duel.opponentId?.toString() === userId) return (await toViews(userId, [duel]))[0]!;
+  if (duel.opponentId?.toString() === userId) return toSnapshot(userId, duel, now.getTime());
   if (duel.opponentId) throw conflict('This duel is already taken');
-  await settleDuel(duel);
-  throw conflict('This duel has expired');
+  throw conflict('This duel has closed');
 }
 
-/** `POST /duels/:id/play`: starts (or resumes) the caller's DUEL session on the shared set. */
-export async function playDuel(userId: string, duelId: string): Promise<SessionView> {
-  const duel = await findOwnDuel(userId, duelId);
-  const findMine = () => SessionModel.findOne({ duelId: duel._id, userId }).select('_id');
-  const existing = await findMine();
-  if (existing) return getSession(userId, existing._id.toString());
-  if (ENDED.includes(duel.status as DuelStatus)) throw conflict('This duel has ended');
-
-  // Lean read: Mongoose wraps nested arrays in documents; the session needs plain string[][].
-  const { items } = (await DuelModel.findById(duel._id).select('items').lean())!;
-  const challenges = await challengesRepo.findByIds(items.map((i) => i.challengeId));
-  const byId = new Map(challenges.map((c) => [c._id.toString(), c]));
-  const picked = items.flatMap((item) => {
-    const challenge = byId.get(item.challengeId.toString());
-    return challenge
-      ? [{ challenge, isRevisit: false, optionOrders: item.optionOrders as unknown as string[][] }]
-      : [];
-  });
-  const created = await createSession(userId, {
-    type: 'DUEL',
-    duelId,
-    duelFormat: formatOf(duel),
-    picked,
-  });
-  if (created) return created;
-  // A double tap on "Play" lost the unique-index race: return the session the other call made.
-  const winner = await findMine();
-  if (!winner) throw conflict('Could not start the duel, please try again');
-  return getSession(userId, winner._id.toString());
+/** `POST /duels/:id/cancel`: the creator, while LOBBY/READY. Repeats return the cancelled duel. */
+export async function cancelDuel(userId: string, duelId: string): Promise<DuelSnapshot> {
+  await cancelByCreator(userId, duelId);
+  return snapshot(userId, duelId);
 }
 
-export async function getDuel(userId: string, duelId: string): Promise<DuelView> {
-  return (await toViews(userId, [await findOwnDuel(userId, duelId)], true))[0]!;
+export const getDuel = snapshot;
+
+/** Keyset cursor `<createdAt ms>.<duelId>`, stable while new duels are created. */
+function decodeCursor(cursor: string): { at: Date; id: Types.ObjectId } {
+  const [ms, id] = cursor.split('.');
+  const at = new Date(Number(ms));
+  if (!id || !Types.ObjectId.isValid(id) || Number.isNaN(at.getTime()))
+    throw new AppError('VALIDATION_ERROR', 'Invalid cursor');
+  return { at, id: new Types.ObjectId(id) };
 }
 
-/**
- * `GET /duels`: the three tabs. Live duels are settled first, so one that just expired moves to
- * Finished in this same response. Both reads are bounded.
- */
-export async function listDuels(userId: string): Promise<DuelListView> {
-  const mine = { $or: [{ creatorId: userId }, { opponentId: userId }] };
-  const live = await DuelModel.find({ ...mine, status: { $in: LIVE } })
-    .sort({ createdAt: -1 })
-    .limit(DUEL.activeListMax);
-  const settled = await Promise.all(live.map(settleDuel));
-  const stillLive = settled.filter((d) => LIVE.includes(d.status as DuelStatus));
-  const finished = await DuelModel.find({ ...mine, status: { $in: ENDED } })
-    .sort({ updatedAt: -1 })
-    .limit(DUEL.finishedListSize);
-
-  const views = await toViews(userId, [...stillLive, ...finished]);
-  const live$ = views.filter((v) => v.result === null);
+/** `GET /duels`: the caller's duels (live and finished), newest first, cursor-paginated. */
+export async function listDuels(userId: string, query: PageQuery): Promise<Page<DuelView>> {
+  const limit = query.limit ?? DUEL.historyPageSize;
+  const after = query.cursor ? decodeCursor(query.cursor) : null;
+  const rows = await DuelModel.find({
+    $and: [
+      { $or: [{ creatorId: userId }, { opponentId: userId }] },
+      after
+        ? {
+            $or: [
+              { createdAt: { $lt: after.at } },
+              { createdAt: after.at, _id: { $lt: after.id } },
+            ],
+          }
+        : {},
+    ],
+  })
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(limit + 1);
+  const page = rows.slice(0, limit);
+  const last = page[page.length - 1];
   return {
-    yourTurn: live$.filter((v) => v.myState !== 'FINISHED'),
-    waiting: live$.filter((v) => v.myState === 'FINISHED'),
-    finished: views.filter((v) => v.result !== null),
+    items: await toViews(userId, page),
+    nextCursor:
+      rows.length > limit && last ? `${last.createdAt.getTime()}.${last._id.toString()}` : null,
   };
 }

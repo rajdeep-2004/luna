@@ -3,7 +3,7 @@ import type {
   AnswerResult,
   BoardView,
   DuelFormat,
-  DuelListView,
+  DuelSnapshot,
   DuelView,
   Page,
   SessionHistoryItem,
@@ -46,12 +46,12 @@ export const leaderboardApi = {
 };
 
 export const duelsApi = {
-  list: () => api.get<DuelListView>('/duels'),
-  create: (format: DuelFormat = 'CLASSIC') => api.post<DuelView>('/duels', { format }),
-  join: (code: string) => api.post<DuelView>('/duels/join', { code }),
-  get: (id: string) => api.get<DuelView>(`/duels/${id}`),
-  /** Starts (or resumes) my DUEL session. */
-  play: (id: string) => api.post<SessionView>(`/duels/${id}/play`, {}),
+  /** Newest first; live duels and finished ones (D-052). */
+  list: (cursor?: string) => api.get<Page<DuelView>>(`/duels${cursorQuery(cursor)}`),
+  create: (format: DuelFormat = 'CLASSIC') => api.post<DuelSnapshot>('/duels', { format }),
+  join: (code: string) => api.post<DuelSnapshot>('/duels/join', { code }),
+  get: (id: string) => api.get<DuelSnapshot>(`/duels/${id}`),
+  cancel: (id: string) => api.post<DuelSnapshot>(`/duels/${id}/cancel`, {}),
 };
 
 export const dailyApi = {

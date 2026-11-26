@@ -23,6 +23,15 @@ Backlog, deferred ideas and known debt. Scope changes go here first; nothing her
 - Move `.scratch/api-tests` into the repo if the course requires visible tests (D-002).
 - XP ledger insert and `users.totalXP` `$inc` are two writes (D-015). A crash between them leaves `totalXP` short of the ledger forever. Fix with a nightly reconcile (`totalXP = sum(ledger)`) or a transaction if Atlas tier allows (D-030).
 - A crash after an answer is recorded but before its topic-progress/revisit write loses that one update (D-015, D-030). Replaying needs a per-attempt "applied" marker.
+- P13 review (medium): the socket JWT is checked only in the handshake; a socket opened before the token expires keeps working. Re-verify on each event or disconnect at `exp` (D-052).
+- P13 review (medium): the duel win bonus is claimed before it is paid; a crash between them loses that bonus (same trade-off as D-015). A per-duel ledger key (`duelwin:<duelId>`) plus the daily-slot check would make it retry-safe.
+- P13 review (medium): live duels assume one API instance (`seats` map and timers are process-local; boot recovery marks every seat offline). Before scaling out: Socket.IO Redis adapter + a per-duel lease (D-052, architecture §12).
+- P13 review (low): `finalizeDuel` checks `finalizedAt` with a read; two concurrent calls both run (safe today because every step is idempotent). Claim it with a conditional update if a non-idempotent step is ever added.
+- P13 review (low): boot recovery ticks every open duel before `listen`; boot time grows with open duels. Tick in the background if that becomes slow.
+- P13 review (low): `migrateV1Duels` scans for `phase: {$exists: false}` on every boot (no index). Drop the call once production has been migrated.
+- P13 review (low): if a duel's challenge is deactivated mid-match, the question/reveal event is skipped silently while the phase still advances. Log at error, or cancel the duel.
+- P13 review (low): socket rate limit is per socket (a user can open many); `POST /duels` and `POST /duels/:id/cancel` have no route limiter beyond the global one.
+- P14: remove the V1 DUEL-session bits the app still reads (`SessionView.stepElapsedMs`, `endedEarly`, the duel timer in `SessionScreen`) once the live match screen replaces them; the app must keep the duel socket connected (or reconnect within 60 s) after sharing a lobby code, or the lobby is cancelled.
 
 ## Product backlog (from docs/product/)
 - **P8: new Explore mini-games** (Rajdeep, D-037): fast formats beyond the four quiz modes, such as a 60-second blitz or a swipe true/false round. Needs new content and engine work.

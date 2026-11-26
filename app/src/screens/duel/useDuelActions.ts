@@ -2,8 +2,8 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Alert, Share } from 'react-native';
-import type { DuelFormat, DuelView } from '@luna/shared';
+import { Share } from 'react-native';
+import type { DuelFormat, DuelSnapshot } from '@luna/shared';
 import { bladeOf, rulesLine } from '../../lib/duelFormats';
 import { duelsApi, userMessage } from '../../api';
 import type { AppStackParams } from '../../navigation/types';
@@ -21,25 +21,10 @@ export async function shareDuelCode(code: string, format?: DuelFormat): Promise<
   }
 }
 
-/** The duel rules, shown once before the timer starts, so nobody is surprised by the countdown. */
-export function confirmReady(
-  rivalName: string | null,
-  format: DuelFormat | undefined,
-  onPlay: () => void,
-): void {
-  Alert.alert(
-    `${bladeOf(format).name}${rivalName ? ` vs @${rivalName}` : ''}`,
-    `${rulesLine(format)} No hints. The timer starts as soon as you begin.`,
-    [
-      { text: 'Not now', style: 'cancel' },
-      { text: 'Begin', onPress: onPlay },
-    ],
-  );
-}
-
 /**
- * Create, join and play, each guarded by `pending` so a double tap never sends a second request
- * (a second create would open a second duel).
+ * Create and join, each guarded by `pending` so a double tap never sends a second request (a second
+ * create would hit the one-open-duel rule). Live play arrives in P14 (D-052); until then both open
+ * the duel's page, which shows the lobby or the result.
  */
 export function useDuelActions() {
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParams>>();
@@ -62,25 +47,26 @@ export function useDuelActions() {
     }
   }
 
-  async function create(format: DuelFormat): Promise<DuelView | null> {
+  const openDuel = (duelId: string) => navigation.navigate('DuelResult', { duelId });
+
+  async function create(format: DuelFormat): Promise<DuelSnapshot | null> {
     const duel = await run('create', () => duelsApi.create(format));
     if (duel) {
       void refresh();
       await shareDuelCode(duel.code, duel.format);
+      openDuel(duel.id);
     }
     return duel;
   }
 
-  async function join(code: string): Promise<DuelView | null> {
+  async function join(code: string): Promise<DuelSnapshot | null> {
     const duel = await run('join', () => duelsApi.join(code));
-    if (duel) void refresh();
+    if (duel) {
+      void refresh();
+      openDuel(duel.id);
+    }
     return duel;
   }
 
-  async function play(duelId: string): Promise<void> {
-    const session = await run(duelId, () => duelsApi.play(duelId));
-    if (session) navigation.navigate('Session', { sessionId: session.id });
-  }
-
-  return { create, join, play, pending, error, clearError: () => setError(null) };
+  return { create, join, openDuel, pending, error, clearError: () => setError(null) };
 }

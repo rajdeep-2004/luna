@@ -38,7 +38,8 @@ export const DATABASES_CHOICE: ChallengeSeed[] = [
     subtopic: 'data types',
     type,
     difficulty: 1,
-    prompt: 'You are adding a price column for a shop that sells in euros. Which type do you choose?',
+    prompt:
+      'You are adding a price column for a shop that sells in euros. Which type do you choose?',
     options: opts(
       'FLOAT holding euros, because it handles decimals',
       'TEXT holding strings like "19.99", so nothing is rounded',
@@ -346,7 +347,7 @@ export const DATABASES_CHOICE: ChallengeSeed[] = [
       c: "Dates come first, so one user's rows are scattered across the whole index.",
       d: 'The database usually uses one and then filters or sorts; neither gives user rows in date order.',
     },
-    hint: 'Which index returns this user\'s rows already in created_at order?',
+    hint: "Which index returns this user's rows already in created_at order?",
   },
   {
     slug: 'db-partial-unique-soft-delete',
@@ -450,7 +451,7 @@ export const DATABASES_CHOICE: ChallengeSeed[] = [
     optionFeedback: {
       a: 'Locks millions of rows for a long time and rolls everything back on any failure.',
       b: 'Memory blow-up and the same giant transaction, plus a network trip for every row.',
-      c: 'A constant default cannot compute a value from each row\'s address.',
+      c: "A constant default cannot compute a value from each row's address.",
     },
   },
   {

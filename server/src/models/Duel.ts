@@ -1,7 +1,7 @@
 import { Schema, model, type InferSchemaType, type HydratedDocument } from 'mongoose';
-import { DUEL_FORMATS } from '@luna/shared';
+import { DUEL_FORMATS, DUEL_PHASES } from '@luna/shared';
 
-/** One finished player's score, written once when their DUEL session completes. */
+/** One player's final score, written once when the duel ends. */
 const resultSchema = new Schema(
   {
     correct: { type: Number, required: true },
@@ -20,34 +20,60 @@ const itemSchema = new Schema(
   { _id: false },
 );
 
+/** A player's live presence. Only the socket layer writes it. */
+const seatSchema = new Schema(
+  {
+    connected: { type: Boolean, default: false },
+    /** Last connect or disconnect; the reconnect and lobby grace periods count from here. */
+    lastSeenAt: { type: Date, default: () => new Date() },
+    readyAt: { type: Date, default: null },
+  },
+  { _id: false },
+);
+
 /**
- * An asynchronous friend duel. Status moves OPEN (no opponent) → ACTIVE (joined) → COMPLETED or
- * EXPIRED. Every transition is a conditional update on the current status, so it happens once.
- * Expiry is checked on read (no background job, architecture §12).
+ * A live duel (D-052). `phase` is the server-authoritative state machine (shared/liveDuel.ts);
+ * every transition is a conditional update on `(phase, currentIndex)`, so a deadline timer and an
+ * answer racing each other move it once. Answers live in `duelanswers`.
+ *
+ * V1 asynchronous duels kept `status` and `expiresAt`; the boot migration gave every V1 row a phase
+ * (D-052), so new code reads `phase` only.
  */
 const duelSchema = new Schema(
   {
     code: { type: String, required: true },
     creatorId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     opponentId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
-    /** Duels made before P7 have no field and read as CLASSIC. */
     format: { type: String, enum: DUEL_FORMATS, default: 'CLASSIC' },
     items: { type: [itemSchema], required: true },
-    status: {
-      type: String,
-      enum: ['OPEN', 'ACTIVE', 'COMPLETED', 'EXPIRED'],
-      default: 'OPEN',
-    },
+    phase: { type: String, enum: DUEL_PHASES, required: true },
+    currentIndex: { type: Number, default: 0 },
+    questionStartedAt: { type: Date, default: null },
+    deadlineAt: { type: Date, default: null },
+    /** End of COUNTDOWN or REVEAL. */
+    phaseEndsAt: { type: Date, default: null },
+    lobbyExpiresAt: { type: Date, default: null },
+    creatorSeat: { type: seatSchema, default: () => ({}) },
+    opponentSeat: { type: seatSchema, default: null },
     creatorResult: { type: resultSchema, default: null },
     opponentResult: { type: resultSchema, default: null },
     winnerId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
-    endReason: { type: String, enum: ['PLAYED', 'FORFEIT', 'EXPIRED', null], default: null },
+    endReason: {
+      type: String,
+      enum: ['PLAYED', 'FORFEIT', 'EXPIRED', 'CANCELLED', 'ABANDONED', null],
+      default: null,
+    },
+    endedAt: { type: Date, default: null },
+    /** Set once the win bonus is settled and both DUEL sessions are completed. */
+    finalizedAt: { type: Date, default: null },
     /** Claimed with a false→true update before paying, so the win bonus is paid at most once. */
     winBonusClaimed: { type: Boolean, default: false },
     winBonusXP: { type: Number, default: 0 },
     /** Set once the claimed bonus is paid or found capped, so a concurrent reader knows it's final. */
     winBonusSettled: { type: Boolean, default: false },
-    expiresAt: { type: Date, required: true },
+    /** V1 only (no default): OPEN/ACTIVE/COMPLETED/EXPIRED and the 48 h play window. */
+    status: { type: String, enum: ['OPEN', 'ACTIVE', 'COMPLETED', 'EXPIRED'] },
+    expiresAt: { type: Date },
   },
   { timestamps: true },
 );
@@ -55,6 +81,16 @@ const duelSchema = new Schema(
 duelSchema.index({ code: 1 }, { unique: true });
 duelSchema.index({ creatorId: 1, createdAt: -1 });
 duelSchema.index({ opponentId: 1, createdAt: -1 });
+// "My open lobby" and the one-lobby rule: two concurrent creates can't both insert a LOBBY.
+duelSchema.index({ creatorId: 1, phase: 1 });
+duelSchema.index(
+  { creatorId: 1 },
+  { unique: true, partialFilterExpression: { phase: 'LOBBY' }, name: 'one_open_lobby' },
+);
+// Boot recovery: in-flight duels by phase, and due deadlines.
+duelSchema.index({ phase: 1, deadlineAt: 1 });
+// Boot recovery: ended duels whose bonus/sessions were not finalized (crash between steps).
+duelSchema.index({ finalizedAt: 1, phase: 1 });
 
 export type Duel = InferSchemaType<typeof duelSchema>;
 export type DuelDoc = HydratedDocument<Duel>;

@@ -86,12 +86,12 @@ export const JoinDuelRequest = z.object({ code: DuelCode });
 export type JoinDuelRequest = z.infer<typeof JoinDuelRequest>;
 
 /**
- * Sent as the answer when the 60 s duel timer runs out. The server also treats any answer that
- * arrives after the timer (plus a small network grace) as a timeout, so the client can't stall.
+ * The answer recorded for a question nobody answered before the deadline. Only the server writes it
+ * (live duels, D-052); a client can't submit it.
  */
 export const DUEL_TIMEOUT_ANSWER = 'TIMEOUT';
 
-/** game-modes.md §4: the per-challenge duel countdown. The app shows it; the server enforces it. */
+/** game-modes.md §4: the per-challenge Classic duel countdown. */
 export const DUEL_TIMER_MS = 60_000;
 
 /** The three blades (D-039). Classic is the original duel; the others arrived with P7. */
@@ -99,63 +99,18 @@ export const DUEL_FORMATS = ['CLASSIC', 'BLITZ', 'SUDDEN_DEATH'] as const;
 export type DuelFormat = (typeof DUEL_FORMATS)[number];
 
 /**
- * Size and clock of each format. `graceMs` is the network allowance on top of the timer before a
- * late answer counts as a timeout; Blitz gets 2 s because 5 s would be half its timer.
- * Sudden Death ends the run at the first miss, so `questions` is its maximum.
+ * Size and clock of each format, read by the server engine and the app. Sudden Death ends at the
+ * first question where exactly one player is wrong (D-052), so `questions` is its maximum.
  */
 export const DUEL_FORMAT_RULES: Record<
   DuelFormat,
-  { questions: number; timerMs: number; graceMs: number; endsOnMiss: boolean }
+  { questions: number; timerMs: number; endsOnMiss: boolean }
 > = {
-  CLASSIC: { questions: 5, timerMs: DUEL_TIMER_MS, graceMs: 5_000, endsOnMiss: false },
-  BLITZ: { questions: 10, timerMs: 10_000, graceMs: 2_000, endsOnMiss: false },
-  SUDDEN_DEATH: { questions: 10, timerMs: 30_000, graceMs: 5_000, endsOnMiss: true },
+  CLASSIC: { questions: 5, timerMs: DUEL_TIMER_MS, endsOnMiss: false },
+  BLITZ: { questions: 10, timerMs: 10_000, endsOnMiss: false },
+  SUDDEN_DEATH: { questions: 10, timerMs: 30_000, endsOnMiss: true },
 };
 
 /** `POST /duels`. The body is optional; an empty one makes a Classic duel. */
 export const CreateDuelRequest = z.object({ format: z.enum(DUEL_FORMATS).default('CLASSIC') });
 export type CreateDuelRequest = z.infer<typeof CreateDuelRequest>;
-
-export type DuelStatus = 'OPEN' | 'ACTIVE' | 'COMPLETED' | 'EXPIRED';
-export type DuelEndReason = 'PLAYED' | 'FORFEIT' | 'EXPIRED';
-
-export type DuelPlayerResult = {
-  correct: number;
-  totalTimeMs: number;
-  /** One entry per challenge, in duel order. Only on `GET /duels/:id`, not in lists. */
-  perQuestion?: { isCorrect: boolean; timeTakenMs: number; timedOut: boolean }[];
-};
-
-export type DuelView = {
-  id: string;
-  code: string;
-  format: DuelFormat;
-  status: DuelStatus;
-  role: 'CREATOR' | 'OPPONENT';
-  me: PlayerView;
-  /** Null until someone joins. */
-  rival: PlayerView | null;
-  myState: 'NOT_STARTED' | 'PLAYING' | 'FINISHED';
-  rivalFinished: boolean;
-  /** My DUEL session, once started. */
-  sessionId: string | null;
-  createdAt: string;
-  expiresAt: string;
-  /** Set once the duel is COMPLETED or EXPIRED. */
-  result: {
-    endReason: DuelEndReason;
-    /** Null on a draw or when nobody finished. */
-    winnerId: string | null;
-    mine: DuelPlayerResult | null;
-    rivals: DuelPlayerResult | null;
-    /** The win bonus paid to the winner (0 when capped, a draw or a forfeit). */
-    winBonusXP: number;
-  } | null;
-};
-
-/** `GET /duels`: the Duel screen's three tabs. */
-export type DuelListView = {
-  yourTurn: DuelView[];
-  waiting: DuelView[];
-  finished: DuelView[];
-};

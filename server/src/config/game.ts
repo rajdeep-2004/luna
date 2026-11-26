@@ -149,14 +149,11 @@ export const DUEL = {
   } satisfies Record<DuelFormat, readonly ChallengeType[]>,
   codeLength: 6,
   codeRetries: 5,
-  // Timers and grace per format live in DUEL_FORMAT_RULES (shared), so the app reads the same numbers.
-  expiryMs: 48 * 60 * 60 * 1000,
-  maxOpenPerUser: 5,
+  // Timers per format live in DUEL_FORMAT_RULES and the live clock in LIVE_DUEL (both shared).
   winBonusXP: 10,
   winBonusesPerDay: 3,
-  finishedListSize: 20,
-  /** Bounds the "your turn" and "waiting" lists; a user has at most 5 open duels as creator. */
-  activeListMax: 50,
+  /** `GET /duels` history page size. */
+  historyPageSize: 20,
   /** Penalty per earlier pick from the same topic, so a duel mixes topics. */
   repeatTopicPenalty: 2,
   /** How long a winner's completion waits for a concurrent bonus payment (D-033). */

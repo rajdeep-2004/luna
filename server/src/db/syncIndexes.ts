@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import '../models/AnswerAttempt';
 import '../models/Challenge';
 import '../models/Duel';
+import '../models/DuelAnswer';
 import '../models/RevisitItem';
 import '../models/Session';
 import '../models/Topic';

@@ -111,7 +111,7 @@ export const CACHING_QUEUES_CHOICE: ChallengeSeed[] = [
     type,
     difficulty: 1,
     prompt:
-      'You scaled the API from 1 to 3 instances behind a load balancer. Sessions are kept in each process\'s memory, and users now get logged out at random. Admins must be able to revoke a session instantly. What do you change?',
+      'You scaled the API from 1 to 3 instances behind a load balancer. Sessions are kept in each process\'s memory, and users now get logged out at random. You need to keep all 3 instances, and admins must be able to revoke a session instantly. What do you change?',
     options: opts(
       'Store sessions in a shared Redis that every instance reads',
       'Give each instance more memory',
@@ -125,7 +125,7 @@ export const CACHING_QUEUES_CHOICE: ChallengeSeed[] = [
       'Once there is more than one instance, anything kept in process memory is local to one of them. Shared state needs a shared store.',
     optionFeedback: {
       b: 'Memory size is not the problem; the sessions are on the wrong instance.',
-      c: 'Works, but gives up the scaling you needed.',
+      c: 'Ruled out: you need the 3 instances for the traffic.',
       d: 'Still local to each server, so the same random logouts happen.',
     },
   },
@@ -227,7 +227,7 @@ export const CACHING_QUEUES_CHOICE: ChallengeSeed[] = [
     ),
     answerKey: 'b',
     explanation:
-      'Every instance increments the same Redis key, and INCR is atomic, so the count is exact across servers. The expiry starts the 15-minute window on the first failure and resets it afterwards.',
+      'Every instance increments the same Redis key, and INCR is atomic, so the count is exact across servers. The expiry starts a fixed 15-minute window at the first failure; when the key expires, the count starts again from zero. In production, send INCR and EXPIRE together (MULTI or a small Lua script) so a crash between them cannot leave a counter with no TTL.',
     misconception:
       'A limit enforced per instance is really "limit × instances". Shared limits need shared, atomic counters.',
     optionFeedback: {
@@ -275,7 +275,7 @@ export const CACHING_QUEUES_CHOICE: ChallengeSeed[] = [
       'Keep PUBLISH, but publish each message twice',
       'A Redis Stream with a consumer group, acked after the invoice is saved',
       'Make the invoicing service restart faster',
-      'Have invoicing poll the orders service\'s HTTP API every minute for all orders',
+      'Have the orders service call invoicing over HTTP once per order, logging any failure',
     ),
     answerKey: 'b',
     explanation:
@@ -285,7 +285,7 @@ export const CACHING_QUEUES_CHOICE: ChallengeSeed[] = [
     optionFeedback: {
       a: 'Both copies are lost if nobody is listening.',
       c: 'Shrinks the window but never closes it.',
-      d: 'Works, but polls everything forever and still needs to track what it has already invoiced.',
+      d: 'A call made during a restart fails, and a log line does not create the invoice: the same orders are still lost.',
     },
     hint: 'Where does a published message go when nobody is subscribed?',
   },
@@ -351,7 +351,7 @@ export const CACHING_QUEUES_CHOICE: ChallengeSeed[] = [
     type,
     difficulty: 3,
     prompt:
-      'Each order saved in Postgres must produce an "order placed" message for the warehouse. Publishing after COMMIT loses messages when the process crashes in between; publishing before COMMIT announces orders that then roll back. The message broker does not support distributed transactions. What do you build?',
+      'Each order saved in Postgres must produce an "order placed" message for the warehouse. Publishing after COMMIT loses messages when the process crashes in between; publishing before COMMIT announces orders that then roll back. The message broker does not support distributed transactions, and the warehouse is another team\'s service that must not read your database. What do you build?',
     options: opts(
       'Insert the message into an outbox table in the same transaction; a relay publishes and marks it sent',
       'Publish before COMMIT and send a "cancel" message if the transaction fails',
@@ -366,7 +366,7 @@ export const CACHING_QUEUES_CHOICE: ChallengeSeed[] = [
     optionFeedback: {
       b: 'A crash before the cancel is sent leaves the bogus order announced.',
       c: 'The retry loop lives in the process that just crashed, so it never runs.',
-      d: 'Works for one consumer, but couples the warehouse to your schema and misses rows from long transactions that commit late.',
+      d: 'Ruled out: the warehouse must not read your database, and polling by id misses rows from long transactions that commit late.',
     },
   },
   {

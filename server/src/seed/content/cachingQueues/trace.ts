@@ -238,9 +238,9 @@ export const CACHING_QUEUES_TRACE: ChallengeSeed[] = [
     type,
     difficulty: 3,
     prompt:
-      'Stock is 1. Client A runs the steps on the left; between A\'s GET and EXEC, client B runs DECR stock. What does A\'s EXEC return, and what is stock afterwards?',
+      'Stock is 1. Client A runs the steps on the left; between A\'s GET and EXEC, client B runs DECR stock. The steps run top to bottom. What does A\'s EXEC return, and what is stock afterwards?',
     codeSnippet:
-      '# Client A\nWATCH stock\nGET stock        # "1"\nMULTI\nDECR stock\nEXEC\n# Client B, before A\'s EXEC:\nDECR stock',
+      'A: WATCH stock\nA: GET stock     # "1"\nB: DECR stock     # runs now, before A\'s EXEC\nA: MULTI\nA: DECR stock\nA: EXEC',
     options: opts(
       'A\'s EXEC returns an array with -1; stock is -1',
       'B\'s DECR waits until A\'s EXEC finishes; stock is -1',

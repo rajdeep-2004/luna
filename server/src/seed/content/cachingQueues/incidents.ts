@@ -127,7 +127,7 @@ export const CACHING_QUEUES_INCIDENTS: ChallengeSeed[] = [
         ),
         answerKey: 'd',
         explanation:
-          "Invalidate after a successful write, so a concurrent read can't re-cache the old value. A shorter TTL bounds the damage if an invalidation is ever missed.",
+          'Invalidating after a successful write means any read that starts afterwards loads the new price. A rare slow read that straddles the write can still re-cache the old value, so a shorter TTL bounds that case and any invalidation that is ever missed.',
         misconception:
           'Deleting before the write races with readers and can bring the old price back. A short TTL alone still leaves a minute of wrong prices and more database load.',
       },

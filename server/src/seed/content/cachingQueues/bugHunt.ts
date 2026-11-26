@@ -31,7 +31,7 @@ export const CACHING_QUEUES_BUG_HUNT: ChallengeSeed[] = [
     type,
     difficulty: 1,
     prompt:
-      'The dashboard shows a 0% cache hit rate for users, even for the same user requested again and again. Which line is the bug?',
+      'Every cache in the app uses keys like user:<id>. The dashboard shows a 0% cache hit rate for users, even for the same user requested again and again. Which line is the bug?',
     codeSnippet:
       'async function getUser(id) {\n  const cached = await redis.get(`user:${id}`);\n  if (cached) return JSON.parse(cached);\n  const user = await db.users.findById(id);\n  await redis.set(`users:${id}`, JSON.stringify(user), { EX: 600 });\n  return user;\n}',
     answerKey: '5',
@@ -120,7 +120,7 @@ export const CACHING_QUEUES_BUG_HUNT: ChallengeSeed[] = [
     prompt:
       'Profiles include viewer-specific fields (like "you follow them"). Users sometimes see another viewer\'s version. Which line is the bug?',
     codeSnippet:
-      "async function getProfile(userId, viewerId) {\n  const key = `profile:${userId}`;\n  const cached = await redis.get(key);\n  if (cached) return JSON.parse(cached);\n  const profile = await buildProfile(userId, viewerId);\n  await redis.set(key, JSON.stringify(profile), 'EX', 300);\n  return profile;\n}",
+      "async function getProfile(userId, viewerId) {\n  const key = `profile:${userId}`;\n  const cached = await redis.get(key);\n  if (cached) return JSON.parse(cached);\n  const profile = await buildProfile(userId, viewerId);\n  await redis.set(key, JSON.stringify(profile), { EX: 300 });\n  return profile;\n}",
     answerKey: '2',
     explanation:
       "The result depends on both userId and viewerId, but the key only contains userId. The first viewer's version is served to everyone. The key must include every input that changes the result, or the viewer-specific parts must not be cached.",
@@ -138,7 +138,7 @@ export const CACHING_QUEUES_BUG_HUNT: ChallengeSeed[] = [
     prompt:
       'The exchange-rate API was down for 5 seconds. For the next hour, every user saw the hard-coded default rates. Which line is the bug?',
     codeSnippet:
-      "async function getRates() {\n  const cached = await redis.get('rates');\n  if (cached) return JSON.parse(cached);\n  try {\n    const rates = await fetchRates();\n    await redis.set('rates', JSON.stringify(rates), 'EX', 3600);\n    return rates;\n  } catch {\n    await redis.set('rates', JSON.stringify(DEFAULT_RATES), 'EX', 3600);\n    return DEFAULT_RATES;\n  }\n}",
+      "async function getRates() {\n  const cached = await redis.get('rates');\n  if (cached) return JSON.parse(cached);\n  try {\n    const rates = await fetchRates();\n    await redis.set('rates', JSON.stringify(rates), { EX: 3600 });\n    return rates;\n  } catch {\n    await redis.set('rates', JSON.stringify(DEFAULT_RATES), { EX: 3600 });\n    return DEFAULT_RATES;\n  }\n}",
     answerKey: '9',
     explanation:
       'Returning a fallback during an outage is fine. Caching it for the full hour is not: once the API recovers, the cache keeps serving the fallback. Do not cache the fallback, or cache it for a few seconds so the next request retries soon.',
@@ -190,7 +190,7 @@ export const CACHING_QUEUES_BUG_HUNT: ChallengeSeed[] = [
     prompt:
       'Search results are cached, but the hit rate is low: the app and the website build the same filters with parameters in a different order. Which line is the bug?',
     codeSnippet:
-      "app.get('/search', async (req, res) => {\n  const key = 'search:' + JSON.stringify(req.query);\n  const cached = await redis.get(key);\n  if (cached) return res.json(JSON.parse(cached));\n  const results = await searchProducts(req.query);\n  await redis.set(key, JSON.stringify(results), 'EX', 120);\n  res.json(results);\n});",
+      "app.get('/search', async (req, res) => {\n  const key = 'search:' + JSON.stringify(req.query);\n  const cached = await redis.get(key);\n  if (cached) return res.json(JSON.parse(cached));\n  const results = await searchProducts(req.query);\n  await redis.set(key, JSON.stringify(results), { EX: 120 });\n  res.json(results);\n});",
     answerKey: '2',
     explanation:
       '?color=red&size=m and ?size=m&color=red are the same search, but JSON.stringify keeps insertion order, so they produce two keys and two misses. Normalise the key: sort the parameters (and drop ones that do not affect results) before building it.',
@@ -205,12 +205,12 @@ export const CACHING_QUEUES_BUG_HUNT: ChallengeSeed[] = [
     type,
     difficulty: 2,
     prompt:
-      'The API runs on 4 instances behind a load balancer. After an admin turns a feature flag off, most requests still see it on, for hours. Which line is the bug?',
+      'The API runs on 4 instances behind a load balancer. flagCache is a module-level Map, filled on first read and never expired. After an admin turns a feature flag off, most requests still see it on, for hours. Which line is the bug?',
     codeSnippet:
-      "const flagCache = new Map(); // filled on first read, no expiry\napp.put('/admin/flags/:name', async (req, res) => {\n  await db.flags.update(req.params.name, req.body);\n  flagCache.delete(req.params.name);\n  res.sendStatus(204);\n});",
-    answerKey: '1',
+      "app.put('/admin/flags/:name', async (req, res) => {\n  await db.flags.update(req.params.name, req.body);\n  flagCache.delete(req.params.name);\n  res.sendStatus(204);\n});",
+    answerKey: '3',
     explanation:
-      'Each instance has its own Map. The delete runs only on the instance that handled the admin request; the other three keep their copy forever. Use a shared cache (Redis) or give the local cache a short TTL so every instance refreshes.',
+      'Each instance has its own Map. This delete runs only on the instance that handled the admin request; the other three keep their copy forever. Invalidate everywhere (move the flags to a shared cache such as Redis, or broadcast the invalidation), and give local copies a short TTL as a backstop.',
     misconception:
       'An in-process cache is per process. Invalidating it on one instance does nothing for the others.',
     hint: 'How many copies of flagCache exist in production?',

@@ -327,7 +327,7 @@ export const DATABASES_TRACE: ChallengeSeed[] = [
     prompt:
       'Same two checkouts as a plain read-then-write, but now both transactions use REPEATABLE READ in Postgres. Both read stock 5, then A updates to 4 and commits. What happens to B\'s UPDATE?',
     codeSnippet:
-      "-- A and B both:\nBEGIN ISOLATION LEVEL REPEATABLE READ;\nSELECT stock FROM items WHERE id = 7;        -- 5\nUPDATE items SET stock = 4 WHERE id = 7;\nCOMMIT;",
+      "-- A and B both:\nBEGIN ISOLATION LEVEL REPEATABLE READ;\nSELECT stock FROM items WHERE id = 7;        -- 5\nUPDATE items SET stock = $1 WHERE id = 7;  -- $1 = value read - 1 (4)\nCOMMIT;",
     options: opts(
       'It fails with "could not serialize access due to concurrent update"',
       'It succeeds and the stock ends at 4, as at READ COMMITTED',

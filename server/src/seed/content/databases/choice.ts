@@ -329,24 +329,24 @@ export const DATABASES_CHOICE: ChallengeSeed[] = [
     type,
     difficulty: 3,
     prompt:
-      'The hot query is: WHERE user_id = ? ORDER BY created_at DESC LIMIT 20. Which index serves it best?',
+      "The hot query is: WHERE user_id = ? AND kind IN ('post', 'share') ORDER BY created_at DESC LIMIT 20. About 95% of a user's rows match the kind filter, and power users have millions of rows. Which index serves it best?",
     options: opts(
       'A compound index on (user_id, created_at)',
+      'A compound index on (user_id, kind, created_at)',
       'A compound index on (created_at, user_id)',
-      'Two separate indexes, one on each column',
-      'An index on created_at only',
+      'Two separate indexes, on user_id and on created_at',
     ),
     answerKey: 'a',
     explanation:
-      "Put the equality column first and the sort column second. The database jumps to that user's entries, which are already ordered by date, and reads 20 of them. No sorting is needed.",
+      "With (user_id, created_at) the database jumps to that user's entries, already ordered by date, and reads them newest first, dropping the 5% with another kind, until it has 20. No sort is needed. Putting kind second looks more precise, but an IN list on it splits the user's rows into two date-ordered runs, so Postgres must read every matching row of both and sort them before the LIMIT.",
     misconception:
-      'Column order in a compound index matters: it works like a phone book sorted by last name, then first name.',
+      'Matching every filter column is not the goal. A column between the equality filter and the sort column breaks the index order unless it is also an equality.',
     optionFeedback: {
-      b: "Dates come first, so one user's rows are scattered across the index.",
-      c: 'The database usually uses only one, then filters or sorts the rest.',
-      d: "It reads everyone's recent rows and filters out other users.",
+      b: 'The IN on kind breaks the created_at order: millions of rows are read and sorted to return 20.',
+      c: "Dates come first, so one user's rows are scattered across the whole index.",
+      d: 'The database usually uses one and then filters or sorts; neither gives user rows in date order.',
     },
-    hint: 'Equality filter first, then the sort.',
+    hint: 'Which index returns this user\'s rows already in created_at order?',
   },
   {
     slug: 'db-partial-unique-soft-delete',

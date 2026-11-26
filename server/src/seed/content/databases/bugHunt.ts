@@ -263,7 +263,7 @@ export const DATABASES_BUG_HUNT: ChallengeSeed[] = [
       "const { rows } = await db.query(\n  `SELECT id, title, created_at FROM posts\n   WHERE created_at < $1\n   ORDER BY created_at DESC, id DESC\n   LIMIT 20`,\n  [cursor.createdAt],\n);",
     answerKey: '3',
     explanation:
-      'If page 1 ends in the middle of a group of posts sharing one created_at, "created_at < cursor" skips the rest of that group. The cursor must include the tie-breaker: WHERE (created_at, id) < ($1, $2), with cursor.id as the second parameter, matching the ORDER BY.',
+      'If page 1 ends in the middle of a group of posts sharing one created_at, "created_at < cursor" skips the rest of that group. The cursor must include the tie-breaker: WHERE (created_at, id) < ($1, $2), with cursor.id as the second parameter, matching the ORDER BY. Passing that parameter is a companion edit; the bug is the WHERE clause that ignores the tie-breaker.',
     misconception:
       'A keyset cursor must be unique. Sorting by a tie-breaker is not enough if the WHERE clause ignores it.',
     hint: 'What happens to rows that have exactly the cursor\'s created_at?',
@@ -298,7 +298,7 @@ export const DATABASES_BUG_HUNT: ChallengeSeed[] = [
       "BEGIN;\nSELECT id, payload FROM jobs\n  WHERE status = 'queued'\n  ORDER BY id\n  LIMIT 1\n  FOR UPDATE;\n-- process the job, then:\nUPDATE jobs SET status = 'done' WHERE id = $1;\nCOMMIT;",
     answerKey: '6',
     explanation:
-      'Every worker selects the same oldest row and FOR UPDATE makes all but one wait for its lock. When it is released, the waiting workers find that row already done and come back empty-handed, so jobs are still processed one at a time. FOR UPDATE SKIP LOCKED makes each worker skip rows that are already locked and take the next free job.',
+      'Every worker selects the same oldest row and FOR UPDATE makes all but one wait for its lock. When it is released, Postgres re-checks the row for each waiting worker, sees it is no longer queued, and with LIMIT 1 usually returns no row at all, so jobs are still processed about one at a time. FOR UPDATE SKIP LOCKED makes each worker skip rows that are already locked and take the next free job.',
     misconception:
       'Adding workers only helps if they can claim different work. Lock contention on the same row serialises them.',
     hint: 'Which row does every worker try to lock?',

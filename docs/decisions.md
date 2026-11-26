@@ -1784,3 +1784,79 @@ ordering; hot keys vs sharding.
 
 **Revisit** when P12 finishes debugging-prod (add it to `FINISHED_TOPICS`), or if players report a question as wrong
 (fix the text, keep the slug).
+
+### D-051 — V2 question bank for Debugging & production (P12), and the full-bank audit
+
+**Context.** P12 is the last V2 content phase (plan §3–§4, D-047). Debugging-prod had 10 V1 singles and 2 incidents, still
+in the old single-file layout (`content/debuggingProd.ts` plus the shared `content/incidents.ts`). The target is the same
+as every topic: 6 Trace, 6 Bug Hunt and 6 Engineer's Choice at each level (54 singles) plus 4 incidents at levels 1, 2, 2
+and 3. P12 also had to prove the whole bank complete: `npm run audit:content -w server -- --strict` across all five topics.
+
+**Decision.** Debugging-prod now meets the target exactly, in the folder layout from P10:
+`server/src/seed/content/debuggingProd/{trace,bugHunt,choice,incidents}.ts` plus `index.ts`. The shared `incidents.ts`
+held only the two debugging-prod incidents, so it moved into the topic folder and the shared file was deleted;
+`content/index.ts` now just concatenates the five topics. Every V1 slug is kept, so player history stays valid.
+
+**Re-levelled and reworked V1 questions.**
+- `prod-unbounded-map` 3 → 2. Keys that are never reused (because of `Date.now()`) are one idea plus garbage-collection
+  reachability. That is not a senior-level production edge case.
+- `prod-canary` 3 → 2, and the stem now gives counts (20,000 requests, 400 errors against an expected 200), so it no longer
+  clashes with the new level-3 `prod-canary-small-sample`, which teaches the opposite case: a difference too small to
+  mean anything.
+- `prod-heavy-health-check`: the old answer put a database ping in the endpoint the platform uses to restart pods. The
+  reviewer caught that this contradicts the new Bug Hunt `prod-liveness-checks-db`, so the answer now keeps the restart
+  check to the process and moves the database check to readiness.
+- The joke distractors were replaced with real misconceptions: "start rewriting the feature" is still there but phrased
+  as a belief, "turn logging off" became "lower the log level to debug everywhere", and "add two more tables for
+  safety" became "raise the platform timeout". As in D-050, V1 options were re-ordered so that not every V1 answer is
+  "a". Stored attempts keep `isCorrect`, so only old session detail views are affected.
+
+**Subtopics covered.** Logging (levels, structured fields, secrets in logs, `JSON.stringify` of an Error, log volume
+and sampling), stack traces, error handling (catch-and-continue, empty catch, errors sent with status 200, matching on
+message text vs error codes, unhandled rejections killing the process, Express 5 error-handler order, stream `'error'`
+events with `.pipe`), configuration (env vars are strings, hardcoded hosts, missing required secrets), metrics (average
+vs median vs percentiles, measuring duration after `next()`, label cardinality), SLOs and error-budget burn rate,
+alerting on symptoms, observability (request ids, module-level request state, forwarding correlation ids), timeouts
+(units, `Promise.race` not cancelling, optional dependencies), retries (amplification across layers, retrying 4xx,
+backoff without jitter, retry storms and circuit breakers), idempotency (client timeouts that duplicate writes, a new
+idempotency key per attempt), partial failure (`Promise.all` side effects), the event loop (sync crypto, ReDoS),
+resource exhaustion (pool held across an external call), memory leaks (unbounded maps, SSE listeners cleaned up on
+`'finish'`, heap-snapshot method), health checks (heavy checks, liveness vs readiness), graceful shutdown (grace period
+vs long requests, shutdown order), rate limiting behind a proxy, deploys (rollback, feature flags, canaries and sample
+size, rollback blocked by a NOT NULL migration), overload and load shedding, debugging method (bisect), incident
+response and blameless postmortems. Incidents: 502s from a missing env var (L1), cross-origin cookies (L2), an OOM-kill
+memory leak (L2), and a self-sustaining retry storm after a database failover (L3).
+
+**Balance (audit).** `--strict` over all five topics: 290 challenges (270 singles + 20 incidents), every cell at target,
+0 errors, 0 warnings. Debugging-prod correct-answer positions over its 48 multiple-choice units: a 11 / b 12 / c 13 /
+d 12. The first draft had the correct option strictly longest in 63% of questions, above the 50% limit, so twelve options
+were rewritten (shorter correct options, longer distractors that are still real beliefs). It is now at 18/48 (38%).
+
+**Test change, intentional.** `audit.test.ts` used to assert that `--strict` fails on the real bank, which was true while
+cells were under target. That behaviour change is the point of P12, so the test now checks the under-target error with a
+one-question fixture, and a new test asserts that the real bank has 290 items, no errors and no warnings under `--strict`
+and that the CLI exits 0. `bank.test.ts` adds debugging-prod to `FINISHED_TOPICS` (counts per cell, no answer key in
+rounds, P9 variety on the real bank).
+
+**Review.** One cavecrew reviewer pass over `git diff main...HEAD`: 1 high, 3 medium, 8 low. Fixed: the health-check
+contradiction (high); the backoff snippet now throws after its last attempt instead of silently resolving to undefined;
+the Express default-handler explanation now says it shows the stack outside production and prints to stderr; the
+migration-rollback stem now says the channel data must be kept, which rules out the drop-the-column option. Also fixed:
+the burn-rate wording, the canary counts, the postmortem stem (it now asks about blast radius, so a second reviewer is
+no longer an equally good answer), the timeout-budget rule (the longest serial chain, not the sum), the memory-leak
+numbers, the scope of the `next()` explanation, and a force-exit timer in the shutdown explanation. *Not changed:* three
+suggested level moves, because each would push a cell off 6/6. They are in `TODOS.md`.
+
+**Not done: seeding Atlas.** As in P10 and P11, `server/.env` points at the cluster the deployed API uses, so `npm run
+seed` was not run; every test file loads the bank through the seed schema instead. Still in `TODOS.md`.
+
+**Concepts worth learning.** Percentiles vs averages; error budgets and burn rate; why retries multiply load and how
+jitter and circuit breakers stop that; why a timeout does not cancel work; idempotency keys; liveness vs readiness;
+graceful shutdown ordering; metric cardinality; catastrophic regex backtracking; expand-and-contract migrations; load
+shedding; blameless postmortems.
+
+**Files.** `server/src/seed/content/debuggingProd/*`, `server/src/seed/content/index.ts` (old `debuggingProd.ts` and
+`incidents.ts` deleted), `docs/architecture.md`, `docs/prd.md`, `TODOS.md`.
+
+**Revisit** when players report a question as wrong or mis-levelled (fix the text, keep the slug), or when the bank grows
+past the `SELECTION.poolMax` headroom (D-050).

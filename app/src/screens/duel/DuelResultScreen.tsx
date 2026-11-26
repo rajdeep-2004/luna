@@ -10,7 +10,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import type { DuelPlayerResult, DuelView } from '@luna/shared';
+import type { DuelView } from '@luna/shared';
 import { duelsApi, userMessage } from '../../api';
 import { FaceOff } from '../../art/FaceOff';
 import { HankoStamp } from '../../art/HankoStamp';
@@ -18,15 +18,19 @@ import { WinSeal } from '../../art/WinSeal';
 import { AppText, Button, ErrorState, Screen } from '../../components';
 import { formatClock, formatRemaining } from '../../lib/duration';
 import { bladeOf, formatOrClassic, rulesLine } from '../../lib/duelFormats';
+import { duelLines, type PlayerLine } from '../../lib/duelScore';
 import { haptic } from '../../lib/haptics';
 import { useReduceMotion } from '../../lib/motion';
 import type { AppStackParams } from '../../navigation/types';
 import { colors, layout, radii, spacing } from '../../theme';
-import { confirmReady, shareDuelCode, useDuelActions } from './useDuelActions';
+import { shareDuelCode, useDuelActions } from './useDuelActions';
 
 type Props = NativeStackScreenProps<AppStackParams, 'DuelResult'>;
 
-/** competition.md §2 "Result screen", or "Waiting for @friend…" until both have played. */
+/**
+ * competition.md §2 "Result screen", or the lobby until the match is played. The live match screen
+ * arrives in P14 (D-052).
+ */
 export function DuelResultScreen({ route, navigation }: Props) {
   const { duelId } = route.params;
   const query = useQuery({ queryKey: ['duel', duelId], queryFn: () => duelsApi.get(duelId) });
@@ -43,8 +47,7 @@ export function DuelResultScreen({ route, navigation }: Props) {
   const home = () => navigation.popToTop();
 
   async function rematch() {
-    const duel = await actions.create(formatOrClassic(query.data?.format));
-    if (duel) navigation.replace('DuelResult', { duelId: duel.id });
+    await actions.create(formatOrClassic(query.data?.format));
   }
 
   const d = query.data;
@@ -97,18 +100,6 @@ export function DuelResultScreen({ route, navigation }: Props) {
             {actions.error}
           </AppText>
         ) : null}
-        {!d.result && d.myState !== 'FINISHED' ? (
-          <Button
-            label={d.myState === 'PLAYING' ? 'Resume your turn' : 'Play your turn'}
-            pending={actions.pending === d.id}
-            disabled={actions.pending !== null}
-            onPress={() =>
-              d.myState === 'PLAYING'
-                ? void actions.play(d.id)
-                : confirmReady(d.rival?.username ?? null, d.format, () => void actions.play(d.id))
-            }
-          />
-        ) : null}
         {d.result ? (
           <Button
             label="Rematch"
@@ -117,11 +108,7 @@ export function DuelResultScreen({ route, navigation }: Props) {
             onPress={() => void rematch()}
           />
         ) : null}
-        <Button
-          label="Back home"
-          variant={d.result || d.myState !== 'FINISHED' ? 'ghost' : 'primary'}
-          onPress={home}
-        />
+        <Button label="Back home" variant={d.result ? 'ghost' : 'primary'} onPress={home} />
       </View>
     </Screen>
   );
@@ -131,17 +118,13 @@ function Waiting({ duel }: { duel: DuelView }) {
   return (
     <View style={styles.waiting}>
       <AppText variant="title" style={styles.centerText}>
-        {duel.myState !== 'FINISHED'
-          ? 'Your turn'
-          : duel.rival
-            ? `Waiting for @${duel.rival.username}…`
-            : 'Waiting for someone to join…'}
+        {duel.rival ? `@${duel.rival.username} has joined` : 'Waiting for someone to join…'}
       </AppText>
       <AppText color="muted" style={styles.centerText}>
-        {duel.myState !== 'FINISHED'
-          ? `${rulesLine(duel.format)} No hints.`
-          : 'Your answers are in. The result appears when they finish.'}{' '}
-        The duel expires in {formatRemaining(duel.expiresAt)}.
+        {rulesLine(duel.format)} No hints.
+        {duel.lobbyExpiresAt
+          ? ` The invite closes in ${formatRemaining(duel.lobbyExpiresAt)}.`
+          : ''}
       </AppText>
       {!duel.rival ? (
         <View style={styles.codeSlip}>
@@ -170,6 +153,8 @@ function Waiting({ duel }: { duel: DuelView }) {
 function bannerText(d: DuelView): string {
   const r = d.result!;
   if (r.endReason === 'EXPIRED') return 'This duel expired';
+  if (r.endReason === 'CANCELLED') return 'This duel was cancelled';
+  if (r.endReason === 'ABANDONED') return 'Both players left';
   if (!r.winnerId) return 'A draw. Evenly matched.';
   if (r.winnerId === d.me.id) return r.endReason === 'FORFEIT' ? 'You win by default' : 'You win';
   const name = d.rival?.username ?? 'rival';
@@ -178,7 +163,7 @@ function bannerText(d: DuelView): string {
 
 /** After the face-off clash, the score lands and the winner's 勝 seal strikes (motion 6). */
 function Result({ duel }: { duel: DuelView }) {
-  const r = duel.result!;
+  const r = { ...duel.result!, ...duelLines(duel) };
   const reduce = useReduceMotion();
   const land = useSharedValue(reduce ? 1 : 0);
   const seal = useSharedValue(reduce ? 1 : 0);
@@ -246,8 +231,8 @@ function Result({ duel }: { duel: DuelView }) {
 }
 
 type BreakdownProps = {
-  mine: DuelPlayerResult | null;
-  rivals: DuelPlayerResult | null;
+  mine: PlayerLine | null;
+  rivals: PlayerLine | null;
   rivalName: string;
 };
 type Q = { isCorrect: boolean; timedOut: boolean } | undefined;

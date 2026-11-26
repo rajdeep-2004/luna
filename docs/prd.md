@@ -156,7 +156,7 @@ Status: `todo` | `building` | `shipped`.
 | P10 | V2 bank: JavaScript async + HTTP & APIs                                             | F-16                                                 | shipped  |
 | P11 | V2 bank: Databases + Caching & queues                                               | F-16                                                 | shipped  |
 | P12 | V2 bank: Debugging production + full-bank audit                                     | F-16                                                 | shipped  |
-| P13 | V2: live duel backend (Socket.IO, synced questions)                                 | F-18                                                 | todo     |
+| P13 | V2: live duel backend (Socket.IO, synced questions)                                 | F-18                                                 | building |
 | P14 | V2: live duel app                                                                   | F-18                                                 | todo     |
 | P15 | V2 hardening, docs, 2.0.0                                                           | all                                                  | todo     |
 | P16 | New mini-games for Explore (e.g. blitz, swipe rounds)                               | D-037                                                | todo     |

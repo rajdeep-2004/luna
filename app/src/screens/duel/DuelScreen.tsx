@@ -6,8 +6,9 @@ import { ActivityIndicator, ScrollView, StyleSheet, useWindowDimensions, View } 
 import {
   DUEL_FORMATS,
   DuelCode,
+  ENDED_PHASES,
   type DuelFormat,
-  type DuelListView,
+  type DuelPhase,
   type DuelView,
 } from '@luna/shared';
 import { duelsApi, userMessage } from '../../api';
@@ -27,14 +28,15 @@ import type { AppStackParams } from '../../navigation/types';
 import { useAuthStore } from '../../store/auth';
 import { colors, layout, radii, spacing } from '../../theme';
 import { DuelRow } from './DuelRow';
-import { confirmReady, DUELS_KEY, useDuelActions } from './useDuelActions';
+import { DUELS_KEY, useDuelActions } from './useDuelActions';
 
-type Tab = keyof DuelListView;
+type Tab = 'open' | 'finished';
 const TABS: { key: Tab; label: string; empty: string }[] = [
-  { key: 'yourTurn', label: 'Your turn', empty: 'No duels waiting on you.' },
-  { key: 'waiting', label: 'Waiting', empty: 'Nobody owes you a move.' },
+  { key: 'open', label: 'Open', empty: 'No open duels. Challenge a friend.' },
   { key: 'finished', label: 'Finished', empty: 'Your finished duels appear here.' },
 ];
+const isEnded = (d: DuelView) => (ENDED_PHASES as readonly DuelPhase[]).includes(d.phase);
+const tabOf = (d: DuelView): Tab => (isEnded(d) ? 'finished' : 'open');
 const CODE_LENGTH = 6;
 
 /**
@@ -45,9 +47,9 @@ export function DuelScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParams>>();
   const user = useAuthStore((s) => s.user);
   const { width } = useWindowDimensions();
-  const list = useQuery({ queryKey: DUELS_KEY, queryFn: duelsApi.list });
+  const list = useQuery({ queryKey: DUELS_KEY, queryFn: () => duelsApi.list() });
   const actions = useDuelActions();
-  const [tab, setTab] = useState<Tab>('yourTurn');
+  const [tab, setTab] = useState<Tab>('open');
   const [format, setFormat] = useState<DuelFormat>('CLASSIC');
   const [code, setCode] = useState('');
   const [codeError, setCodeError] = useState<string | null>(null);
@@ -65,22 +67,16 @@ export function DuelScreen() {
     if (!parsed.success) return setCodeError(parsed.error.issues[0]?.message ?? 'Invalid code');
     setCodeError(null);
     const duel = await actions.join(parsed.data);
-    if (!duel) return;
-    setCode('');
-    confirmReady(duel.rival?.username ?? null, duel.format, () => void actions.play(duel.id));
+    if (duel) setCode('');
   }
 
-  function open(duel: DuelView) {
-    if (duel.result || duel.myState === 'FINISHED')
-      return navigation.navigate('DuelResult', { duelId: duel.id });
-    if (duel.myState === 'PLAYING') return void actions.play(duel.id);
-    confirmReady(duel.rival?.username ?? null, duel.format, () => void actions.play(duel.id));
-  }
+  const open = (duel: DuelView) => navigation.navigate('DuelResult', { duelId: duel.id });
 
-  const rows = list.data?.[tab] ?? [];
+  const all = list.data?.items ?? [];
+  const rows = all.filter((d) => tabOf(d) === tab);
   const current = TABS.find((t) => t.key === tab)!;
-  // The face-off shows your next rival when one is waiting on you, else the unknown friend.
-  const next = list.data?.yourTurn.find((d) => d.rival)?.rival ?? null;
+  // The face-off shows the rival in your newest open duel, else the unknown friend.
+  const next = all.find((d) => !isEnded(d) && d.rival)?.rival ?? null;
 
   return (
     <Screen padded={false}>
@@ -157,7 +153,7 @@ export function DuelScreen() {
           <View style={styles.tabs} accessibilityRole="tablist">
             {TABS.map((t) => {
               const active = t.key === tab;
-              const count = list.data?.[t.key].length ?? 0;
+              const count = all.filter((d) => tabOf(d) === t.key).length;
               return (
                 <PressableSink
                   key={t.key}

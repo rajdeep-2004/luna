@@ -39,7 +39,7 @@ export function getProgressStats(rows: ProgressRow[]): (TopicStats & { difficult
 export async function playerStats(userId: string): Promise<PlayerStats> {
   const mine = {
     $or: [{ creatorId: userId }, { opponentId: userId }],
-    status: 'COMPLETED' as const,
+    phase: 'COMPLETED' as const,
   };
   const [katasCompleted, duelsWon, duelsDecided, duelsPlayed] = await Promise.all([
     SessionModel.countDocuments({ userId, type: 'DAILY', status: 'COMPLETED' }),

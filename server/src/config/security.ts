@@ -15,3 +15,9 @@ export const RATE_LIMITS = {
   /** Duel join: codes are guessable in principle (32^6). */
   duelJoin: { windowMs: 15 * 60 * 1000, limit: 30 },
 } as const;
+
+/**
+ * Per-socket token bucket for live duel events (D-052): `burst` events at once, refilled at
+ * `perSecond`. A normal client sends a handful per question, so this only stops floods.
+ */
+export const SOCKET_LIMITS = { burst: 10, perSecond: 3 } as const;

@@ -12,7 +12,7 @@ import type {
   TopicSlug,
   PracticeMode,
 } from '@luna/shared';
-import { DUEL_FORMAT_RULES, DUEL_TIMEOUT_ANSWER, type DuelFormat } from '@luna/shared';
+import type { DuelFormat } from '@luna/shared';
 import { SessionModel, type SessionDoc } from '../../models/Session';
 import { AnswerAttemptModel } from '../../models/AnswerAttempt';
 import type { ChallengeDoc } from '../../models/Challenge';
@@ -26,8 +26,7 @@ import { recordAnswer } from '../progress/topicProgress.service';
 import { trackRevisit } from '../progress/revisit.service';
 import { assessmentStatus } from '../progress/assessments.service';
 import { usersRepo } from '../users/users.repository';
-import { evaluate, timeoutEvaluation } from './sessions.evaluator';
-import { assertDuelPlayable } from '../duels/duels.settle';
+import { evaluate } from './sessions.evaluator';
 import {
   pickBaseline,
   pickCheckpoint,
@@ -167,23 +166,6 @@ export async function getSession(userId: string, sessionId: string): Promise<Ses
 const duelFormatOf = (session: SessionDoc): DuelFormat =>
   (session.duelFormat ?? 'CLASSIC') as DuelFormat;
 
-const endsOnMiss = (session: SessionDoc): boolean =>
-  session.type === 'DUEL' && DUEL_FORMAT_RULES[duelFormatOf(session)].endsOnMiss;
-
-/**
- * A Sudden Death run is over once it holds a miss. Derived from the attempts as well as the flag,
- * so a crash between saving the miss and setting `endedEarly` can't leave a run that neither
- * continues correctly nor completes.
- */
-const runIsOver = (session: SessionDoc, attempts: { isCorrect: boolean }[]): boolean =>
-  session.endedEarly || (endsOnMiss(session) && attempts.some((a) => !a.isCorrect));
-
-/** Time since the session's latest answer (or its start): the server clock for the current step. */
-function elapsedSince(session: SessionDoc, attempts: { createdAt: Date }[]): number {
-  const last = attempts.reduce((t, a) => (a.createdAt > t ? a.createdAt : t), session.startedAt);
-  return Math.max(0, Date.now() - last.getTime());
-}
-
 async function buildView(session: SessionDoc, challenges: ChallengeDoc[]): Promise<SessionView> {
   const byId = new Map(challenges.map((c) => [c._id.toString(), c]));
   const attempts = await AnswerAttemptModel.find({ sessionId: session._id })
@@ -216,12 +198,10 @@ async function buildView(session: SessionDoc, challenges: ChallengeDoc[]): Promi
     type: session.type as SessionType,
     ...(session.mode ? { mode: session.mode as PracticeMode } : {}),
     ...(session.type === 'DUEL' ? { duelFormat: duelFormatOf(session) } : {}),
-    ...(runIsOver(session, attempts) ? { endedEarly: true } : {}),
     status: session.status as SessionView['status'],
     startedAt: session.startedAt.toISOString(),
     totalAnswers: session.totalAnswers,
     items: items.sort((a, b) => a.order - b.order),
-    ...(session.type === 'DUEL' ? { stepElapsedMs: elapsedSince(session, attempts) } : {}),
   };
 }
 
@@ -237,7 +217,8 @@ async function loadAnswerContext(
   if (session.type === 'DAILY' && (await isKataExpired(userId, session))) {
     throw conflict('This Kata ended at midnight. Today has a new one.');
   }
-  if (session.type === 'DUEL') await assertDuelPlayable(session.duelId);
+  // Live duel answers arrive over the socket, on the duel's clock (D-052).
+  if (session.type === 'DUEL') throw conflict('Duel answers go through the live duel');
   const item = session.items.find((i) => i.challengeId.toString() === challengeId);
   if (!item) throw notFound('Challenge in this session');
   const challenge = await challengesRepo.findById(challengeId);
@@ -290,108 +271,31 @@ export async function submitAnswer(
     await repairAnsweredXP(userId, session, challenge, stageIndex);
     throw conflict('Already answered');
   }
-  if (session.endedEarly) throw conflict('This run has ended');
-  if (endsOnMiss(session)) {
-    // Sudden Death is strictly in order: only the first unanswered question may be answered,
-    // and nothing after a miss (even if the flag was never set).
-    const done = await AnswerAttemptModel.find({ sessionId })
-      .select('challengeId isCorrect')
-      .lean();
-    if (runIsOver(session, done)) throw conflict('This run has ended');
-    const doneIds = new Set(done.map((a) => a.challengeId.toString()));
-    const firstOpen = [...session.items]
-      .sort((a, b) => a.order - b.order)
-      .find((i) => !doneIds.has(i.challengeId.toString()));
-    if (firstOpen?.challengeId.toString() !== challengeId)
-      throw conflict('Answer the questions in order');
-  }
   // Server-measured time since the previous answer in this session (or the session start).
   const last = await AnswerAttemptModel.findOne({ sessionId })
     .sort({ createdAt: -1 })
     .select('createdAt')
     .lean();
   const since = last?.createdAt ?? session.startedAt;
-  const elapsedMs = Date.now() - since.getTime();
-  // Duels: the format's timer per challenge on the server's clock (60 s Classic, 10 s Blitz,
-  // 30 s Sudden Death). A late answer is a timeout whatever the client sends, and a timeout
-  // records exactly the timer (scoring.md §6).
-  const isDuel = session.type === 'DUEL';
-  const rules = isDuel ? DUEL_FORMAT_RULES[duelFormatOf(session)] : null;
-  const isTimeout =
-    !!rules && (answer === DUEL_TIMEOUT_ANSWER || elapsedMs > rules.timerMs + rules.graceMs);
-  const result = isTimeout
-    ? timeoutEvaluation(challenge, stageIndex)
-    : evaluate(challenge, stageIndex, answer);
-  const timeTakenMs = isTimeout
-    ? rules!.timerMs
-    : Math.min(elapsedMs, rules ? rules.timerMs : SESSION.maxAnswerTimeMs);
+  const result = evaluate(challenge, stageIndex, answer);
+  const timeTakenMs = Math.min(Date.now() - since.getTime(), SESSION.maxAnswerTimeMs);
   const usedHint = item.hintsUsed.includes(stageIndex);
 
-  // 1) The attempt insert is the idempotency guard: a double submit stops here with a 409.
-  let attemptId;
-  let attemptAt: Date;
-  try {
-    const attempt = await AnswerAttemptModel.create({
-      userId,
-      sessionId,
-      challengeId,
-      stageIndex,
-      answer,
-      isCorrect: result.isCorrect,
-      usedHint,
-      isTimeout,
-      timeTakenMs,
-      topicSlug: challenge.topicSlug,
-      type: challenge.type,
-      difficulty: challenge.difficulty,
-    });
-    attemptId = attempt._id;
-    attemptAt = attempt.createdAt;
-  } catch (err) {
-    if (!isDuplicateKey(err)) throw err;
+  const recorded = await recordAttempt(userId, session, challenge, {
+    stageIndex,
+    answer,
+    isCorrect: result.isCorrect,
+    usedHint,
+    isTimeout: false,
+    timeTakenMs,
+  });
+  if (!recorded) {
     await repairAnsweredXP(userId, session, challenge, stageIndex);
     throw conflict('Already answered');
   }
 
-  // 2) Topic progress, then 3) XP through the ledger (first correct only; none for the baseline).
-  await recordAnswer(
-    userId,
-    challenge.topicSlug as TopicSlug,
-    result.isCorrect,
-    challenge.difficulty,
-  );
-  const user = await usersRepo.findById(userId);
-  await trackRevisit(
-    userId,
-    {
-      id: challengeId,
-      topicSlug: challenge.topicSlug as TopicSlug,
-      type: challenge.type as ChallengeType,
-    },
-    result.isCorrect,
-    user?.timezone ?? 'UTC',
-  );
   const isIncident = challenge.type === 'INCIDENT';
   const isLastStage = stageIndex === answerCount(challenge) - 1;
-  const xpEarned = await answerXP({
-    userId,
-    session,
-    challenge,
-    stageIndex,
-    isCorrect: result.isCorrect,
-    usedHint,
-    attemptAt,
-  });
-  if (xpEarned > 0) await AnswerAttemptModel.updateOne({ _id: attemptId }, { $set: { xpEarned } });
-
-  // Sudden Death: the first miss (or timeout) ends the run. A conditional update, so a retry
-  // can't flip it twice; the flag lets completion accept fewer answers than the total.
-  const endsRun = endsOnMiss(session) && !result.isCorrect;
-  if (endsRun)
-    await SessionModel.updateOne(
-      { _id: sessionId, endedEarly: false },
-      { $set: { endedEarly: true } },
-    );
   const answeredInSession = await AnswerAttemptModel.countDocuments({ sessionId });
   const nextStage =
     isIncident && !isLastStage
@@ -399,14 +303,80 @@ export async function submitAnswer(
       : undefined;
   return {
     ...result,
-    xpEarned,
+    xpEarned: recorded.xpEarned,
     usedHint,
     timeTakenMs,
     ...(nextStage ? { nextStage } : {}),
     ...(isIncident && isLastStage && challenge.rootCause ? { rootCause: challenge.rootCause } : {}),
     challengeComplete: !isIncident || isLastStage,
-    sessionReadyToComplete: endsRun || answeredInSession >= session.totalAnswers,
+    sessionReadyToComplete: answeredInSession >= session.totalAnswers,
   };
+}
+
+export type AttemptInput = {
+  stageIndex: number;
+  answer: string;
+  isCorrect: boolean;
+  usedHint: boolean;
+  isTimeout: boolean;
+  timeTakenMs: number;
+};
+
+/**
+ * Records one evaluated answer and its effects, in order (D-015): 1) the attempt insert, which is
+ * the idempotency guard, 2) topic progress and the revisit queue, 3) XP through the ledger.
+ * Returns null when the attempt already exists (a double submit), so nothing is counted twice.
+ * Used by every session type, including live duels (D-052).
+ */
+export async function recordAttempt(
+  userId: string,
+  session: SessionDoc,
+  challenge: ChallengeDoc,
+  input: AttemptInput,
+): Promise<{ xpEarned: number } | null> {
+  const { stageIndex, isCorrect, usedHint } = input;
+  let attemptId;
+  let attemptAt: Date;
+  try {
+    const attempt = await AnswerAttemptModel.create({
+      userId,
+      sessionId: session._id,
+      challengeId: challenge._id,
+      ...input,
+      topicSlug: challenge.topicSlug,
+      type: challenge.type,
+      difficulty: challenge.difficulty,
+    });
+    attemptId = attempt._id;
+    attemptAt = attempt.createdAt;
+  } catch (err) {
+    if (isDuplicateKey(err)) return null;
+    throw err;
+  }
+
+  await recordAnswer(userId, challenge.topicSlug as TopicSlug, isCorrect, challenge.difficulty);
+  const user = await usersRepo.findById(userId);
+  await trackRevisit(
+    userId,
+    {
+      id: challenge._id.toString(),
+      topicSlug: challenge.topicSlug as TopicSlug,
+      type: challenge.type as ChallengeType,
+    },
+    isCorrect,
+    user?.timezone ?? 'UTC',
+  );
+  const xpEarned = await answerXP({
+    userId,
+    session,
+    challenge,
+    stageIndex,
+    isCorrect,
+    usedHint,
+    attemptAt,
+  });
+  if (xpEarned > 0) await AnswerAttemptModel.updateOne({ _id: attemptId }, { $set: { xpEarned } });
+  return { xpEarned };
 }
 
 export async function revealHint(
@@ -432,54 +402,57 @@ export async function revealHint(
   return { hint };
 }
 
-/**
- * Sudden Death scores only the run up to and including the first miss, in question order. The
- * order check in submitAnswer already stops later answers; this makes the score right even if a
- * concurrent submit slipped in before the run was marked as ended.
- */
-function runUpToFirstMiss<T extends { challengeId: unknown; isCorrect: boolean }>(
-  session: SessionDoc,
-  attempts: T[],
-): T[] {
-  if (!endsOnMiss(session)) return attempts;
-  const kept: T[] = [];
-  for (const item of [...session.items].sort((a, b) => a.order - b.order)) {
-    const a = attempts.find((x) => String(x.challengeId) === item.challengeId.toString());
-    if (!a) break;
-    kept.push(a);
-    if (!a.isCorrect) break;
-  }
-  return kept;
-}
-
 /** Idempotent: only the first call completes the session; later calls return the stored summary. */
 export async function completeSession(userId: string, sessionId: string): Promise<SessionSummary> {
   const session = await findOwnSession(userId, sessionId);
-  // Summaries stored before P4 have no `bonuses`; default it so clients can rely on the field.
-  if (session.status === 'COMPLETED' && session.summary) {
-    const stored = session.summary as Omit<SessionSummary, 'bonuses' | 'fixedMistakes'> & {
-      bonuses?: BonusAward[];
-      fixedMistakes?: number;
-    };
-    // A replay (reopening a finished Kata, a remount) must not re-fire the rank-up moment.
-    const { rankUp: _seen, ...rest } = stored;
-    void _seen;
-    return { ...rest, bonuses: stored.bonuses ?? [], fixedMistakes: stored.fixedMistakes ?? 0 };
-  }
+  if (session.status === 'COMPLETED' && session.summary) return storedSummary(session);
+  if (session.type === 'DUEL') throw conflict('A live duel finishes on its own');
 
-  const all = await AnswerAttemptModel.find({ sessionId })
+  const attempts = await AnswerAttemptModel.find({ sessionId })
     .select('challengeId topicSlug isCorrect timeTakenMs xpEarned')
     .lean();
-  const attempts = runUpToFirstMiss(session, all);
-  // Only a Sudden Death run that ended at a miss may finish short (D-039).
-  if (attempts.length < session.totalAnswers && !runIsOver(session, attempts))
+  if (attempts.length < session.totalAnswers)
     throw conflict('Answer every challenge before finishing');
+  return finishSession(userId, session, attempts);
+}
 
+/** A stored summary, replayed without re-firing one-time moments. */
+export function storedSummary(session: SessionDoc): SessionSummary {
+  // Summaries stored before P4 have no `bonuses`; default it so clients can rely on the field.
+  const stored = session.summary as Omit<SessionSummary, 'bonuses' | 'fixedMistakes'> & {
+    bonuses?: BonusAward[];
+    fixedMistakes?: number;
+  };
+  // A replay (reopening a finished Kata, a remount) must not re-fire the rank-up moment.
+  const { rankUp: _seen, ...rest } = stored;
+  void _seen;
+  return { ...rest, bonuses: stored.bonuses ?? [], fixedMistakes: stored.fixedMistakes ?? 0 };
+}
+
+type CompletedAttempt = {
+  challengeId: unknown;
+  topicSlug: string;
+  isCorrect: boolean;
+  timeTakenMs: number;
+  xpEarned: number;
+};
+
+/**
+ * Builds the summary, settles bonuses and streak (idempotent, so before the flip), flips the
+ * session to COMPLETED once, then checks achievements. Shared by REST completion and the live
+ * duel engine, which completes both players' DUEL sessions when a duel ends (D-052).
+ */
+export async function finishSession(
+  userId: string,
+  session: SessionDoc,
+  attempts: CompletedAttempt[],
+): Promise<SessionSummary> {
+  const sessionId = session._id.toString();
   const revisitIds = new Set(
     session.items.filter((i) => i.isRevisit).map((i) => i.challengeId.toString()),
   );
   const fixedMistakes = attempts.filter(
-    (a) => a.isCorrect && revisitIds.has(a.challengeId.toString()),
+    (a) => a.isCorrect && revisitIds.has(String(a.challengeId)),
   ).length;
   const base = {
     ...buildSummary(sessionId, session.type as SessionType, attempts),

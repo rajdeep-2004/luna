@@ -13,7 +13,7 @@ import {
 } from '../progress/progression.service';
 import { setDifficulty } from '../progress/topicProgress.service';
 import { usersRepo } from '../users/users.repository';
-import { recordDuelResult } from '../duels/duels.settle';
+import { duelBonusesFor } from '../duels/duels.settle';
 
 async function ledgerTotal(userId: string): Promise<number> {
   const [row] = await XpEventModel.aggregate<{ total: number }>([
@@ -65,7 +65,7 @@ export async function settleProgression(
   }
   const bonuses = await payBonuses(userId, candidates, session.startedAt);
   if (type === 'DUEL' && session.duelId)
-    bonuses.push(...(await recordDuelResult(userId, session.duelId, summary)));
+    bonuses.push(...(await duelBonusesFor(userId, session.duelId)));
   const xpEarned = summary.xpEarned + bonuses.reduce((n, b) => n + b.xp, 0);
 
   // Ledger total, not users.totalXP: a parallel completion may have inserted a ledger row but not

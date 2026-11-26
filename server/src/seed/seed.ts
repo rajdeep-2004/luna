@@ -2,11 +2,13 @@ import { connectDb, disconnectDb } from '../db/connect';
 import { logger } from '../lib/logger';
 import { loadContent } from './load';
 import { syncAllIndexes } from '../db/syncIndexes';
+import { migrateV1Duels } from '../db/migrations';
 
 async function main() {
   await connectDb();
   const dropped = await syncAllIndexes();
   logger.info({ dropped }, 'indexes in sync');
+  await migrateV1Duels();
   const result = await loadContent();
   logger.info(result, 'seed complete');
   await disconnectDb();

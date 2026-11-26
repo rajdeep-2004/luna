@@ -3,6 +3,7 @@ import type { DuelView } from '@luna/shared';
 import { Kanji } from '../../art/Kanji';
 import { YokaiMask } from '../../art/YokaiMask';
 import { AppText, PressableSink } from '../../components';
+import { duelLines } from '../../lib/duelScore';
 import { formatRemaining } from '../../lib/duration';
 import { bladeOf } from '../../lib/duelFormats';
 import { colors, radii, spacing } from '../../theme';
@@ -46,24 +47,22 @@ export function DuelRow({ duel, pending, disabled, onPress }: Props) {
 function statusLine(d: DuelView): string {
   if (d.result) {
     if (d.result.endReason === 'EXPIRED') return 'Expired';
+    if (d.result.endReason === 'CANCELLED') return 'Cancelled';
+    if (d.result.endReason === 'ABANDONED') return 'Abandoned';
     if (!d.result.winnerId) return 'Draw';
     const won = d.result.winnerId === d.me.id;
     const forfeit = d.result.endReason === 'FORFEIT' ? ' by default' : '';
     return won ? `You won${forfeit}` : `You lost${forfeit}`;
   }
-  const left = `${formatRemaining(d.expiresAt)} left`;
-  if (!d.rival)
-    return d.myState === 'FINISHED'
-      ? `Waiting for someone to join · ${left}`
-      : `Your turn · ${left}`;
-  if (d.myState === 'FINISHED') return `Waiting for @${d.rival.username} · ${left}`;
-  if (d.myState === 'PLAYING') return `Resume · ${left}`;
-  return `Your turn · ${left}`;
+  const left = d.lobbyExpiresAt ? ` · ${formatRemaining(d.lobbyExpiresAt)} left` : '';
+  if (!d.rival) return `Waiting for someone to join${left}`;
+  if (d.phase === 'READY') return `@${d.rival.username} joined${left}`;
+  return 'In play';
 }
 
 function Score({ duel }: { duel: DuelView }) {
-  const r = duel.result;
-  if (!r?.mine && !r?.rivals) return null;
+  const r = duelLines(duel);
+  if (!r.mine && !r.rivals) return null;
   return (
     <AppText variant="title" style={styles.score}>
       {r.mine?.correct ?? '–'} – {r.rivals?.correct ?? '–'}

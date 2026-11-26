@@ -88,14 +88,21 @@ export const DAILY_KATA_SLOTS = [
   'INCIDENT',
 ] as const;
 
-/** Daily Kata slot scoring (lower wins): unseen dominates, then difficulty fit, then variety (D-028). */
+/**
+ * Daily Kata soft preferences inside a slot's candidate tier (D-028, D-048). Lower is likelier: the
+ * weight is `exp(-score / SELECTION.temperature)`, so preferred and weakest topics are drawn more
+ * often and a topic already in the Kata less often, but none is ever certain.
+ */
 export const KATA_WEIGHTS = {
-  seen: 10,
   preferred: -0.5,
   weakest: -0.75,
   repeatTopic: 0.75,
+  seen: 10,
   jitter: 0.5,
 } as const;
+
+/** Practice, incident and checkpoint picks (lower score wins): unseen first, random among equals. */
+export const PICK_WEIGHTS = { seen: 10, jitter: 0.5 } as const;
 
 /** Sessions whose completion can pay the first-incident bonus (not baseline or checkpoint). */
 export const INCIDENT_BONUS_SESSION_TYPES: readonly SessionType[] = ['INCIDENT', 'DAILY'];
@@ -161,8 +168,21 @@ export const DUEL = {
   bonusWait: { tries: 10, delayMs: 50 },
 } as const;
 
-/** Practice, incident and checkpoint picks (lower score wins): unseen first, random among equals. */
-export const PICK_WEIGHTS = { seen: 10, jitter: 0.5 } as const;
+/**
+ * V2 selection (D-048, docs/v2/plan.md §5). Every set is drawn by weighted random sampling instead
+ * of "best score", so two players with the same profile get different questions.
+ * - Hard tiers first: unseen before seen (`seenTier` outranks any difficulty gap), then nearest
+ *   difficulty. Sampling only happens inside the best tier that still has candidates.
+ * - Inside a tier, weight = exp(-softScore / temperature). Lower temperature → stricter preferences.
+ * - "Seen" = answered, or served in one of the player's sessions in the last `recentDays` days
+ *   (an abandoned round), reading at most `recentSessionsMax` sessions.
+ */
+export const SELECTION = {
+  temperature: 0.5,
+  seenTier: 10,
+  recentDays: 7,
+  recentSessionsMax: 50,
+} as const;
 
 /**
  * V2 content targets and audit thresholds (docs/v2/plan.md §4, benchmarks.md §4). Read only by the

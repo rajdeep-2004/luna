@@ -1469,3 +1469,24 @@ first open.
 summary without per-topic tables), F-21 (weak topic used for selection and "Train again", not shown as a number) and
 F-24 (topic statistics served by the API, not shown on the Profile). F-18 also gains the three duel formats. Scope
 is unchanged: every capability still exists, and only where it shows up changed.
+
+---
+
+### D-046 — README covers the APK; test count corrected
+
+- **Date:** 2026-11-26 · **Step:** P6 — docs · **Status:** Active · **Type:** docs
+
+**Context.** The README was last rewritten just before the APK release (D-044), so it never said how to install
+Luna without Expo Go. Its Deployment section also described the Render service as built from `server/`, which
+contradicts the settings actually used (D-036). Separately, `architecture.md` §13 still said 55 API tests, while
+the suite in `.scratch/api-tests/` has grown to 66 (P7 added mode-round, duel-format and Sudden Death tests).
+
+**Decision.** Add an "Install the APK (Android)" section to the README, before "Run it yourself", with the
+release link, the "install unknown apps" step and the cold-start note. Correct the README's Render settings to
+match D-036, and say that the app ships as an EAS-built APK. Update the test count and coverage list in
+`architecture.md` §13 to the 66 tests counted on 2026-11-26.
+
+**Why.** A reader, a tester or a professor should be able to install the app from the README alone. Docs must
+describe what is built, so the stale deploy settings and test count were wrong, not just old.
+
+**Files.** `README.md`, `docs/architecture.md`, `docs/decisions.md`.

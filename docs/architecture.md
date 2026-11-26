@@ -1,6 +1,6 @@
 # Architecture — Luna
 
-> Last updated: 2026-11-22 — Planned in P0, brought in line with the code in P6. Update whenever the build diverges.
+> Last updated: 2026-11-26 — Planned in P0, brought in line with the code in P6. Update whenever the build diverges.
 
 ## 0. Delivery setup
 
@@ -271,7 +271,7 @@ scale with the `{weekKey, userId}` index. Later: a cached `weeklyXP` counter per
 
 | Layer | Covers | Tool | Command |
 |---|---|---|---|
-| API smoke tests (gitignored) | critical paths: auth, answer-key leakage, double submit, XP once, streak, Daily Kata once, mastery, board, achievements, duel join race, timer, expiry (55 tests) | Vitest + Supertest + mongodb-memory-server | `cd .scratch/api-tests && npx vitest run` |
+| API smoke tests (gitignored) | critical paths: auth and lockout, answer-key leakage, double submit, XP once, streak, Daily Kata once, mastery and adaptivity, revisits, board, achievements, mode rounds and boss incidents, duel join race, timers per format, Sudden Death, tie-break, expiry, win-bonus cap (66 tests) | Vitest + Supertest + mongodb-memory-server | `cd .scratch/api-tests && npx vitest run` |
 | Frontend | each phase's click-through checklist | manual on Expo Go (Rajdeep) | — |
 | Static | lint + typecheck all workspaces | ESLint, tsc | `npm run lint && npm run typecheck` |
 

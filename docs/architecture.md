@@ -94,7 +94,8 @@ luna/
 │       ├── db/               connect, syncIndexes
 │       └── seed/             seed script, content schema check, audit, content/ (the question bank):
 │                             finished V2 topics get a folder content/<topic>/{trace,bugHunt,choice,incidents}.ts
-│                             (jsAsync/, httpApis/ since P10); other topics are still one file + incidents.ts
+│                             (jsAsync/, httpApis/ since P10; databases/, cachingQueues/ since P11); debugging-prod is still
+│                             one file + incidents.ts
 ├── shared/                   Zod schemas + TS types for the API contract (runtime dependency: zod only)
 ├── docs/                     prd, architecture, build-plan, decisions, product/ (game rules), luna-idea
 ├── .scratch/                 GITIGNORED. API smoke tests and throwaway scripts, never pushed
@@ -220,6 +221,8 @@ own day. Selection: 1 TRACE, 1 BUG_HUNT, 2 ENGINEER_CHOICE,
 1 INCIDENT. Prefer unseen challenges at the user's per-topic difficulty, include up to 2 previously
 missed ones (missed ≥3 questions ago), and weight towards weak and preferred topics. Fall back to any
 active challenge of that type if a pool is empty.
+Candidate pools come from `challengesRepo.findActive`, bounded by `SELECTION.poolMax` (1,000, D-050); the
+bound must stay above the whole active bank, or cross-topic picks silently lose the last topics.
 
 **Selection variety (V2, D-048).** Every set (Kata slots, practice and mode rounds, incidents,
 checkpoint, baseline, duels) is drawn by weighted random sampling (`server/src/lib/sampling.ts`, random

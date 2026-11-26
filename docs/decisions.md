@@ -1490,3 +1490,44 @@ match D-036, and say that the app ships as an EAS-built APK. Update the test cou
 describe what is built, so the stale deploy settings and test count were wrong, not just old.
 
 **Files.** `README.md`, `docs/architecture.md`, `docs/decisions.md`.
+
+---
+
+### D-047 — Luna V2: bigger levelled bank, per-player variety, live duels
+
+- **Date:** 2026-11-26 · **Step:** P8 — V2 plan · **Status:** Active · **Type:** product + technical
+
+**Context.** Rajdeep set the V2 outcome directly (2026-11-26): a much larger question bank written separately for
+beginner, intermediate and advanced players; questions that differ between two players who start the same Daily Kata or
+practice round; and duels played live, with both players on the same question at the same time, moving on together when
+both have answered or the timer runs out, with no async play window. He asked for the work to be split into phases that
+run unattended, each tested and merged into `main` without a PR, each in a fresh context.
+
+**Decision.** Eight phases (P8–P15), written up in `docs/v2/plan.md`, each with a task file in `docs/v2/phases/` and a
+shared definition of done in `docs/v2/runbook.md`. The bank grows from 58 to 290 questions (6 per topic × type × level,
+plus 4 incidents per topic), held to a written level benchmark. Selection switches from "best score plus a little jitter"
+to weighted random sampling, which is why two identical players now get different sets. Duels move to Socket.IO with a
+server-authoritative state machine stored in MongoDB. This lifts the V1 non-goal "no real-time multiplayer", on
+Rajdeep's instruction. The old P8 (mini-games) becomes P16 and is not part of this run.
+
+**Why 290 questions.** Variety comes from pool size, not from cleverer randomness. With about 30 candidates per Daily Kata
+slot at a player's level, two players share a slot about 1 time in 30. Fewer questions would force repeats within a
+couple of weeks of daily play; many more would cost writing quality, which the brief puts first.
+
+**Why Socket.IO.** "Both move to the next question together" needs the server to push; polling would add latency and
+waste requests on Render's free tier. Raw WebSockets would mean rebuilding reconnects, acknowledgements and rooms.
+Socket.IO is a standard, well-understood dependency and works in Expo Go.
+
+**Why a phase-runner script instead of /clear.** `/clear` and `/compact` are interactive commands that a session cannot
+run on itself. `scripts/v2/run-phases.sh` starts a new headless `claude -p` session per phase, which gives each phase an
+empty context, the same effect as `/clear`. Claude Code compacts on its own inside a long session. The script stops at
+the first phase that does not record DONE. Tonight's run drives the same phase files from fresh sub-agents.
+
+**Assumptions not confirmed by Rajdeep (he was asleep):** per-question timers stay (Classic 60 s, Blitz 10 s, Sudden Death
+30 s), since the brief relies on a timer reaching zero; "no duration" was read as "no 48 h play window". An invite (lobby)
+still expires after 10 minutes so stale codes don't linger. In live Sudden Death, a question that both players miss does
+not end the duel. A dropped player has 20 s to reconnect before forfeiting.
+
+**Files.** `docs/v2/*`, `scripts/v2/run-phases.sh`, `docs/prd.md`, `docs/decisions.md`.
+
+**Revisit** if a phase is blocked, or if Rajdeep wants different duel timings.

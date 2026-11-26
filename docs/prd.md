@@ -43,7 +43,7 @@ V1 optimises for the CS student.
 - A coding IDE, code compilation or code execution.
 - Full courses or long-form lessons.
 - AI tutoring or AI-generated questions.
-- Real-time multiplayer or WebSockets (duels are asynchronous).
+- ~~Real-time multiplayer or WebSockets (duels are asynchronous).~~ Lifted for V2 by Rajdeep (2026-11-26, D-047): duels become live (`docs/v2/plan.md` §6).
 - Forums, user-generated questions, payments, teacher/admin dashboards.
 - Push notifications.
 - Avatar image uploads (users pick from preset avatars).
@@ -151,7 +151,15 @@ Status: `todo` | `building` | `shipped`.
 | P5  | Competition and profile: Dojo Board, duels, achievements                            | F-17–F-20                                            | shipped  |
 | P6  | Polish, deploy and demo prep                                                        | Acceptance criteria 1–12                             | building |
 | P7  | Game redesign: design system, game-first screens, Explore mode picker, duel formats | D-037–D-043                                          | shipped  |
-| P8  | New mini-games for Explore (e.g. blitz, swipe rounds)                               | D-037                                                | todo     |
+| P8  | V2 plan: phases, runbook, phase runner (`docs/v2/`)                                 | D-047                                                | shipped  |
+| P9  | V2: level rubric, content audit, per-player randomised selection                    | F-04, F-10, F-16                                     | todo     |
+| P10 | V2 bank: JavaScript async + HTTP & APIs                                             | F-16                                                 | todo     |
+| P11 | V2 bank: Databases + Caching & queues                                               | F-16                                                 | todo     |
+| P12 | V2 bank: Debugging production + full-bank audit                                     | F-16                                                 | todo     |
+| P13 | V2: live duel backend (Socket.IO, synced questions)                                 | F-18                                                 | todo     |
+| P14 | V2: live duel app                                                                   | F-18                                                 | todo     |
+| P15 | V2 hardening, docs, 2.0.0                                                           | all                                                  | todo     |
+| P16 | New mini-games for Explore (e.g. blitz, swipe rounds)                               | D-037                                                | todo     |
 
 ## 10. Open questions
 

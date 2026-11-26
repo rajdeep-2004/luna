@@ -1,6 +1,7 @@
 import { TOPIC_SLUGS, type PracticeMode, type TopicSlug } from '@luna/shared';
 import { AnswerAttemptModel } from '../../models/AnswerAttempt';
 import type { ChallengeDoc } from '../../models/Challenge';
+import { SessionModel } from '../../models/Session';
 import { AppError } from '../../lib/errors';
 import { CHECKPOINT, REVISIT, SELECTION, SESSION } from '../../config/game';
 import { cryptoRng, tieredOrder, weightedPick, type Rng } from '../../lib/sampling';
@@ -17,9 +18,26 @@ export type PickedItem = {
 };
 const fresh = (challenge: ChallengeDoc): PickedItem => ({ challenge, isRevisit: false });
 
-export async function seenIds(userId: string): Promise<Set<string>> {
-  const ids = await AnswerAttemptModel.distinct('challengeId', { userId });
-  return new Set(ids.map(String));
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Challenges that count as seen for ranking: every one the user has answered, plus every one served
+ * in their sessions of the last `SELECTION.recentDays` days, answered or not (D-048). So quitting a
+ * round and starting another doesn't replay the questions just shown. The session read is bounded
+ * and served by the `{userId, createdAt}` index.
+ */
+export async function seenIds(userId: string, now = new Date()): Promise<Set<string>> {
+  const since = new Date(now.getTime() - SELECTION.recentDays * DAY_MS);
+  const [answered, recent] = await Promise.all([
+    AnswerAttemptModel.distinct('challengeId', { userId }),
+    SessionModel.find({ userId, createdAt: { $gte: since } })
+      .sort({ createdAt: -1 })
+      .limit(SELECTION.recentSessionsMax)
+      .select('items.challengeId')
+      .lean(),
+  ]);
+  const served = recent.flatMap((s) => s.items.map((i) => i.challengeId));
+  return new Set([...answered, ...served].map(String));
 }
 
 /**

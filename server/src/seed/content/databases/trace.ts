@@ -68,7 +68,12 @@ export const DATABASES_TRACE: ChallengeSeed[] = [
     difficulty: 1,
     prompt: `${TABLES}\n\nHow many rows does this query return?`,
     codeSnippet: 'SELECT user_id, COUNT(*) AS n\nFROM orders\nGROUP BY user_id;',
-    options: opts('3, one per order', '1, the total count', '2, one per user who has orders', '3, one per user'),
+    options: opts(
+      '3, one per order',
+      '1, the total count',
+      '2, one per user who has orders',
+      '3, one per user',
+    ),
     answerKey: 'c',
     explanation:
       'GROUP BY collapses rows that share a user_id into one row. The orders table only mentions users 1 and 2, so there are 2 groups: (1, 2) and (2, 1). Chen is not in the orders table at all.',
@@ -150,8 +155,7 @@ export const DATABASES_TRACE: ChallengeSeed[] = [
     difficulty: 2,
     prompt:
       'users: (1, Asha, referrer NULL), (2, Ben, referrer 1), (3, Chen, referrer 1).\nThe goal is "users who never referred anyone". What comes back?',
-    codeSnippet:
-      'SELECT name FROM users\nWHERE id NOT IN (\n  SELECT referrer_id FROM users\n);',
+    codeSnippet: 'SELECT name FROM users\nWHERE id NOT IN (\n  SELECT referrer_id FROM users\n);',
     options: opts('Ben, Chen', 'Asha', 'No rows', 'Asha, Ben, Chen'),
     answerKey: 'c',
     explanation:
@@ -277,15 +281,10 @@ export const DATABASES_TRACE: ChallengeSeed[] = [
     type,
     difficulty: 3,
     prompt:
-      "Postgres with node-postgres. tags.name is UNIQUE and the table starts empty. The code ignores the duplicate error on purpose. What ends up in tags?",
+      'Postgres with node-postgres. tags.name is UNIQUE and the table starts empty. The code ignores the duplicate error on purpose. What ends up in tags?',
     codeSnippet:
       "await client.query('BEGIN');\nawait client.query(\"INSERT INTO tags (name) VALUES ('a')\");\ntry {\n  await client.query(\"INSERT INTO tags (name) VALUES ('a')\");\n} catch {}\nawait client.query(\"INSERT INTO tags (name) VALUES ('b')\");\nawait client.query('COMMIT');",
-    options: opts(
-      "'a' and 'b'",
-      "Only 'a'",
-      "Only 'b'",
-      "Nothing; the 'b' insert throws too",
-    ),
+    options: opts("'a' and 'b'", "Only 'a'", "Only 'b'", "Nothing; the 'b' insert throws too"),
     answerKey: 'd',
     explanation:
       'In Postgres, any error inside a transaction marks the whole transaction as aborted. Every later statement fails with "current transaction is aborted, commands ignored until end of transaction block", so the \'b\' insert throws, COMMIT is never reached, and nothing is saved. Use a SAVEPOINT around the risky statement, or INSERT ... ON CONFLICT DO NOTHING.',
@@ -325,9 +324,9 @@ export const DATABASES_TRACE: ChallengeSeed[] = [
     type,
     difficulty: 3,
     prompt:
-      'Same two checkouts as a plain read-then-write, but now both transactions use REPEATABLE READ in Postgres. Both read stock 5, then A updates to 4 and commits. What happens to B\'s UPDATE?',
+      "Same two checkouts as a plain read-then-write, but now both transactions use REPEATABLE READ in Postgres. Both read stock 5, then A updates to 4 and commits. What happens to B's UPDATE?",
     codeSnippet:
-      "-- A and B both:\nBEGIN ISOLATION LEVEL REPEATABLE READ;\nSELECT stock FROM items WHERE id = 7;        -- 5\nUPDATE items SET stock = $1 WHERE id = 7;  -- $1 = value read - 1 (4)\nCOMMIT;",
+      '-- A and B both:\nBEGIN ISOLATION LEVEL REPEATABLE READ;\nSELECT stock FROM items WHERE id = 7;        -- 5\nUPDATE items SET stock = $1 WHERE id = 7;  -- $1 = value read - 1 (4)\nCOMMIT;',
     options: opts(
       'It fails with "could not serialize access due to concurrent update"',
       'It succeeds and the stock ends at 4, as at READ COMMITTED',
@@ -350,9 +349,9 @@ export const DATABASES_TRACE: ChallengeSeed[] = [
     prompt:
       'Rule: at least one doctor must stay on call. Alice and Bob are both on call. Each clicks "go off call" at the same moment. Both transactions run at REPEATABLE READ in Postgres. How many doctors are on call afterwards?',
     codeSnippet:
-      "BEGIN ISOLATION LEVEL REPEATABLE READ;\nSELECT COUNT(*) FROM doctors WHERE on_call;   -- 2\n-- 2 > 1, so it is safe to leave\nUPDATE doctors SET on_call = false WHERE name = $me;\nCOMMIT;",
+      'BEGIN ISOLATION LEVEL REPEATABLE READ;\nSELECT COUNT(*) FROM doctors WHERE on_call;   -- 2\n-- 2 > 1, so it is safe to leave\nUPDATE doctors SET on_call = false WHERE name = $me;\nCOMMIT;',
     options: opts(
-      '1, because the second transaction sees the first one\'s change',
+      "1, because the second transaction sees the first one's change",
       '1, because one transaction fails with a serialization error',
       '2, because the two updates block each other',
       '0',

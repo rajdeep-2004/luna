@@ -24,8 +24,20 @@ export async function participantDuel(
   return { duel, seat };
 }
 
-export async function setPresence(duelId: string, userId: string, seat: Seat, connected: boolean) {
-  await store.markSeat(duelId, seat, connected, new Date(runtime.now()));
+/**
+ * Seat online/offline. A disconnect passes the time it happened: if a reconnect has already been
+ * written (a newer `lastSeenAt`), the late offline write is skipped instead of overwriting it.
+ */
+export async function setPresence(
+  duelId: string,
+  userId: string,
+  seat: Seat,
+  connected: boolean,
+  at?: Date,
+) {
+  const when = at ?? new Date(runtime.now());
+  const r = await store.markSeat(duelId, seat, connected, when, at ? { ifNotAfter: at } : {});
+  if (at && r.modifiedCount === 0) return;
   runtime.hubEmit(duelId, DUEL_EVENTS.presence, { duelId, userId, connected });
   logger.info({ duelId, userId, connected }, 'duel presence');
   await runtime.tick(duelId);

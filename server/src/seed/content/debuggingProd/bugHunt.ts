@@ -66,7 +66,7 @@ export const DEBUGGING_PROD_BUG_HUNT: ChallengeSeed[] = [
     prompt:
       'Every call to the rates API fails with a TimeoutError, though the API answers in about 200 ms. Which line is the bug?',
     codeSnippet:
-      "const RATES_URL = config.ratesUrl;\nconst TIMEOUT_MS = 5; // give the API 5 seconds\nasync function getRates() {\n  const res = await fetch(RATES_URL, { signal: AbortSignal.timeout(TIMEOUT_MS) });\n  if (!res.ok) throw new Error(`rates API returned ${res.status}`);\n  return res.json();\n}",
+      'const RATES_URL = config.ratesUrl;\nconst TIMEOUT_MS = 5; // give the API 5 seconds\nasync function getRates() {\n  const res = await fetch(RATES_URL, { signal: AbortSignal.timeout(TIMEOUT_MS) });\n  if (!res.ok) throw new Error(`rates API returned ${res.status}`);\n  return res.json();\n}',
     answerKey: '2',
     explanation:
       'AbortSignal.timeout takes milliseconds, and the constant says 5. Every request is aborted after 5 ms, long before the API can answer. The fix is TIMEOUT_MS = 5000. Naming the unit (TIMEOUT_MS) helps only if the value matches it.',
@@ -246,7 +246,7 @@ export const DEBUGGING_PROD_BUG_HUNT: ChallengeSeed[] = [
       "app.set('trust proxy', 1);\napp.use(async (req, res, next) => {\n  const key = `rl:${req.socket.remoteAddress}`;\n  const [count] = await redis.multi().incr(key).expire(key, 60, 'NX').exec();\n  if (count > 100) return res.status(429).json({ error: 'Too many requests' });\n  next();\n});",
     answerKey: '3',
     explanation:
-      "req.socket.remoteAddress is the address of the machine that opened the TCP connection, which is the load balancer, for every user. All traffic shares one counter, and the first 100 requests in a minute lock everyone out. With trust proxy set to 1, req.ip is the client address from X-Forwarded-For; key on req.ip (or on the user id when logged in).",
+      'req.socket.remoteAddress is the address of the machine that opened the TCP connection, which is the load balancer, for every user. All traffic shares one counter, and the first 100 requests in a minute lock everyone out. With trust proxy set to 1, req.ip is the client address from X-Forwarded-For; key on req.ip (or on the user id when logged in).',
     misconception:
       'Behind a proxy, the socket address is the proxy. The client address comes from a header, and you should only trust as many hops as you actually run.',
   },
@@ -310,7 +310,7 @@ export const DEBUGGING_PROD_BUG_HUNT: ChallengeSeed[] = [
     type,
     difficulty: 3,
     prompt:
-      'The /metrics response grew to 80 MB, scrapes time out, and the app\'s memory climbs steadily. Which line is the bug?',
+      "The /metrics response grew to 80 MB, scrapes time out, and the app's memory climbs steadily. Which line is the bug?",
     codeSnippet:
       "const httpDuration = new client.Histogram({ name: 'http_request_duration_seconds', help: 'Request duration', labelNames: ['method', 'route', 'status'] });\napp.use((req, res, next) => {\n  const end = httpDuration.startTimer();\n  res.on('finish', () => end({ method: req.method, route: req.originalUrl, status: res.statusCode }));\n  next();\n});",
     answerKey: '4',

@@ -41,6 +41,8 @@ const rt: Runtime = { hub: null, timings: DEFAULT_TIMINGS, now: () => Date.now()
 const MAX_STEPS = 8;
 /** After a lost race the duel is re-checked this soon, never in a tight loop. */
 const RETRY_MS = 250;
+/** After a failed step (a transient database error) the duel is retried this soon. */
+const ERROR_RETRY_MS = 2_000;
 
 export function startRuntime(opts: { hub: DuelHub; timings?: Partial<Timings> }): void {
   rt.hub = opts.hub;
@@ -129,11 +131,13 @@ async function endReveal(d: DuelDoc, index: number, t: Timings): Promise<boolean
     ok(c!),
     ok(o ?? ''),
   ]);
-  if (next === 'END') {
-    // A crash between REVEAL and its timeouts: fill them before scoring (idempotent).
-    await store.fillTimeouts(d, index, now(), t.questionMs[(d.format ?? 'CLASSIC') as DuelFormat]);
-    return store.complete(d, index, now());
-  }
+  // A crash between the REVEAL move and its side effects: redo them first (both idempotent), so
+  // every answer of this question has its timeout and its AnswerAttempt before play moves on.
+  await store.fillTimeouts(d, index, now(), t.questionMs[(d.format ?? 'CLASSIC') as DuelFormat]);
+  const challenge = (await duelChallenges(d))[index];
+  if (challenge)
+    for (const a of await answersOf(d)) if (a.index === index) await syncAttempt(d, challenge, a);
+  if (next === 'END') return store.complete(d, index, now());
   return store.startQuestion(d, 'REVEAL', index + 1, now(), t);
 }
 
@@ -195,7 +199,24 @@ function describe(a: Action): string {
   return a.type;
 }
 
+const needsFinalize = (d: DuelDoc) =>
+  (d.phase === 'COMPLETED' || d.phase === 'ABANDONED') && !d.finalizedAt;
+
+/**
+ * One tick. If anything throws (a transient database error), the duel is re-armed to retry
+ * instead of being left with no timer, and an ended duel that was never finalized is finalized
+ * here, not only at the next boot.
+ */
 async function step(duelId: string): Promise<void> {
+  try {
+    await advance(duelId);
+  } catch (err) {
+    logger.error({ err, duelId }, 'duel tick failed; retrying');
+    scheduler.arm(duelId, now() + ERROR_RETRY_MS, () => void tick(duelId));
+  }
+}
+
+async function advance(duelId: string): Promise<void> {
   let changed = false;
   let stalled = false;
   let d: DuelDoc | null = null;
@@ -220,6 +241,7 @@ async function step(duelId: string): Promise<void> {
   }
   if (!d) return;
   const latest = (await DuelModel.findById(duelId)) ?? d;
+  if (needsFinalize(latest)) await onEnded(duelId);
   if (changed) await pushState(latest);
   arm(latest, stalled);
 }
@@ -239,7 +261,5 @@ function arm(d: DuelDoc, retrySoon: boolean) {
  */
 export function tick(duelId: string): Promise<void> {
   if (!rt.started) return Promise.resolve();
-  return scheduler
-    .serial(duelId, () => step(duelId))
-    .catch((err) => logger.error({ err, duelId }, 'duel tick failed'));
+  return scheduler.serial(duelId, () => step(duelId));
 }

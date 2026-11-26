@@ -160,10 +160,11 @@ export async function toSnapshot(userId: string, d: DuelDoc, now: number): Promi
   const current = showQuestion ? challenges[i] : undefined;
   const mine = answers.find((a) => a.userId === userId && a.index === i);
   const through = revealedThrough(d);
+  // A duel that ended mid-question (forfeit, abandon) never revealed it: a round counts only once
+  // both answers exist, which the reveal step guarantees (it writes the timeouts).
+  const bothAnswered = (idx: number) => answers.filter((a) => a.index === idx).length >= 2;
   const rounds = challenges.flatMap((c, idx) =>
-    c && idx <= through && answers.some((a) => a.index === idx)
-      ? [roundReveal(d, idx, c, answers)]
-      : [],
+    c && idx <= through && bothAnswered(idx) ? [roundReveal(d, idx, c, answers)] : [],
   );
   return {
     ...baseView(userId, d, players, answers),

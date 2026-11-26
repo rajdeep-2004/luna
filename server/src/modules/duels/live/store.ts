@@ -44,10 +44,21 @@ export const countAnswered = (duelId: Id, index: number) =>
 // ---- presence ----
 
 /** Seat online/offline. Only while the duel is not over. */
-export async function markSeat(duelId: Id, seat: Seat, connected: boolean, at: Date) {
+export async function markSeat(
+  duelId: Id,
+  seat: Seat,
+  connected: boolean,
+  at: Date,
+  opts: { ifNotAfter?: Date } = {},
+) {
   const f = seatField(seat);
   return DuelModel.updateOne(
-    { _id: duelId, [f]: { $ne: null }, phase: { $in: [...PREGAME_PHASES, ...PLAYING_PHASES] } },
+    {
+      _id: duelId,
+      [f]: { $ne: null },
+      phase: { $in: [...PREGAME_PHASES, ...PLAYING_PHASES] },
+      ...(opts.ifNotAfter ? { [`${f}.lastSeenAt`]: { $lte: opts.ifNotAfter } } : {}),
+    },
     { $set: { [`${f}.connected`]: connected, [`${f}.lastSeenAt`]: at } },
   );
 }

@@ -2,6 +2,7 @@ import { randomInt } from 'node:crypto';
 import { Types } from 'mongoose';
 import {
   DUEL_CODE_ALPHABET,
+  PLAYING_PHASES,
   PREGAME_PHASES,
   type DuelFormat,
   type DuelSnapshot,
@@ -83,6 +84,14 @@ export async function createDuel(
  */
 export async function joinDuel(userId: string, code: string): Promise<DuelSnapshot> {
   const now = new Date(runtime.now());
+  // One live match at a time: not while already seated in another duel that has a rival.
+  const busy = await DuelModel.exists({
+    code: { $ne: code },
+    $or: [{ creatorId: userId }, { opponentId: userId }],
+    opponentId: { $ne: null },
+    phase: { $in: ['READY', ...PLAYING_PHASES] },
+  });
+  if (busy) throw conflict('Finish or leave your current duel first');
   const joined = await DuelModel.findOneAndUpdate(
     {
       code,

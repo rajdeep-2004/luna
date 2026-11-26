@@ -32,6 +32,7 @@ export async function submitLiveAnswer(
   p: DuelAnswerPayload,
   now: number,
   t: Timings,
+  clock: () => number = () => now,
 ): Promise<{ receipt: DuelAnswerReceipt; duel: DuelDoc; fresh: boolean }> {
   const duel = await DuelModel.findById(p.duelId);
   if (!duel || !seatOf(duel, userId)) throw notFound('Duel');
@@ -63,6 +64,10 @@ export async function submitLiveAnswer(
     responseMs: responseTime(duel.questionStartedAt, now, timerMs),
     receivedAt: new Date(now),
   };
+  // Check the clock again right before the insert: the reads above may have taken a while, and a
+  // row stored after the deadline timer revealed this question must not count.
+  if (clock() > duel.deadlineAt.getTime() + t.networkGraceMs)
+    throw reject(p.duelId, userId, p.index, 'LATE', 'Time is up for this question');
   try {
     await DuelAnswerModel.create(row);
   } catch (err) {

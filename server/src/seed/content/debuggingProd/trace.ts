@@ -62,7 +62,7 @@ export const DEBUGGING_PROD_TRACE: ChallengeSeed[] = [
       "async function handler() {\n  try {\n    await chargeCard();\n  } catch (err) {\n    logger.error(err.message);\n  }\n  return 'ok';\n}",
     options: opts(
       "It rejects with 'card declined', because the error is logged and then passed on",
-      "It logs nothing and resolves to undefined",
+      'It logs nothing and resolves to undefined',
       'It rejects with an unhandled rejection, which crashes the process',
       "It logs 'card declined' and resolves to 'ok'",
     ),
@@ -235,7 +235,8 @@ export const DEBUGGING_PROD_TRACE: ChallengeSeed[] = [
     subtopic: 'error handling',
     type,
     difficulty: 2,
-    prompt: "On Express 5, GET /items throws. What does the client get, and what does logger.error log?",
+    prompt:
+      'On Express 5, GET /items throws. What does the client get, and what does logger.error log?',
     codeSnippet:
       "app.use((err, req, res, next) => {\n  logger.error({ err }, 'request failed');\n  res.status(500).json({ error: 'internal' });\n});\napp.get('/items', async () => {\n  throw new Error('db down');\n});",
     options: opts(
@@ -246,7 +247,7 @@ export const DEBUGGING_PROD_TRACE: ChallengeSeed[] = [
     ),
     answerKey: 'b',
     explanation:
-      "Express 5 does pass a rejected async handler to the error chain, so it neither hangs nor crashes. But middleware runs in the order it was registered, and the error handler sits before the route, so no error handler comes after it. Express falls back to its built-in handler, which sends an HTML 500 page (with the stack trace unless NODE_ENV is production) and prints the error to stderr; your JSON format and your logger.error call never run. Register error handlers last.",
+      'Express 5 does pass a rejected async handler to the error chain, so it neither hangs nor crashes. But middleware runs in the order it was registered, and the error handler sits before the route, so no error handler comes after it. Express falls back to its built-in handler, which sends an HTML 500 page (with the stack trace unless NODE_ENV is production) and prints the error to stderr; your JSON format and your logger.error call never run. Register error handlers last.',
     misconception:
       'An error handler is not global. It only catches errors from the routes and middleware registered before it.',
   },
@@ -307,7 +308,7 @@ export const DEBUGGING_PROD_TRACE: ChallengeSeed[] = [
     prompt:
       'At t = 0 all 1,000 clients fail together because the API restarted. It is healthy again at t = 2 s and can take about 300 requests per second. What does it see next?',
     codeSnippet:
-      'for (let attempt = 1; attempt <= 3; attempt++) {\n  try {\n    return await callApi();\n  } catch {\n    await sleep(1000 * 2 ** (attempt - 1));\n  }\n}\nthrow new Error(\'api unavailable\');',
+      "for (let attempt = 1; attempt <= 3; attempt++) {\n  try {\n    return await callApi();\n  } catch {\n    await sleep(1000 * 2 ** (attempt - 1));\n  }\n}\nthrow new Error('api unavailable');",
     options: opts(
       'A steady 300 requests per second, because the delays double',
       'About 1,000 requests at t = 3 s, all at once',

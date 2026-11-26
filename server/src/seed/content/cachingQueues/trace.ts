@@ -88,7 +88,12 @@ export const CACHING_QUEUES_TRACE: ChallengeSeed[] = [
     prompt:
       'An in-memory cache holds at most 2 entries and evicts the least recently used one when full. Which key is gone after the last line?',
     codeSnippet: "cache.set('a', 1);\ncache.set('b', 2);\ncache.get('a');\ncache.set('c', 3);",
-    options: opts("'a', because it was added first", "'b'", "'c', because there is no room", 'None: the cache grows to 3'),
+    options: opts(
+      "'a', because it was added first",
+      "'b'",
+      "'c', because there is no room",
+      'None: the cache grows to 3',
+    ),
     answerKey: 'b',
     explanation:
       "Reading 'a' makes it the most recently used. When 'c' arrives the cache is full, so it evicts the entry nobody has touched for longest: 'b'.",
@@ -104,7 +109,8 @@ export const CACHING_QUEUES_TRACE: ChallengeSeed[] = [
     difficulty: 1,
     prompt:
       'Three jobs are queued at t = 0. One worker runs one job at a time, and each job takes 2 s. When does the third job finish?',
-    codeSnippet: "queue.process(1, async (job) => {\n  await renderPdf(job.data); // 2 s\n});\nawait queue.add('pdf', a);\nawait queue.add('pdf', b);\nawait queue.add('pdf', c);",
+    codeSnippet:
+      "queue.process(1, async (job) => {\n  await renderPdf(job.data); // 2 s\n});\nawait queue.add('pdf', a);\nawait queue.add('pdf', b);\nawait queue.add('pdf', c);",
     options: opts('t = 6 s', 't = 2 s', 't = 4 s', 'Never, the worker only takes one job'),
     answerKey: 'a',
     explanation:
@@ -157,7 +163,7 @@ export const CACHING_QUEUES_TRACE: ChallengeSeed[] = [
     prompt:
       'The public endpoint strips the email before responding. Then the account page asks for the same user. What does the last line print?',
     codeSnippet:
-      "const cache = new Map();\nasync function getUser(id) {\n  if (!cache.has(id)) cache.set(id, await db.findUser(id));\n  return cache.get(id);\n}\nconst pub = await getUser(1);\ndelete pub.email;          // public view\nconst me = await getUser(1);\nconsole.log(me.email);",
+      'const cache = new Map();\nasync function getUser(id) {\n  if (!cache.has(id)) cache.set(id, await db.findUser(id));\n  return cache.get(id);\n}\nconst pub = await getUser(1);\ndelete pub.email;          // public view\nconst me = await getUser(1);\nconsole.log(me.email);',
     options: opts(
       'undefined',
       "'asha@example.com'",
@@ -180,7 +186,7 @@ export const CACHING_QUEUES_TRACE: ChallengeSeed[] = [
     prompt:
       'An SQS-style queue hides a received message for 30 s (visibility timeout) and redelivers it if it is not deleted by then. Two workers are idle. A job takes 45 s, and the worker deletes the message when done (a delete removes it for good). How many times does the job start?',
     codeSnippet:
-      "const msg = await queue.receive();        // hidden for 30 s\nawait transcode(JSON.parse(msg.body));    // 45 s\nawait queue.delete(msg.receiptHandle);",
+      'const msg = await queue.receive();        // hidden for 30 s\nawait transcode(JSON.parse(msg.body));    // 45 s\nawait queue.delete(msg.receiptHandle);',
     options: opts('1', '2', '3, one every 30 s until deleted', '0: the message expires first'),
     answerKey: 'b',
     explanation:
@@ -221,7 +227,8 @@ export const CACHING_QUEUES_TRACE: ChallengeSeed[] = [
     difficulty: 2,
     prompt:
       'A job is allowed 4 attempts in total, with exponential backoff starting at 1 s (delay doubles after each failure). Every attempt fails instantly. How long after the first attempt does the job give up?',
-    codeSnippet: "await queue.add('sync', data, {\n  attempts: 4,\n  backoff: { type: 'exponential', delay: 1000 },\n});",
+    codeSnippet:
+      "await queue.add('sync', data, {\n  attempts: 4,\n  backoff: { type: 'exponential', delay: 1000 },\n});",
     options: opts('15 s', '8 s', '4 s', '7 s'),
     answerKey: 'd',
     explanation:
@@ -238,18 +245,18 @@ export const CACHING_QUEUES_TRACE: ChallengeSeed[] = [
     type,
     difficulty: 3,
     prompt:
-      'Stock is 1. Client A runs the steps on the left; between A\'s GET and EXEC, client B runs DECR stock. The steps run top to bottom. What does A\'s EXEC return, and what is stock afterwards?',
+      "Stock is 1. Client A runs the steps on the left; between A's GET and EXEC, client B runs DECR stock. The steps run top to bottom. What does A's EXEC return, and what is stock afterwards?",
     codeSnippet:
       'A: WATCH stock\nA: GET stock     # "1"\nB: DECR stock     # runs now, before A\'s EXEC\nA: MULTI\nA: DECR stock\nA: EXEC',
     options: opts(
-      'A\'s EXEC returns an array with -1; stock is -1',
-      'B\'s DECR waits until A\'s EXEC finishes; stock is -1',
-      'EXEC returns nil and A\'s DECR never runs; stock is 0',
+      "A's EXEC returns an array with -1; stock is -1",
+      "B's DECR waits until A's EXEC finishes; stock is -1",
+      "EXEC returns nil and A's DECR never runs; stock is 0",
       'EXEC fails with a lock-timeout error; stock is 0',
     ),
     answerKey: 'c',
     explanation:
-      'WATCH makes the transaction conditional: if any watched key changes before EXEC, Redis discards the queued commands and EXEC returns nil. B changed stock, so A\'s DECR never runs and stock is 0. A should re-read and retry, and will then see 0 left.',
+      "WATCH makes the transaction conditional: if any watched key changes before EXEC, Redis discards the queued commands and EXEC returns nil. B changed stock, so A's DECR never runs and stock is 0. A should re-read and retry, and will then see 0 left.",
     misconception:
       'MULTI is not a lock. Other clients keep writing freely; WATCH only lets you notice that they did and abort.',
     hint: 'What does WATCH do when the key changes?',
@@ -262,7 +269,7 @@ export const CACHING_QUEUES_TRACE: ChallengeSeed[] = [
     type,
     difficulty: 3,
     prompt:
-      'Each worker takes the lock with SET NX PX 10000 and releases it with a plain DEL. Worker A takes it at t = 0 and pauses for 15 s. What does C\'s SET return at t = 16, and who is inside the critical section then?',
+      "Each worker takes the lock with SET NX PX 10000 and releases it with a plain DEL. Worker A takes it at t = 0 and pauses for 15 s. What does C's SET return at t = 16, and who is inside the critical section then?",
     codeSnippet:
       't = 0   A: SET lock A NX PX 10000   -> OK\nt = 12  B: SET lock B NX PX 10000   -> ?\nt = 15  A: DEL lock\nt = 16  C: SET lock C NX PX 10000   -> ?',
     options: opts(
@@ -273,9 +280,9 @@ export const CACHING_QUEUES_TRACE: ChallengeSeed[] = [
     ),
     answerKey: 'd',
     explanation:
-      'A\'s lock expired at 10 s, so B got it at 12 s. A\'s DEL at 15 s deleted B\'s lock, not its own, so C\'s SET NX at 16 s succeeds. B was never told and is still working: two workers in the critical section. Release with a check-and-delete script that compares the stored token.',
+      "A's lock expired at 10 s, so B got it at 12 s. A's DEL at 15 s deleted B's lock, not its own, so C's SET NX at 16 s succeeds. B was never told and is still working: two workers in the critical section. Release with a check-and-delete script that compares the stored token.",
     misconception:
-      'A lease that expires is not a lock you still hold. Releasing without checking the owner deletes someone else\'s lock.',
+      "A lease that expires is not a lock you still hold. Releasing without checking the owner deletes someone else's lock.",
     hint: 'Whose lock does A delete at t = 15?',
   },
   {
@@ -287,7 +294,8 @@ export const CACHING_QUEUES_TRACE: ChallengeSeed[] = [
     difficulty: 3,
     prompt:
       'Redis has maxmemory 1gb and maxmemory-policy volatile-lru. Memory is full, and none of the keys has a TTL. What happens to the next SET of a new key?',
-    codeSnippet: 'CONFIG GET maxmemory-policy   # volatile-lru\nINFO memory                   # used_memory at maxmemory\nSET cart:991 "{...}"',
+    codeSnippet:
+      'CONFIG GET maxmemory-policy   # volatile-lru\nINFO memory                   # used_memory at maxmemory\nSET cart:991 "{...}"',
     options: opts(
       'It fails with an OOM "command not allowed" error',
       'Redis evicts the least recently used key, then stores it',
@@ -311,7 +319,12 @@ export const CACHING_QUEUES_TRACE: ChallengeSeed[] = [
       'Three "set email" messages for the same user are queued in order. Message 1 fails once and is retried after a 5 s backoff; the others succeed at once. What email does the user end up with?',
     codeSnippet:
       "// queued in this order\n1: { userId: 4, email: 'a@x.io' }   // fails once, retried after 5 s\n2: { userId: 4, email: 'b@x.io' }\n3: { userId: 4, email: 'c@x.io' }\n// consumer: UPDATE users SET email = $email WHERE id = $userId",
-    options: opts("'c@x.io'", "'b@x.io'", "'a@x.io'", 'It depends on the queue: FIFO queues keep the original order'),
+    options: opts(
+      "'c@x.io'",
+      "'b@x.io'",
+      "'a@x.io'",
+      'It depends on the queue: FIFO queues keep the original order',
+    ),
     answerKey: 'c',
     explanation:
       'Messages 2 and 3 are applied while message 1 waits out its backoff. When the retry succeeds, it overwrites the newest value with the oldest one: a@x.io. Fixes: per-key ordering (a FIFO message group that blocks on failure), or a version number the UPDATE checks.',
@@ -331,7 +344,7 @@ export const CACHING_QUEUES_TRACE: ChallengeSeed[] = [
     codeSnippet:
       't = 0  reader: cache miss; SELECT price -> 100 (slow network)\nt = 1  writer: UPDATE price = 80\nt = 2  writer: DEL product:1\nt = 3  reader: SET product:1 100 EX 600\nt = 4  ?',
     options: opts(
-      'Nothing: the writer\'s DEL removed it',
+      "Nothing: the writer's DEL removed it",
       '80, because the reader re-reads before writing',
       '100, until the 600 s TTL expires',
       'Nothing: SET is ignored for a key deleted a moment ago',
@@ -350,7 +363,8 @@ export const CACHING_QUEUES_TRACE: ChallengeSeed[] = [
     subtopic: 'outbox',
     type,
     difficulty: 3,
-    prompt: 'The process is killed (deploy, OOM) right after line 3 finishes. What is the state afterwards?',
+    prompt:
+      'The process is killed (deploy, OOM) right after line 3 finishes. What is the state afterwards?',
     codeSnippet:
       "await db.query('BEGIN');\nconst id = await insertOrder(db, order);\nawait db.query('COMMIT');\nawait queue.publish('order.placed', { id });\nres.status(201).json({ id });",
     options: opts(

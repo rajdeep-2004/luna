@@ -236,7 +236,7 @@ async function loadAnswerContext(
  * sums it. Progress and revisit writes are not replayed: D-015 accepts losing one progress update
  * on a crash, and replaying them without a marker could double-count.
  */
-async function repairAnsweredXP(
+export async function repairAnsweredXP(
   userId: string,
   session: SessionDoc,
   challenge: ChallengeDoc,

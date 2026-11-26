@@ -108,7 +108,13 @@ function register(io: Server, socket: LiveSocket) {
 
   on(socket, DUEL_EVENTS.answer, DuelAnswerPayload, async (p): Promise<DuelAnswerReceipt> => {
     assertSeatHolder(socket, p.duelId);
-    const { receipt, fresh } = await submitLiveAnswer(userId, p, runtime.now(), runtime.timings());
+    const { receipt, fresh } = await submitLiveAnswer(
+      userId,
+      p,
+      runtime.now(),
+      runtime.timings(),
+      runtime.now,
+    );
     if (fresh) {
       socket.to(room(p.duelId)).emit(
         DUEL_EVENTS.opponentAnswered as never,
@@ -138,8 +144,9 @@ function register(io: Server, socket: LiveSocket) {
       // Only the seat holder's drop counts: a replaced device going away changes nothing.
       if (seats.get(key) !== socket.id) continue;
       seats.delete(key);
+      const at = new Date(runtime.now());
       void participantDuel(userId, duelId)
-        .then(({ seat }) => setPresence(duelId, userId, seat, false))
+        .then(({ seat }) => setPresence(duelId, userId, seat, false, at))
         .catch((err) => logger.warn({ err, duelId }, 'duel disconnect not recorded'));
     }
   });

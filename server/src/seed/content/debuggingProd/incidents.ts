@@ -141,7 +141,8 @@ export const DEBUGGING_PROD_INCIDENTS: ChallengeSeed[] = [
     subtopic: 'memory leaks',
     type,
     difficulty: 2,
-    prompt: 'Since Tuesday, every API pod restarts about every three hours, and a few requests fail each time.',
+    prompt:
+      'Since Tuesday, every API pod restarts about every three hours, and a few requests fail each time.',
     stages: [
       {
         title: 'Alert',
@@ -196,7 +197,7 @@ export const DEBUGGING_PROD_INCIDENTS: ChallengeSeed[] = [
       },
     ],
     rootCause:
-      "The /prices/stream release added an EventEmitter listener per connection and never removed it when clients disconnected, so listeners and their response objects piled up until each pod hit its memory limit and was OOM-killed.",
+      'The /prices/stream release added an EventEmitter listener per connection and never removed it when clients disconnected, so listeners and their response objects piled up until each pod hit its memory limit and was OOM-killed.',
   },
 
   // ── Level 3 ──────────────────────────────────────────────────────────────────────
@@ -208,7 +209,7 @@ export const DEBUGGING_PROD_INCIDENTS: ChallengeSeed[] = [
     type,
     difficulty: 3,
     prompt:
-      "The payments database failed over in 30 seconds, ten minutes ago. Payments is still timing out on 90% of requests.",
+      'The payments database failed over in 30 seconds, ten minutes ago. Payments is still timing out on 90% of requests.',
     stages: [
       {
         title: 'Alert',

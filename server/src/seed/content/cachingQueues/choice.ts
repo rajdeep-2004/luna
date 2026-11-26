@@ -111,7 +111,7 @@ export const CACHING_QUEUES_CHOICE: ChallengeSeed[] = [
     type,
     difficulty: 1,
     prompt:
-      'You scaled the API from 1 to 3 instances behind a load balancer. Sessions are kept in each process\'s memory, and users now get logged out at random. You need to keep all 3 instances, and admins must be able to revoke a session instantly. What do you change?',
+      "You scaled the API from 1 to 3 instances behind a load balancer. Sessions are kept in each process's memory, and users now get logged out at random. You need to keep all 3 instances, and admins must be able to revoke a session instantly. What do you change?",
     options: opts(
       'Store sessions in a shared Redis that every instance reads',
       'Give each instance more memory',
@@ -258,7 +258,7 @@ export const CACHING_QUEUES_CHOICE: ChallengeSeed[] = [
       'A long loop is one big unit of failure. Small, independent, idempotent jobs fail and retry one at a time.',
     optionFeedback: {
       a: 'Still one 3-hour loop that cannot resume after a crash.',
-      b: '50,000 concurrent calls hit the email provider\'s rate limit and crash the process.',
+      b: "50,000 concurrent calls hit the email provider's rate limit and crash the process.",
       d: 'Sending emails is waiting on the network, not CPU; the crash problem stays.',
     },
   },
@@ -404,11 +404,11 @@ export const CACHING_QUEUES_CHOICE: ChallengeSeed[] = [
     type,
     difficulty: 3,
     prompt:
-      'A celebrity post\'s key gets 200,000 reads/s. It lives on one shard of a Redis cluster, whose CPU is at 100% while the other shards idle. The post can be up to 2 s stale. What helps most?',
+      "A celebrity post's key gets 200,000 reads/s. It lives on one shard of a Redis cluster, whose CPU is at 100% while the other shards idle. The post can be up to 2 s stale. What helps most?",
     options: opts(
       'Add more shards to the cluster',
       'A 1–2 s in-process cache for that key on each API instance',
-      'Raise the key\'s TTL from 60 s to 1 hour so it is never missed',
+      "Raise the key's TTL from 60 s to 1 hour so it is never missed",
       'Move the post back to Postgres',
     ),
     answerKey: 'b',
@@ -439,7 +439,7 @@ export const CACHING_QUEUES_CHOICE: ChallengeSeed[] = [
     ),
     answerKey: 'c',
     explanation:
-      'Partitioning by key keeps one account\'s events in order on one consumer, while different accounts run in parallel across partitions. You only need ordering within an account, so that is the only ordering you pay for.',
+      "Partitioning by key keeps one account's events in order on one consumer, while different accounts run in parallel across partitions. You only need ordering within an account, so that is the only ordering you pay for.",
     misconception:
       'Global ordering and parallelism fight each other. Most systems only need ordering per entity, and partitioning by that key gives both.',
     optionFeedback: {
@@ -465,7 +465,7 @@ export const CACHING_QUEUES_CHOICE: ChallengeSeed[] = [
     ),
     answerKey: 'd',
     explanation:
-      'The unique insert and the business update commit together: a duplicate fails on the constraint and does nothing, and a crash rolls back both, so the provider\'s retry can still succeed. The dedup record and the effect can never disagree.',
+      "The unique insert and the business update commit together: a duplicate fails on the constraint and does nothing, and a crash rolls back both, so the provider's retry can still succeed. The dedup record and the effect can never disagree.",
     misconception:
       'An idempotency check stored somewhere other than the data it protects can drift from it. Keep the dedup record in the same transaction as the effect.',
     optionFeedback: {

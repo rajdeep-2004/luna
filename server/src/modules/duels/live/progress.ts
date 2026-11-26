@@ -5,7 +5,12 @@ import { DuelModel, type DuelDoc } from '../../../models/Duel';
 import { SessionModel, type SessionDoc } from '../../../models/Session';
 import { logger } from '../../../lib/logger';
 import { challengesRepo } from '../../challenges/challenges.repository';
-import { createSession, finishSession, recordAttempt } from '../../sessions/sessions.service';
+import {
+  createSession,
+  finishSession,
+  recordAttempt,
+  repairAnsweredXP,
+} from '../../sessions/sessions.service';
 import { payWinBonus } from '../duels.settle';
 import { markFinalized } from './store';
 
@@ -70,7 +75,7 @@ type StoredAnswer = {
 export async function syncAttempt(d: DuelDoc, challenge: ChallengeDoc, a: StoredAnswer) {
   const session = await sessionFor(d, a.userId.toString());
   if (!session || session.status !== 'ACTIVE') return;
-  await recordAttempt(a.userId.toString(), session, challenge, {
+  const recorded = await recordAttempt(a.userId.toString(), session, challenge, {
     stageIndex: 0,
     answer: a.answer ?? DUEL_TIMEOUT_ANSWER,
     isCorrect: a.isCorrect,
@@ -78,6 +83,8 @@ export async function syncAttempt(d: DuelDoc, challenge: ChallengeDoc, a: Stored
     isTimeout: Boolean(a.timedOut),
     timeTakenMs: a.responseMs,
   });
+  // Already recorded: re-run the XP award (a ledger no-op if it happened), as REST retries do.
+  if (!recorded) await repairAnsweredXP(a.userId.toString(), session, challenge, 0);
 }
 
 /**

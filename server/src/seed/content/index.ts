@@ -5,4 +5,10 @@ import { CACHING_QUEUES } from './cachingQueues';
 import { DEBUGGING_PROD } from './debuggingProd';
 
 export { TOPICS } from './topics';
-export const CHALLENGES = [...JS_ASYNC, ...HTTP_APIS, ...DATABASES, ...CACHING_QUEUES, ...DEBUGGING_PROD];
+export const CHALLENGES = [
+  ...JS_ASYNC,
+  ...HTTP_APIS,
+  ...DATABASES,
+  ...CACHING_QUEUES,
+  ...DEBUGGING_PROD,
+];

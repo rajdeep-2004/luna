@@ -16,5 +16,6 @@ export const challengesRepo = {
     topicSlug?: TopicSlug;
     type?: ChallengeType | { $ne: ChallengeType };
     difficulty?: Difficulty;
-  }): Promise<ChallengeDoc[]> => ChallengeModel.find({ ...filter, isActive: true }).limit(SELECTION.poolMax),
+  }): Promise<ChallengeDoc[]> =>
+    ChallengeModel.find({ ...filter, isActive: true }).limit(SELECTION.poolMax),
 };

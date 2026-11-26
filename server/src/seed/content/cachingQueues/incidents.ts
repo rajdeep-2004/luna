@@ -142,7 +142,8 @@ export const CACHING_QUEUES_INCIDENTS: ChallengeSeed[] = [
     subtopic: 'priorities',
     type,
     difficulty: 2,
-    prompt: 'Support is flooded: password reset emails take 40 minutes to arrive. Yesterday they took seconds.',
+    prompt:
+      'Support is flooded: password reset emails take 40 minutes to arrive. Yesterday they took seconds.',
     stages: [
       {
         title: 'Alert',
@@ -150,7 +151,7 @@ export const CACHING_QUEUES_INCIDENTS: ChallengeSeed[] = [
           'The email queue has 180,000 waiting jobs. Workers are healthy and sending about 75 emails a second. The email provider reports no errors.',
         prompt: 'What do you check first?',
         options: opts(
-          'The email provider\'s status page',
+          "The email provider's status page",
           'Which jobs make up the backlog, and when they were added',
           'The reset-token code',
           'DNS records for the email domain',
@@ -175,8 +176,7 @@ export const CACHING_QUEUES_INCIDENTS: ChallengeSeed[] = [
         answerKey: 'd',
         explanation:
           'A FIFO queue treats every job the same. A reset added at 9:01 waits behind 180,000 newsletters, no matter how urgent it is.',
-        misconception:
-          'One queue for all work means the biggest batch sets everyone\'s latency.',
+        misconception: "One queue for all work means the biggest batch sets everyone's latency.",
         hint: 'Where does a reset job added at 9:01 sit in the queue?',
       },
       {
@@ -191,7 +191,7 @@ export const CACHING_QUEUES_INCIDENTS: ChallengeSeed[] = [
         ),
         answerKey: 'a',
         explanation:
-          'Dedicated capacity for transactional mail means a bulk send can never get in front of a reset. Rate-limiting the bulk queue also keeps it from using up the provider\'s sending limit.',
+          "Dedicated capacity for transactional mail means a bulk send can never get in front of a reset. Rate-limiting the bulk queue also keeps it from using up the provider's sending limit.",
         misconception:
           'Scaling workers to the largest burst is costly and the provider would throttle you anyway. Isolate work with different urgency instead.',
       },

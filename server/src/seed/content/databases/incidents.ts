@@ -20,7 +20,12 @@ export const DATABASES_INCIDENTS: ChallengeSeed[] = [
         evidence:
           'p95 latency is 2.4 s (normally 150 ms). Database CPU 92%. App server CPU 35%. Traffic is normal.',
         prompt: 'What do you investigate first?',
-        options: opts('App server CPU', 'Frontend rendering', 'DNS configuration', 'Database query performance'),
+        options: opts(
+          'App server CPU',
+          'Frontend rendering',
+          'DNS configuration',
+          'Database query performance',
+        ),
         answerKey: 'd',
         explanation:
           'Traffic is normal and the app servers are relaxed, but the database is pegged. The load is coming from the queries the app sends it.',
@@ -47,7 +52,8 @@ export const DATABASES_INCIDENTS: ChallengeSeed[] = [
       },
       {
         title: 'Resolve',
-        evidence: 'EXPLAIN shows a sequential scan of the whole table: there is no index on customer_email.',
+        evidence:
+          'EXPLAIN shows a sequential scan of the whole table: there is no index on customer_email.',
         prompt: 'What is the corrective action?',
         options: opts(
           'Add another app server',
@@ -73,7 +79,8 @@ export const DATABASES_INCIDENTS: ChallengeSeed[] = [
     subtopic: 'connections',
     type,
     difficulty: 2,
-    prompt: 'After this morning\'s release, the API times out on most requests, but the database looks bored.',
+    prompt:
+      "After this morning's release, the API times out on most requests, but the database looks bored.",
     stages: [
       {
         title: 'Alert',
@@ -95,7 +102,7 @@ export const DATABASES_INCIDENTS: ChallengeSeed[] = [
       {
         title: 'Investigate',
         evidence:
-          'The release added a coupon check:\nconst client = await pool.connect();\nawait client.query(\'BEGIN\');\nconst c = await findCoupon(client, code);\nif (!c) return res.status(404).end();\n...\nawait client.query(\'COMMIT\');\nclient.release();',
+          "The release added a coupon check:\nconst client = await pool.connect();\nawait client.query('BEGIN');\nconst c = await findCoupon(client, code);\nif (!c) return res.status(404).end();\n...\nawait client.query('COMMIT');\nclient.release();",
         prompt: 'Which path leaks the connection?',
         options: opts(
           'The 404 return: it never commits, rolls back or releases the client',
@@ -181,7 +188,7 @@ export const DATABASES_INCIDENTS: ChallengeSeed[] = [
         options: opts(
           'Kill the reporting query and never run reports again',
           'Run all future migrations at 3 a.m. and hope nothing is running',
-          'Cancel the migration, then rerun it with SET lock_timeout = \'3s\' and retries, so it gives up instead of blocking traffic',
+          "Cancel the migration, then rerun it with SET lock_timeout = '3s' and retries, so it gives up instead of blocking traffic",
           'Raise max_connections so the waiting queries do not fail',
         ),
         answerKey: 'c',

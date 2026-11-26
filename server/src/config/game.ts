@@ -164,6 +164,21 @@ export const DUEL = {
 /** Practice, incident and checkpoint picks (lower score wins): unseen first, random among equals. */
 export const PICK_WEIGHTS = { seen: 10, jitter: 0.5 } as const;
 
+/**
+ * V2 content targets and audit thresholds (docs/v2/plan.md §4, benchmarks.md §4). Read only by the
+ * dev audit tool (`npm run audit:content -w server`), never by the running server.
+ */
+export const CONTENT_TARGETS = {
+  /** Per topic × single type × difficulty. */
+  singlesPerCell: 6,
+  /** Per topic, by difficulty: 1 beginner, 2 intermediate, 1 advanced. */
+  incidentsByDifficulty: { 1: 1, 2: 2, 3: 1 } as Record<Difficulty, number>,
+  /** Warn when one answer position (a–d) holds more than this share of a topic's 4-option questions. */
+  maxAnswerPositionShare: 0.4,
+  /** Warn when the correct option is strictly the longest in more than this share of a topic's questions. */
+  maxLongestCorrectShare: 0.5,
+} as const;
+
 /** progression.md §7. Awarded once each; no XP. `target` is the count the condition needs. */
 export const ACHIEVEMENTS = [
   {

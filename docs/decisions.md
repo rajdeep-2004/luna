@@ -1695,3 +1695,92 @@ shared versus private caches; why `X-Forwarded-For` can only be trusted for the 
 
 **Revisit** when P11/P12 finish their topics (add them to `FINISHED_TOPICS` in `bank.test.ts`), or if players report a
 question as wrong (fix the text, keep the slug).
+
+### D-050 — V2 question bank for Databases and Caching & queues (P11), and the candidate-pool bound
+
+**Context.** P11 is the second V2 content phase (plan §3–§4, D-047). Databases had 10 V1 singles and 2 incidents;
+caching & queues had 10 singles and 2 incidents. The target per topic is 6 Trace, 6 Bug Hunt and 6 Engineer's Choice at
+each of the three levels (54 singles) plus 4 incidents at levels 1, 2, 2 and 3. An earlier P11 run was interrupted by a
+usage limit after writing the databases singles (commit `068a1cb`); this run resumed from that branch as the runbook says.
+
+**Decision.** Both topics now meet the target exactly (108 singles and 8 incidents). They use the P10 folder layout,
+`server/src/seed/content/<topic>/{trace,bugHunt,choice,incidents}.ts` plus an `index.ts`, and their four V1 incidents
+moved out of the shared `incidents.ts`, which now only holds the two debugging-prod incidents until P12. Every V1 slug is
+kept. One V1 question was re-levelled: `cache-bad-candidate` 2 → 1 (choosing what not to cache is one concept). The V1
+question `db-compound-index-order` was rewritten for level 3 after review: the query now has an `IN` filter on a second
+column, and the scenario (95 % of rows match, millions of rows per power user) decides that `(user_id, created_at)`
+beats the more "complete-looking" `(user_id, kind, created_at)`, because an `IN` on the middle column breaks the sort
+order and forces a sort of every matching row.
+
+**Deviation from D-049: some V1 options were re-ordered.** P10 left V1 option order alone, reasoning that stored answers
+refer to option ids. Looking closer, an `AnswerAttempt` stores `isCorrect` alongside the chosen id, and scoring, XP,
+mastery, revisits and history all read `isCorrect`; nothing re-evaluates old answers. The only thing an id change
+affects is the detail view of a session that was answered before the change, which would highlight a different option
+text. That is a small cost next to having every V1 incident answer on "a" (a pattern players learn), so the V1
+incidents and five V1 caching choices had their options re-ordered, with `optionFeedback` keys moved in step.
+
+**Subtopics covered.**
+- *Databases:* joins (inner, left, fan-out), NULL semantics (`= NULL`, `NOT IN` with NULL), sorting and LIMIT,
+  aggregation (`GROUP BY`, `WHERE` vs `HAVING`), constraints (unique, foreign keys, partial unique for soft delete),
+  indexes (when to add, compound order, expression indexes, write cost, `CREATE INDEX CONCURRENTLY`), money columns,
+  SQL injection, N+1 queries, transactions (pool clients, aborted transactions, `now()` inside a transaction),
+  isolation (read committed re-reads, lost updates, repeatable-read serialization errors, write skew), row locks
+  (`FOR UPDATE`, `SKIP LOCKED` job queues, deadlocks), pagination (offset without order, keyset ties), upserts,
+  replicas and read-after-write, connections (pooling, serverless exhaustion, leaked clients), migrations (lock queues,
+  zero-downtime renames, batched backfills), hot rows, MongoDB (`$inc`, `findOneAndUpdate`, ObjectId equality, array
+  queries, embed vs reference), node-postgres returning `SUM` as a string.
+- *Caching & queues:* TTL (staleness bound, `SET` clearing a TTL, OTP expiry), cache-aside (miss/hit counting, falsy
+  values, concurrent misses, key mismatches, serialization), cache keys (viewer-specific data, normalised query
+  strings), invalidation (delete before vs after write, the slow-reader race), eviction (LRU, `allkeys-lru` vs
+  `volatile-lru` vs `noeviction`), in-process caches (shared mutable objects, per-instance invalidation), shared state
+  across instances (sessions, rate limits), negative caching, caching fallbacks, synchronized expiry and stampedes, hot
+  keys, Redis specifics (`INCR`, `WATCH`/`MULTI`/`EXEC`, `KEYS` blocking, lock release by token), queues (FIFO with
+  lists, worker throughput, acknowledgements, visibility timeouts, retries with backoff, dead-letter queues, poison
+  messages), idempotency (job ids, webhook dedup in the same transaction), ordering (retries reordering updates,
+  partitioning by key), pub/sub vs durable streams, the transactional outbox and dual writes, enqueue-before-commit,
+  backpressure, priorities (separate queues for transactional mail), write-behind buffers on shutdown.
+
+**Balance (audit).** 0 errors, no warnings for either topic. Correct-answer positions over the 48 multiple-choice units
+per topic: databases a 9 / b 13 / c 13 / d 13, caching-queues a 7 / b 14 / c 13 / d 14 (limit 40 % per letter). The
+correct option is strictly the longest in 24/48 (databases, exactly at the 50 % limit) and 15/48 (caching-queues).
+
+**Bug found and fixed: the candidate pool was capped at 200.** `challengesRepo.findActive` ended in a hard-coded
+`.limit(200)`, sized for the V1 bank. With two more full topics the active singles passed 200, so the query silently
+returned the first 200 documents and the last topic (debugging-prod) disappeared from cross-topic picks: the checkpoint
+test got 4 items instead of 5. The bound now lives in config as `SELECTION.poolMax = 1000` (the V2 bank targets 290), and
+a new test asserts the whole active bank stays under it and that the checkpoint and baseline cover every topic.
+*Alternatives rejected:* removing the limit (the standards require bounded queries); querying per topic (more round
+trips for no gain at this size). *Revisit* if the bank approaches 1,000, or move to per-topic queries then.
+
+**Review.** One cavecrew reviewer pass over `git diff main...HEAD`: every Bug Hunt line number checked and correct; the
+code fix had no issues. 1 high and 12 medium findings, all fixed: a Choice distractor marked "works" (pub/sub vs
+durable queue) became clearly wrong; two other "works" distractors got a constraint in the prompt that rules them out
+(keep 3 instances; the warehouse must not read your database); three Redis snippets used ioredis-style `'EX', n`
+arguments that node-redis v4 ignores, now `{ EX: n }`; the `WATCH` trace was re-ordered so the steps read top to
+bottom; a repeatable-read snippet wrote a literal value that could not produce the "retry writes 3" explanation; two
+Bug Hunts had a second defensible line (reworded prompts, one answer moved to the real line); the stale-prices
+explanation overstated delete-after-write (it narrows the race; the TTL bounds it); the rate-limit explanation now
+says the window is fixed and that INCR + EXPIRE should be sent atomically; the `SKIP LOCKED` explanation now says
+waiting workers *usually* get no row; the keyset explanation names the companion parameter edit.
+
+**Not done: seeding Atlas.** As in P10, `server/.env` points at the cluster the deployed API uses, so the session did not
+run `npm run seed`; the seed schema and `loadContent` are exercised by every test file instead. Still in `TODOS.md`.
+
+**Process note.** The staged deletion of the old `cachingQueues.ts` landed in the pool-fix commit (`a0790fd`) instead of
+the caching content commit, so that one commit does not build on its own. It was already pushed, and the runbook forbids
+rewriting history, so it stays; the next commit restores a building tree.
+
+**Tests.** `bank.test.ts` now lists all four finished topics (counts, no answer key in rounds, P9 variety on the real
+bank) plus the pool-bound test. Full suite: 110 passed.
+
+**Concepts worth learning.** NULL's three-valued logic; isolation anomalies (lost update, write skew) and why stricter
+isolation turns them into retryable errors; lock queues behind DDL; at-least-once delivery and why consumers must be
+idempotent; visibility timeouts; why a lease is not a lock; the outbox pattern; backpressure; partitioning for per-key
+ordering; hot keys vs sharding.
+
+**Files.** `server/src/seed/content/databases/*`, `server/src/seed/content/cachingQueues/*`,
+`server/src/seed/content/incidents.ts`, `server/src/modules/challenges/challenges.repository.ts`,
+`server/src/config/game.ts`, `docs/architecture.md`, `docs/prd.md`, `TODOS.md`.
+
+**Revisit** when P12 finishes debugging-prod (add it to `FINISHED_TOPICS`), or if players report a question as wrong
+(fix the text, keep the slug).

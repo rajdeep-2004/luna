@@ -178,6 +178,11 @@ export const SELECTION = {
   seenTier: ADAPTIVE.max - ADAPTIVE.min + 1,
   recentDays: 7,
   recentSessionsMax: 50,
+  /**
+   * Upper bound on one candidate-pool query (D-050). The V2 bank targets 290 challenges, so 1,000
+   * leaves room to grow while still bounding the query. Raise it before the bank gets close.
+   */
+  poolMax: 1000,
 } as const;
 
 /**

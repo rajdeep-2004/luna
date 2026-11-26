@@ -1612,3 +1612,86 @@ sampling without replacement; dependency injection of randomness for determinist
 
 **Revisit** if players report off-topic Katas (lower the temperature), or when the bank is complete (P12) and the
 audit moves to `--strict`.
+
+### D-049 — V2 question bank for JavaScript async and HTTP & APIs (P10)
+
+**Context.** P10 is the first V2 content phase (plan §3–§4, D-047). Each of the two topics had about ten V1 singles and
+one incident; the target is 6 Trace, 6 Bug Hunt and 6 Engineer's Choice at each of the three levels (54 singles) plus 4
+incidents (levels 1, 2, 2, 3), written to the level rubric in `docs/product/benchmarks.md` §4.
+
+**Decision.** Both topics now meet the target exactly: 108 singles and 8 incidents, 116 challenges in total for the two
+topics. Each finished topic gets its own folder, `server/src/seed/content/<topic>/{trace,bugHunt,choice,incidents}.ts`
+with an `index.ts` that exports the topic array, because a single file would have passed 1,000 lines. The two V1
+incidents of these topics (`incident-listener-leak`, `incident-double-charge`) moved into those folders, so every
+topic's content is in one place; the other topics keep the old layout until P11/P12.
+
+**What was kept, fixed or re-levelled from V1.** Every V1 slug is kept, so player history, mastery and revisit queues
+still point at real questions. Two were re-levelled: `js-promise-all-reject` 3 → 2 (fail-fast Promise.all is an
+intermediate idea, not a production edge case) and `http-missing-ownership-check` 3 → 2 (authentication versus
+authorization is two concepts, but not a subtle one). `js-sequential-awaits` lost a joke distractor ("mark the handler
+async a second time"), replaced with a real misconception (chaining `.then()` is still sequential). Some long correct
+options were shortened to remove the length tell. **V1 option order was not changed**, even where the correct answer is
+"b": stored answers and option feedback refer to option ids, and re-keying would silently change what past answers
+meant. The new questions are written so each topic is balanced overall.
+
+**Subtopics covered.**
+- *JavaScript async:* event loop and timers, microtasks and `process.nextTick`, promises (chains, executors, `all`,
+  `allSettled`, `race`), async/await, error handling (unhandled rejections, late handlers, `finally`, swallowed
+  errors), async iteration and array methods, concurrency (pools, batches, fan-out), cancellation (`AbortController`,
+  race does not cancel), streams and backpressure, event emitters, callbacks and `promisify`, race conditions across
+  `await`, retries and jitter, graceful shutdown, ordering, single-flight, `AsyncLocalStorage`.
+- *HTTP & APIs:* methods and idempotency, status codes, routing and params, middleware order, Express 5 handlers and
+  error handling, body parsing and Content-Type, fetch semantics, cookies (HttpOnly, SameSite), CORS, authentication
+  (JWT verification, where tokens go), authorization, validation and mass assignment, pagination (bounds, offset
+  drift), caching (ETag/304, Cache-Control, Vary, CDNs, hashed assets), rate limiting (Retry-After, trust proxy,
+  distributed counters), retries, redirects (301 vs 308), streaming responses, keep-alive behind a load balancer,
+  webhooks (signatures, at-least-once delivery), API design (202 + polling, backend-for-frontend, versioning,
+  optimistic concurrency with If-Match), real-time delivery (SSE).
+
+**How each level was written.** Level 1 tests one idea in a short snippet (a `var` loop with timers, `fetch` resolving
+on a 404, `next;` without a call). Level 2 combines two (an async callback inside `filter`, Express error middleware
+plus registration order, offset pagination plus concurrent inserts). Level 3 is the production subtlety where two
+options are plausible and the scenario decides: microtask starvation, a rejection with no handler while another await
+is pending, `trust proxy = true` letting clients forge their IP, an idempotency check that loses a race, keep-alive
+timeouts shorter than the load balancer's, a worker-thread pool versus a durable queue when deploys restart
+instances. Incidents follow alert → investigate → resolve, and each stage's evidence builds on the previous one.
+
+**Balance (audit).** 0 errors and no warnings for either topic. Correct-answer positions across the 48
+multiple-choice units per topic (Trace, Choice, incident stages): js-async a 13 / b 15 / c 10 / d 10; http-apis
+a 13 / b 13 / c 11 / d 11 (limit: 40 % on one letter). The correct option is the longest in 17/48 and 21/48 questions
+(limit 50 %). Getting there took one pass of deliberately lengthening distractors and shortening correct options,
+and a small script in `.scratch/tools/` that swaps two answer positions while keeping option feedback keys in step.
+
+**Review.** One content reviewer pass (cavecrew reviewer) checked every answer key and Bug Hunt line number. It found
+two real errors and four risks, all fixed: (1) and (2) `req.on('close')` was used to detect a client disconnect, but
+since Node 16 that event fires as soon as the request body has been read, so the "correct" answers would have
+cancelled every request; they now use `res.on('close')` (with a `writableFinished` check for cancellation). (3) The
+open-redirect explanation suggested a prefix check that `/\evil.example` bypasses; it now recommends comparing
+`new URL(next, origin).origin`. (4) The per-document promise chain needed a `catch` so one failure does not skip every
+later update. (5) "INCR and EXPIRE" is two commands; the answer now says the TTL must be set atomically. (6) A Bug
+Hunt prompt was reworded ("which line has the wrong condition") so its line number is unambiguous.
+
+**Not done: seeding the live database.** The phase file says to run `npm run seed` against a local or test database if
+a `.env` exists. The only `.env` points at the Atlas cluster the deployed API uses, so running it unattended would have
+published the new bank to players before the phase was merged. The seed is instead verified by the test suite, which
+runs the real `loadContent()` against an in-memory MongoDB. Seeding production is in `TODOS.md`.
+
+**Tests.** New `.scratch/api-tests/bank.test.ts`, per finished topic: the seeded bank has at least 6 of every type ×
+level and 4 incidents (1/2/1); a practice round never contains `answerKey`, `optionFeedback` or explanations; the P9
+variety checks on the real bank (10 identical players have a mean pairwise practice overlap under 2 of 5; a finished
+round is followed by an all-unseen round; two incident runs give different incidents). Full suite: 99 passed.
+
+**Alternatives rejected.** *Writing more than 6 per cell:* the target already gives each Daily Kata slot about 30
+candidates; quality per question mattered more than count. *Keeping one file per topic:* about 1,200 lines each, past the
+800-line limit. *Re-keying V1 options to fix the "b" skew:* would need a data migration for stored answers; the new
+questions balance the topic instead.
+
+**Concepts worth learning.** How a good distractor encodes a real misconception; the Node event-loop phases (sync →
+nextTick → microtasks → timers); backpressure; check-then-act races across `await`; idempotency under retries;
+shared versus private caches; why `X-Forwarded-For` can only be trusted for the hops you own.
+
+**Files.** `server/src/seed/content/jsAsync/*`, `server/src/seed/content/httpApis/*`,
+`server/src/seed/content/incidents.ts`, `docs/architecture.md`, `docs/prd.md`, `TODOS.md`.
+
+**Revisit** when P11/P12 finish their topics (add them to `FINISHED_TOPICS` in `bank.test.ts`), or if players report a
+question as wrong (fix the text, keep the slug).

@@ -94,8 +94,8 @@ luna/
 │       ├── db/               connect, syncIndexes
 │       └── seed/             seed script, content schema check, audit, content/ (the question bank):
 │                             finished V2 topics get a folder content/<topic>/{trace,bugHunt,choice,incidents}.ts
-│                             (jsAsync/, httpApis/ since P10; databases/, cachingQueues/ since P11); debugging-prod is still
-│                             one file + incidents.ts
+│                             (jsAsync/, httpApis/ since P10; databases/, cachingQueues/ since P11; debuggingProd/
+│                             since P12). Full bank: 270 singles + 20 incidents, `audit:content --strict` clean
 ├── shared/                   Zod schemas + TS types for the API contract (runtime dependency: zod only)
 ├── docs/                     prd, architecture, build-plan, decisions, product/ (game rules), luna-idea
 ├── .scratch/                 GITIGNORED. API smoke tests and throwaway scripts, never pushed

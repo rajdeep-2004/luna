@@ -27,9 +27,10 @@ Backlog, deferred ideas and known debt. Scope changes go here first; nothing her
 ## Product backlog (from docs/product/)
 - **P8: new Explore mini-games** (Rajdeep, D-037): fast formats beyond the four quiz modes, such as a 60-second blitz or a swipe true/false round. Needs new content and engine work.
 - **Visual and micro-interaction polish pass after V1** (Rajdeep: "looks boring"). Session, feedback and summary screens are functional but plain. Fits the P6 polish task: livelier copy, richer motion, petals, rank-up banner, tab icons.
-- **Grow the question bank.** V1's 50 + 8 items run out of new content after ~12 days of daily play (game-modes.md §5). In progress in V2: js-async and http-apis (P10), databases and caching-queues (P11) are complete (54 + 4 each); debugging-prod (P12) remains.
-- **Seed the production bank after P10/P11** (D-049, D-050): the P10 and P11 sessions did not run `npm run seed` because `server/.env` points at the Atlas cluster the deployed API uses. Run it once (it is idempotent) when you are ready for players to see the new questions.
+- **Grow the question bank.** V1's 50 + 8 items run out of new content after ~12 days of daily play (game-modes.md §5). Done in V2 (P10–P12): all five topics are at 54 singles + 4 incidents (290 items). Next growth would be more incidents or new formats (P16).
+- **Seed the production bank after P10–P12** (D-049, D-050, D-051): the P10, P11 and P12 sessions did not run `npm run seed` because `server/.env` points at the Atlas cluster the deployed API uses. Run it once (it is idempotent) when you are ready for players to see the new questions.
 - **Re-key V1 options for balance** (D-049): V1 questions kept their option order so stored answers stay valid; their correct answers are mostly "b". The new questions balance each topic, but if a topic's audit ever shows skew again, consider re-keying with a migration of stored answers.
+- **P12 review, level nits (D-051)**: the reviewer suggested `prod-unhandled-rejection-crash` (L1 → 2), `prod-shutdown-order` (L3 → 2) and `prod-swallowed-error` (L2 → 1). Moving them would push cells off 6/6, so they stay; swap each with a new question at the other level if players find them mis-levelled.
 - Streak freeze (progression.md §6).
 - Daily leaderboard and promotion/relegation leagues, once there are about 30+ active users per group (competition.md).
 - Public duel matchmaking.

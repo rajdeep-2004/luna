@@ -153,7 +153,7 @@ Status: `todo` | `building` | `shipped`.
 | P7  | Game redesign: design system, game-first screens, Explore mode picker, duel formats | D-037–D-043                                          | shipped  |
 | P8  | V2 plan: phases, runbook, phase runner (`docs/v2/`)                                 | D-047                                                | shipped  |
 | P9  | V2: level rubric, content audit, per-player randomised selection                    | F-04, F-10, F-16                                     | shipped  |
-| P10 | V2 bank: JavaScript async + HTTP & APIs                                             | F-16                                                 | todo     |
+| P10 | V2 bank: JavaScript async + HTTP & APIs                                             | F-16                                                 | shipped  |
 | P11 | V2 bank: Databases + Caching & queues                                               | F-16                                                 | todo     |
 | P12 | V2 bank: Debugging production + full-bank audit                                     | F-16                                                 | todo     |
 | P13 | V2: live duel backend (Socket.IO, synced questions)                                 | F-18                                                 | todo     |

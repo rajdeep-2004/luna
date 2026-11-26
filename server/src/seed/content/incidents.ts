@@ -1,6 +1,9 @@
 import { opts, type ChallengeSeed } from '../schema';
 
-/** Incident Room scenarios (docs/product/game-modes.md §5). Three stages each: alert → investigate → resolve. */
+/**
+ * Incident Room scenarios (docs/product/game-modes.md §5). Three stages each: alert → investigate → resolve.
+ * Topics with a finished V2 bank keep theirs next to their singles (jsAsync/, httpApis/).
+ */
 export const INCIDENTS: ChallengeSeed[] = [
   {
     slug: 'incident-missing-index',
@@ -65,69 +68,6 @@ export const INCIDENTS: ChallengeSeed[] = [
     ],
     rootCause:
       'A frequent query filtered on customer_email, which had no index, so every request did a full table scan. That saturated the database CPU.',
-  },
-  {
-    slug: 'incident-double-charge',
-    title: 'The checkout that charged twice',
-    topicSlug: 'http-apis',
-    subtopic: 'idempotency',
-    type: 'INCIDENT',
-    difficulty: 2,
-    prompt: 'Support tickets are piling up: customers say they were charged twice.',
-    stages: [
-      {
-        title: 'Alert',
-        evidence:
-          '0.8% of orders this week have two identical charges about 10 s apart. Almost all come from the mobile app on slow networks.',
-        prompt: 'What do you suspect first?',
-        options: opts(
-          'Client retries after a timeout',
-          'A database index is missing',
-          'The payment provider is hacked',
-          'Users double-tapping on purpose',
-        ),
-        answerKey: 'a',
-        explanation:
-          'The pattern (slow networks, duplicates about 10 s apart, a typical client timeout) points at automatic retries of a request that had already succeeded.',
-        misconception:
-          'Duplicates with a regular time gap are usually machines retrying, not people.',
-      },
-      {
-        title: 'Investigate',
-        evidence:
-          'Logs show two POST /payments with the same cart. The first finished on the server in 11 s, but the app gave up at 10 s and retried.',
-        prompt: 'What is the real flaw?',
-        options: opts(
-          'POST /payments is not idempotent: a retry creates a new charge',
-          'The timeout is too short',
-          'The cart id is wrong',
-          'The provider is slow and should be replaced',
-        ),
-        answerKey: 'a',
-        explanation:
-          'Timeouts will always happen. The flaw is that the server cannot tell a retry from a new payment, so every retry charges again.',
-        misconception: 'Tuning the timeout makes duplicates rarer but does not stop them.',
-        hint: 'Could the server tell these two requests apart?',
-      },
-      {
-        title: 'Resolve',
-        evidence:
-          'Product wants this fixed without removing retries, because retries save many payments on bad networks.',
-        prompt: 'What do you ship?',
-        options: opts(
-          'An idempotency key per checkout; the server returns the original result for a repeated key',
-          'Remove retries from the app',
-          'Increase the timeout to 60 s',
-          'Refund duplicates every night',
-        ),
-        answerKey: 'a',
-        explanation:
-          'The app generates one key per checkout attempt and sends it with every retry. The server stores it with a unique constraint, so repeats return the first result instead of charging again.',
-        misconception: 'Refunds treat the symptom; customers still see the double charge.',
-      },
-    ],
-    rootCause:
-      "The payment endpoint wasn't idempotent. Slow networks caused client timeouts, the app retried requests that had already succeeded, and each retry created a new charge.",
   },
   {
     slug: 'incident-stale-prices',
@@ -317,68 +257,6 @@ export const INCIDENTS: ChallengeSeed[] = [
     ],
     rootCause:
       'The release made JWT_SECRET a required variable, but it was never set in production, so every new instance failed config validation on boot and the gateway returned 502.',
-  },
-  {
-    slug: 'incident-listener-leak',
-    title: 'Memory climbs every hour',
-    topicSlug: 'js-async',
-    subtopic: 'memory leaks',
-    type: 'INCIDENT',
-    difficulty: 3,
-    prompt: 'The Node service is killed for running out of memory every few hours.',
-    stages: [
-      {
-        title: 'Alert',
-        evidence:
-          'Memory rises steadily from 150 MB to 1.5 GB over 4 hours, then the process is OOM-killed. CPU and traffic are flat. Logs show "MaxListenersExceededWarning".',
-        prompt: 'Which lead do you follow first?',
-        options: opts(
-          'The MaxListenersExceededWarning',
-          'Traffic spikes',
-          'Database latency',
-          'Disk space',
-        ),
-        answerKey: 'a',
-        explanation:
-          'Flat traffic with steady growth suggests something accumulates per request. Node warns when one emitter gets too many listeners: a classic sign of adding listeners without removing them.',
-        misconception: 'Warnings in logs are not noise. This one often points straight at a leak.',
-      },
-      {
-        title: 'Investigate',
-        evidence:
-          "Per request, the handler runs: priceFeed.on('update', (p) => res.write(...)). Nothing ever calls priceFeed.off().",
-        prompt: 'Why does memory grow?',
-        options: opts(
-          'Each request adds a listener that is never removed, keeping its closure (and the response) alive',
-          'res.write is slow',
-          'The garbage collector is disabled',
-          'The price feed sends too much data',
-        ),
-        answerKey: 'a',
-        explanation:
-          "The long-lived emitter holds a reference to every listener, and each listener's closure holds its request objects. None of it can be garbage collected.",
-        misconception:
-          'Garbage collection only frees what nothing references. A global emitter is a reference.',
-        hint: "What keeps an old request's objects reachable?",
-      },
-      {
-        title: 'Resolve',
-        evidence: 'The stream should stop when the client disconnects.',
-        prompt: 'What is the fix?',
-        options: opts(
-          "Remove the listener when the request closes: req.on('close', () => priceFeed.off('update', handler))",
-          'Restart the server every 3 hours',
-          'Raise the max-listeners limit',
-          'Add more memory',
-        ),
-        answerKey: 'a',
-        explanation:
-          "Tie the listener's lifetime to the request's: unsubscribe on close. Memory then stays flat no matter how many clients come and go.",
-        misconception: 'Raising the listener limit silences the warning and keeps the leak.',
-      },
-    ],
-    rootCause:
-      'Each streaming request subscribed a listener to a global price-feed emitter and never unsubscribed, so listeners and their request objects accumulated until the process ran out of memory.',
   },
   {
     slug: 'incident-cors-cookies',

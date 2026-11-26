@@ -174,7 +174,8 @@ export const DUEL = {
  */
 export const SELECTION = {
   temperature: 0.5,
-  seenTier: 10,
+  /** Larger than any difficulty gap, so a seen challenge never outranks an unseen one. */
+  seenTier: ADAPTIVE.max - ADAPTIVE.min + 1,
   recentDays: 7,
   recentSessionsMax: 50,
 } as const;

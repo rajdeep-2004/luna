@@ -4,7 +4,7 @@ import type { ChallengeDoc } from '../../models/Challenge';
 import { SessionModel } from '../../models/Session';
 import { AppError } from '../../lib/errors';
 import { CHECKPOINT, REVISIT, SELECTION, SESSION } from '../../config/game';
-import { cryptoRng, tieredOrder, weightedPick, type Rng } from '../../lib/sampling';
+import { bestTier, cryptoRng, tieredOrder, weightedPick, type Rng } from '../../lib/sampling';
 import { localDateKey } from '../../lib/time';
 import { challengesRepo } from '../challenges/challenges.repository';
 import { getDifficulty } from '../progress/topicProgress.service';
@@ -44,19 +44,21 @@ export async function seenIds(userId: string, now = new Date()): Promise<Set<str
  * A random order (D-048) that keeps the hard rules: unseen before seen, then closest to the target
  * difficulty. Only the order inside one tier is random, so a round takes the best tier first.
  */
+const tierFn = (seen: Set<string>, difficulty: number) => (c: ChallengeDoc) =>
+  (seen.has(c._id.toString()) ? SELECTION.seenTier : 0) + Math.abs(c.difficulty - difficulty);
+
 function rank(
   pool: ChallengeDoc[],
   seen: Set<string>,
   difficulty: number,
   rng: Rng,
 ): ChallengeDoc[] {
-  return tieredOrder(
-    pool,
-    (c) =>
-      (seen.has(c._id.toString()) ? SELECTION.seenTier : 0) + Math.abs(c.difficulty - difficulty),
-    rng,
-  );
+  return tieredOrder(pool, tierFn(seen, difficulty), rng);
 }
+
+/** One pick from the best tier, without ordering the whole pool. */
+const pickOne = (pool: ChallengeDoc[], seen: Set<string>, difficulty: number, rng: Rng) =>
+  weightedPick(bestTier(pool, tierFn(seen, difficulty)), () => 1, rng);
 
 /**
  * Topic Practice: up to one due revisit, then fresh picks in sampled order (progression.md §5).
@@ -124,7 +126,7 @@ export async function pickIncident(
     seenIds(userId),
   ]);
   const inTopic = topicSlug ? pool.filter((c) => c.topicSlug === topicSlug) : [];
-  const first = rank(inTopic.length ? inTopic : pool, seen, 1, rng)[0];
+  const first = pickOne(inTopic.length ? inTopic : pool, seen, 1, rng);
   if (!first) throw new AppError('NOT_FOUND', 'No incidents available');
   return [fresh(first)];
 }
@@ -150,7 +152,7 @@ export async function pickCheckpoint(userId: string, rng: Rng = cryptoRng): Prom
   ]);
   return TOPIC_SLUGS.flatMap((slug) => {
     const inTopic = pool.filter((c) => c.topicSlug === slug);
-    const pick = rank(inTopic, seen, CHECKPOINT.difficulty, rng)[0];
+    const pick = pickOne(inTopic, seen, CHECKPOINT.difficulty, rng);
     return pick ? [fresh(pick)] : [];
   });
 }

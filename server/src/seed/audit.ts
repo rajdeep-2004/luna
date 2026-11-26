@@ -26,13 +26,18 @@ const LEVELS: Difficulty[] = [1, 2, 3];
 const POSITIONS = ['a', 'b', 'c', 'd'] as const;
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
-function schemaErrors(bank: readonly Seed[]): string[] {
-  return bank.flatMap((c, i) => {
+/** Splits the bank into schema-valid entries and one error per invalid entry. */
+function validate(bank: readonly unknown[]): { valid: Seed[]; errors: string[] } {
+  const valid: Seed[] = [];
+  const errors: string[] = [];
+  bank.forEach((c, i) => {
     const r = ChallengeSeed.safeParse(c);
-    if (r.success) return [];
+    if (r.success) return void valid.push(r.data);
+    const slug = (c as { slug?: unknown } | null)?.slug ?? '?';
     const issues = r.error.issues.map((x) => `${x.path.join('.')} ${x.message}`).join('; ');
-    return [`schema: #${i} ${c.slug}: ${issues}`];
+    errors.push(`schema: #${i} ${String(slug)}: ${issues}`);
   });
+  return { valid, errors };
 }
 
 function duplicateErrors(bank: readonly Seed[]): string[] {
@@ -135,10 +140,15 @@ function coverage(bank: readonly Seed[]): { table: string[]; under: string[] } {
   return { table, under };
 }
 
-/** Pure: audits a bank and returns what it found. `strict` makes "under target" an error. */
-export function auditContent(bank: readonly Seed[], strict = false): AuditReport {
+/**
+ * Pure: audits a bank and returns what it found. `strict` makes "under target" an error.
+ * Malformed entries are reported as schema errors and skipped by every other check, so one typo
+ * can't crash the audit or hide the rest of the report.
+ */
+export function auditContent(raw: readonly unknown[], strict = false): AuditReport {
+  const { valid: bank, errors: schema } = validate(raw);
   const { table, under } = coverage(bank);
-  const errors = [...schemaErrors(bank), ...duplicateErrors(bank), ...bank.flatMap(itemErrors)];
+  const errors = [...schema, ...duplicateErrors(bank), ...bank.flatMap(itemErrors)];
   const warnings = balanceWarnings(bank);
   (strict ? errors : warnings).push(...under);
   return { errors, warnings, table };

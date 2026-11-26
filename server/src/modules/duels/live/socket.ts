@@ -4,9 +4,11 @@ import type { ZodType } from 'zod';
 import {
   DUEL_EVENTS,
   DuelAnswerPayload,
+  DuelPingPayload,
   DuelRoomPayload,
   type DuelAck,
   type DuelAnswerReceipt,
+  type DuelPong,
   type DuelSnapshot,
 } from '@luna/shared';
 import { env } from '../../../config/env';
@@ -99,6 +101,11 @@ function register(io: Server, socket: LiveSocket) {
     const { duel } = await participantDuel(userId, duelId);
     return toSnapshot(userId, duel, runtime.now());
   });
+
+  // Clock sync (D-053): no duel needed, rate-limited like every event.
+  on(socket, DUEL_EVENTS.ping, DuelPingPayload, async (): Promise<DuelPong> => ({
+    serverNow: runtime.now(),
+  }));
 
   on(socket, DUEL_EVENTS.ready, DuelRoomPayload, async ({ duelId }) => {
     assertSeatHolder(socket, duelId);

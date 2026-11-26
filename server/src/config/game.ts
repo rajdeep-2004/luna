@@ -97,12 +97,7 @@ export const KATA_WEIGHTS = {
   preferred: -0.5,
   weakest: -0.75,
   repeatTopic: 0.75,
-  seen: 10,
-  jitter: 0.5,
 } as const;
-
-/** Practice, incident and checkpoint picks (lower score wins): unseen first, random among equals. */
-export const PICK_WEIGHTS = { seen: 10, jitter: 0.5 } as const;
 
 /** Sessions whose completion can pay the first-incident bonus (not baseline or checkpoint). */
 export const INCIDENT_BONUS_SESSION_TYPES: readonly SessionType[] = ['INCIDENT', 'DAILY'];

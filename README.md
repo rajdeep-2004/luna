@@ -21,7 +21,8 @@ _Shogun 将軍_, keep the lantern lit, and duel your friends.
 ![Status](https://img.shields.io/badge/V1-live%20on%20Render-D9442B)
 
 [The dojo](#道-the-idea) · [Play](#遊-how-you-play) · [Duels](#刀-duels) · [Ranks](#侍-ranks-and-progress) ·
-[Design](#紙-the-look-kiri-e-den) · [Architecture](#築-how-it-works) · [Run it](#始-run-it-yourself) ·
+[Design](#紙-the-look-kiri-e-den) · [Architecture](#築-how-it-works) · [Install the APK](#install-the-apk-android) ·
+[Run it](#始-run-it-yourself) ·
 [API](#api-reference) · [Engineering](#守-engineering-notes) · [Docs](#書-documentation)
 
 <table>
@@ -250,6 +251,22 @@ sequenceDiagram
 | Tooling      | npm workspaces, ESLint, Prettier, `tsc --noEmit`  | No extra monorepo tool                                                         |
 
 ---
+
+## Install the APK (Android)
+
+The quickest way to play. No Expo Go, no setup: the APK talks to the live API on Render.
+
+1. On your Android phone, open the [**v1.0.0 release**](https://github.com/rajdeep-2004/luna/releases/tag/v1.0.0)
+   and download [`luna-v1.0.0.apk`](https://github.com/rajdeep-2004/luna/releases/download/v1.0.0/luna-v1.0.0.apk).
+2. Open the file. Android asks you to allow installs from this source (your browser or file manager):
+   allow it, then tap **Install**. The APK is signed, but it doesn't come from the Play Store, so
+   Android shows this prompt once.
+3. Open **Luna** and register. The first open after a quiet spell can take up to a minute while the
+   free Render server wakes up; the app says so instead of hanging.
+
+The APK is built by [EAS Build](https://docs.expo.dev/build/introduction/) from the `apk` profile in
+[`app/eas.json`](app/eas.json), with the production API URL built in. iOS has no installable build in V1:
+use Expo Go (below).
 
 ## 始 Run it yourself
 
@@ -522,13 +539,16 @@ The latest end-to-end check of V1 against its acceptance criteria is in
 
 **Live.** The API runs at `https://luna-kloi.onrender.com/api/v1` (health: `/api/v1/health`).
 
-- **API:** a Render web service from `server/` (`npm ci && npm run build`, start `node dist/index.js`,
-  health check `/api/v1/health`) that auto-deploys from `main`.
+- **API:** a Render web service rooted at the repo root (the server depends on the `shared` workspace),
+  built with `npm ci --include=dev && npm run build -w server`, started with `npm run start -w server`,
+  health check `/api/v1/health`. It auto-deploys from `main`.
 - **Database:** MongoDB Atlas M0, with separate `luna_dev` and `luna_prod` databases.
 - **After a deploy that changes indexes,** run the seed once against production so `syncIndexes`
   applies them: `MONGODB_URI=<production URI> npm run seed -w server`.
-- **App:** Expo Go, with `EXPO_PUBLIC_API_URL` pointing at the Render URL. There are no store builds in
-  V1.
+- **App:** an Android APK built by EAS Build (`apk` profile in `app/eas.json`, pointed at the Render URL)
+  and attached to the [v1.0.0 GitHub Release](https://github.com/rajdeep-2004/luna/releases/tag/v1.0.0).
+  In development, Expo Go with `EXPO_PUBLIC_API_URL` set to your LAN IP. There are no Play Store or App
+  Store builds in V1.
 
 ---
 

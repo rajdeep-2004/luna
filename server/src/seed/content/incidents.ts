@@ -2,73 +2,9 @@ import { opts, type ChallengeSeed } from '../schema';
 
 /**
  * Incident Room scenarios (docs/product/game-modes.md §5). Three stages each: alert → investigate → resolve.
- * Topics with a finished V2 bank keep theirs next to their singles (jsAsync/, httpApis/).
+ * Topics with a finished V2 bank keep theirs next to their singles (jsAsync/, httpApis/, databases/).
  */
 export const INCIDENTS: ChallengeSeed[] = [
-  {
-    slug: 'incident-missing-index',
-    title: 'Production is slowing down',
-    topicSlug: 'databases',
-    subtopic: 'indexes',
-    type: 'INCIDENT',
-    difficulty: 1,
-    prompt: 'You are on call. The API has slowed to a crawl.',
-    stages: [
-      {
-        title: 'Alert',
-        evidence:
-          'p95 latency is 2.4 s (normally 150 ms). Database CPU 92%. App server CPU 35%. Traffic is normal.',
-        prompt: 'What do you investigate first?',
-        options: opts(
-          'Database query performance',
-          'Frontend rendering',
-          'App server CPU',
-          'DNS configuration',
-        ),
-        answerKey: 'a',
-        explanation:
-          'Traffic is normal and the app servers are relaxed, but the database is pegged. The load is coming from the queries the app sends it.',
-        misconception:
-          'High latency is not always an app-server problem. Follow the resource that is saturated.',
-      },
-      {
-        title: 'Investigate',
-        evidence:
-          'The slow-query log shows one query running on every request: WHERE customer_email = ? taking 1.8 s and reading 2.4M rows.',
-        prompt: 'What do you look at next?',
-        options: opts(
-          "The query's execution plan and indexes",
-          'Restart the app servers',
-          'Raise the frontend cache duration',
-          'Change the API endpoint URL',
-        ),
-        answerKey: 'a',
-        explanation:
-          'Reading 2.4M rows to return a handful smells like a full table scan. The execution plan (EXPLAIN) shows whether an index is being used.',
-        misconception:
-          'Restarting changes nothing when the slow query will run again on the next request.',
-        hint: 'Why would one lookup read 2.4 million rows?',
-      },
-      {
-        title: 'Resolve',
-        evidence: 'EXPLAIN shows a full collection scan: there is no index on customer_email.',
-        prompt: 'What is the corrective action?',
-        options: opts(
-          'Add an index on customer_email after checking the workload',
-          'Increase the frontend timeout',
-          'Add another app server',
-          'Disable database transactions',
-        ),
-        answerKey: 'a',
-        explanation:
-          'An index on the filtered column turns the scan into a direct lookup. Check write volume first, because every index adds a little cost to inserts and updates.',
-        misconception:
-          'Scaling app servers sends even more slow queries to the same struggling database.',
-      },
-    ],
-    rootCause:
-      'A frequent query filtered on customer_email, which had no index, so every request did a full table scan. That saturated the database CPU.',
-  },
   {
     slug: 'incident-stale-prices',
     title: 'Stale prices after a sale',
@@ -320,68 +256,5 @@ export const INCIDENTS: ChallengeSeed[] = [
     ],
     rootCause:
       "After splitting the app and API across origins, requests no longer carried the session cookie: the client didn't send credentials and the API used a wildcard CORS origin, which browsers reject with credentials.",
-  },
-  {
-    slug: 'incident-deadlock',
-    title: 'Deadlock at month-end',
-    topicSlug: 'databases',
-    subtopic: 'transactions',
-    type: 'INCIDENT',
-    difficulty: 3,
-    prompt: 'During the month-end payout run, transfers start failing in bursts.',
-    stages: [
-      {
-        title: 'Alert',
-        evidence:
-          'About 3% of transfers fail with "deadlock detected; transaction rolled back". It only happens under heavy concurrent load.',
-        prompt: 'What does a deadlock mean?',
-        options: opts(
-          'Two transactions each hold a lock the other needs, so the database kills one',
-          'The database ran out of disk',
-          'A query is missing an index',
-          'The network dropped packets',
-        ),
-        answerKey: 'a',
-        explanation:
-          'Each transaction waits for the other forever, so the database detects the cycle and aborts one of them. It shows up under concurrency, which matches the month-end peak.',
-        misconception:
-          'Deadlocks are not random database failures. They come from the order your code takes locks in.',
-      },
-      {
-        title: 'Investigate',
-        evidence:
-          'transfer(A, B) locks account A then B. At the same time, transfer(B, A) locks B then A.',
-        prompt: 'Why do these two deadlock?',
-        options: opts(
-          'They lock the same two rows in opposite order',
-          'Both transfers are too large',
-          'Accounts A and B are on different servers',
-          'The isolation level is too low',
-        ),
-        answerKey: 'a',
-        explanation:
-          'Each takes its first lock and then waits for the row the other already holds: a cycle. Lock order is the cause.',
-        misconception:
-          'More hardware does not fix a lock cycle; it only changes how often it happens.',
-        hint: 'Compare the order each transfer locks the rows in.',
-      },
-      {
-        title: 'Resolve',
-        evidence: 'Transfers between any two accounts can run at the same time.',
-        prompt: 'What is the robust fix?',
-        options: opts(
-          'Always lock rows in a consistent order (e.g. lowest account id first), and retry the rare deadlock that remains',
-          'Run transfers one at a time globally',
-          'Remove transactions from transfers',
-          'Increase the lock timeout',
-        ),
-        answerKey: 'a',
-        explanation:
-          'If every transaction takes locks in the same global order, no cycle can form. A small retry on deadlock errors covers any remaining edge cases safely.',
-        misconception: 'Removing transactions trades a deadlock for corrupted balances.',
-      },
-    ],
-    rootCause:
-      'Concurrent transfers locked the same pair of account rows in opposite orders, forming lock cycles that the database resolved by aborting one of the transactions.',
   },
 ];

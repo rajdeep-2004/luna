@@ -114,7 +114,7 @@ luna/
 | progress | XP ledger, levels, streaks, topic progress, mastery, adaptivity | — | award XP twice for the same source |
 | daily | build or return today's Daily Kata per user | challenges, progress | build two circuits for the same user and day |
 | leaderboard | weekly ranking aggregation | progress (XP ledger) | scan unbounded results |
-| duels | create, join, play, settle (expiry, forfeit, winner, win bonus), list | sessions, progress (XP ledger) | let a user join their own duel; count a finish after the deadline |
+| duels | REST lobby (create, join, cancel, snapshot, history); live engine over Socket.IO (`live/`: engine, store, runtime, socket, recovery); win bonus | sessions (recordAttempt, finishSession), progress (XP ledger) | let a user join their own duel; accept an answer after the deadline; advance a question twice; send an answer key before the reveal |
 | achievements | evaluate and award badges after session events | progress | award the same badge twice |
 
 ## 6. Layering rules
@@ -140,7 +140,7 @@ Query (`src/api` endpoints) → fetch client. Screens never call `fetch` directl
   `Authorization: Bearer <token>`. No refresh tokens in V1 (D-008).
 - `requireAuth` middleware on every route except `/health`, `/auth/register` and `/auth/login`.
 - AuthZ per resource: sessions, attempts and progress are always queried with `userId = req.user.id`.
-  Duels can only be read by the creator or the opponent.
+  Duels can only be read by the creator or the opponent; only they can join its socket room (JWT checked in the Socket.IO handshake with the same verify as REST).
 - Rate limits (`config/security.ts`): `/auth/*` 10 requests per 15 min per IP, plus a per-account lock
   after 5 failed logins for 15 min. Duel join 30 per 15 min per IP. Global 300/min per IP.
 - No cookies, so no CSRF surface. CORS: the app is native and sends no Origin, so CORS only allows
@@ -173,7 +173,7 @@ Query (`src/api` endpoints) → fetch client. Screens never call `fetch` directl
 | `EXPO_PUBLIC_API_URL` | (app) API base URL | yes | `http://192.168.1.5:8080/api/v1` |
 
 Game constants (XP table, bonuses and caps, level thresholds and names, mastery and adaptivity
-thresholds, Kata/duel composition, duel timer, expiry and open limit) live in `server/src/config/game.ts`,
+thresholds, Kata/duel composition, win bonus) live in `server/src/config/game.ts` (live duel clocks in `LIVE_DUEL` and `DUEL_FORMAT_RULES` in `shared`; socket limits in `config/security.ts`),
 not as magic numbers. Their values come from `docs/product/` (approved).
 
 ## 11. Data model
@@ -188,7 +188,8 @@ not as magic numbers. Their values come from `docs/product/` (approved).
 | usertopicprogress | userId, topicSlug, answers, correct, recentResults (last 10 booleans, mastery), adaptWindow (answers since last difficulty change, max 5), difficultyLevel 1–3, hasAdvancedCorrect, lastPractisedAt | unique `{userId, topicId}` |
 | xpevents | userId, sourceKey (`challenge:<id>[:<stage>]`, `review:<date>:<id>`, `daily:<date>`, `perfect:<date>`, `first-incident`, `streak<N>:<runStart>`, `duelwin:<localDate>:<1..3>`), amount, weekKey (`2026-W47`), createdAt | **unique `{userId, sourceKey}`** (first-completion XP only); `{weekKey, userId}` |
 | revisititems | userId, challengeId, topicSlug, missedAt, missedDate (local `YYYY-MM-DD`), notBeforeDate? (set when a revisit is missed again) | unique `{userId, challengeId}`; `{userId, missedAt}` |
-| duels | code, creatorId, opponentId?, format (`CLASSIC`/`BLITZ`/`SUDDEN_DEATH`), items[5 or 10]{challengeId, optionOrders[][]}, status (`OPEN`/`ACTIVE`/`COMPLETED`/`EXPIRED`), creatorResult?/opponentResult? {correct, totalTimeMs, finishedAt}, winnerId?, endReason (`PLAYED`/`FORFEIT`/`EXPIRED`), winBonusClaimed, winBonusSettled, winBonusXP, expiresAt | unique code; TTL-free (expiry checked on read); `{creatorId, createdAt:-1}`, `{opponentId, createdAt:-1}`. A player's DUEL session is found by `{duelId, userId}` |
+| duels | code, creatorId, opponentId?, format (`CLASSIC`/`BLITZ`/`SUDDEN_DEATH`), items[5 or 10]{challengeId, optionOrders[][]}, phase (`LOBBY`/`READY`/`COUNTDOWN`/`QUESTION`/`REVEAL`/`COMPLETED`/`CANCELLED`/`ABANDONED`), currentIndex, questionStartedAt, deadlineAt, phaseEndsAt, lobbyExpiresAt, creatorSeat/opponentSeat {connected, lastSeenAt, readyAt}, creatorResult?/opponentResult? {correct, totalTimeMs, finishedAt}, winnerId?, endReason (`PLAYED`/`FORFEIT`/`CANCELLED`/`ABANDONED`/`EXPIRED` V1), endedAt, finalizedAt, winBonusClaimed, winBonusSettled, winBonusXP; V1 only: status, expiresAt | unique code; unique partial `{creatorId}` where phase LOBBY (one open lobby); `{creatorId, phase}`; `{phase, deadlineAt}` (recovery); `{finalizedAt, phase}`; `{creatorId, createdAt:-1}`, `{opponentId, createdAt:-1}`. A player's DUEL session is found by `{duelId, userId}` |
+| duelanswers | duelId, userId, index, answer (option id / line, null on timeout), isCorrect, timedOut, responseMs (server-measured, clamped), receivedAt | **unique `{duelId, userId, index}`** (one answer per question; a timeout fill and a late answer can't both land); `{duelId, index}` |
 | revisits | userId, challengeId, answersAtMiss, notBefore (date), status | unique `{userId, challengeId}` while open; `{userId, status, notBefore}` |
 | userachievements | userId, key, awardedAt | unique `{userId, key}` |
 
@@ -242,29 +243,46 @@ an under-target cell an error.
 otherwise → 1. `longestStreak = max(...)`. A timezone change can't be used to farm streaks,
 because the streak only moves when a Daily Kata completes and `lastDailyDate` is compared as a date string.
 
-**Duel:** create → random 6-character code from an unambiguous alphabet (no 0/O/1/I), retry on unique
-collision (up to 5 times). Join → atomic `findOneAndUpdate({code, status: OPEN, opponentId: null,
-creatorId: {$ne: me}, expiresAt > now})`, so only one opponent can ever join. Both play DUEL sessions
-on the same `challengeIds`. Result is computed when both sessions are COMPLETED: more correct wins,
-then lower `totalTimeMs` (compared in whole seconds), else draw. Duel sessions still earn first-completion XP
-(same ledger rules). Details of what P5 built (D-032):
-- *Play:* `POST /duels/:id/play` creates the player's DUEL session on the duel's fixed challenges and option
-  order. The unique `{duelId, userId}` index turns a double tap into one session.
-- *Formats (D-042):* `DUEL_FORMAT_RULES` in `shared` sets each format's size and clock: Classic 5 × 60 s (5 s
-  grace), Blitz 10 × 10 s (2 s grace), Sudden Death up to 10 × 30 s (5 s grace). The duel stores its format and
-  each DUEL session copies it, so an answer reads its timer without a second query.
-- *Timer:* the format's timer per challenge on the server's clock, measured from the previous answer. An answer
-  later than the timer plus its grace, or the `TIMEOUT` answer the app sends at zero, is wrong and records
-  exactly the timer.
-- *Sudden Death:* answers must come in order. The first miss or timeout sets `endedEarly` (a conditional update)
-  and reports `sessionReadyToComplete`; later answers return 409. Completion accepts fewer answers than the total
-  only when `endedEarly` is set, and the score counts the run up to and including the first miss.
-- *Settle:* when a DUEL session completes, the player's score is written onto the duel only if the duel is live
-  and before `expiresAt`. Every read of a duel then settles it: both scores → `COMPLETED`/`PLAYED`; past expiry →
-  the player who finished wins by default (`FORFEIT`, no bonus), or `EXPIRED` if nobody finished or joined. Each
-  transition is a conditional update guarded on the fields it depends on.
-- *Win bonus:* claimed once per duel (`winBonusClaimed` false→true), then paid into the first free daily slot
-  `duelwin:<date>:1..3`, so the 3-per-day cap is enforced by the ledger's unique index.
+**Live duels (V2, D-052).** Server-authoritative; the state machine and clock live on the duel document, the app
+renders what the server pushes. REST sets a duel up, Socket.IO (WebSocket only, same HTTP server, JWT in the handshake)
+plays it.
+- *Create* (`POST /duels`): a LOBBY with a random 6-character code (unambiguous alphabet, retried on collision) and a
+  10-minute `lobbyExpiresAt`. One open duel per creator (409), enforced for LOBBY by a unique partial index so two
+  concurrent creates can't both succeed. *Join* (`POST /duels/join`, rate-limited): one atomic `findOneAndUpdate` on
+  `{code, phase: LOBBY, opponentId: null, creatorId ≠ me, lobbyExpiresAt > now}` → READY, so exactly one of several
+  joiners wins; a player already seated in another live duel gets 409. *Cancel* (`POST /duels/:id/cancel`): creator only,
+  LOBBY/READY. `GET /duels/:id` returns the caller's snapshot; `GET /duels` is a cursor-paginated history.
+- *Socket events* (`DUEL_EVENTS` in `shared`): client `duel:join-room` (participants only; ack = full snapshot),
+  `duel:ready`, `duel:answer {duelId, index, answer}`, `duel:leave`; server `duel:state`, `duel:question`,
+  `duel:opponent-answered`, `duel:reveal`, `duel:ended`, `duel:presence`, `duel:superseded`. Every client event is
+  rate-limited per socket (token bucket), Zod-validated and answered with `{ok, data}` or `{ok: false, error}`.
+- *Engine:* `live/engine.ts` is pure (`decide`, `nextWakeAt`, `afterReveal`, `pickWinner`). `live/runtime.ts#tick`
+  reads the duel, decides, applies the action through `live/store.ts` as one conditional update on the state it was
+  decided from (`phase`, `currentIndex`, seat presence), runs side effects only when it made the move, and arms one timer
+  per duel at the earliest *future* due time. A failed step re-arms a retry. Timers, answers, presence, REST and recovery
+  all go through `tick`, serialized per duel in-process.
+- *Flow:* both seats connected and ready → COUNTDOWN (3 s, both DUEL sessions created) → QUESTION i (timer per format:
+  Classic 5 × 60 s, Blitz 10 × 10 s, Sudden Death up to 10 × 30 s) → REVEAL i when both answered or at `deadlineAt +
+  750 ms` (timeouts written for anyone silent, then both results, the key and the explanation for that question only)
+  → after 3 s, QUESTION i+1 or COMPLETED. Sudden Death ends at the first question where exactly one player is wrong.
+  Winner: more correct, then lower total server-measured response time, else draw.
+- *Answers:* accepted for the current index in QUESTION until the deadline plus grace (checked again just before the
+  insert), once (unique index; a repeat returns the stored receipt). The ack never says right or wrong.
+- *Progress:* every stored duel answer becomes an AnswerAttempt through `sessions.recordAttempt` (mastery, revisits,
+  first-correct XP as in every mode); the reveal and the end of each reveal both re-run it idempotently, which heals a
+  crash between steps. At the end, `finalizeDuel` pays the win bonus (claimed once, 3 per local day via ledger slots, only
+  for PLAYED) and completes both sessions through `sessions.finishSession`; `finalizedAt` marks it done.
+- *Failure handling:* a dropped player keeps their seat 20 s and reconnects with a snapshot; past the grace they forfeit
+  (no win bonus) if the rival is there, or the duel is ABANDONED if both are gone. Lobby: creator offline 60 s or TTL
+  passed → CANCELLED; a joiner offline 60 s frees the seat (READY → LOBBY). Two devices: the newest socket holds the
+  seat; the older gets `duel:superseded`. A stale disconnect write never overwrites a newer reconnect. Boot:
+  `migrateV1Duels` (V1 OPEN/ACTIVE → EXPIRED), then recovery ticks every open duel (deadlines passed while down advance
+  as timeouts; seats start offline with a fresh grace) and finalizes ended-but-unfinalized ones. Shutdown: timers, then
+  sockets and HTTP, then the database.
+- *Scaling note (not built):* one instance owns all timers and the in-memory seat map. To run several instances, add the
+  Socket.IO Redis adapter (rooms across instances) and a lease on each duel (`ownerId`, `leaseUntil`) so exactly one
+  instance drives its timers; recovery then only takes over duels whose lease expired. The first bottleneck is the
+  per-tick duel read plus answer count, fine at capstone scale with the indexes above.
 
 **Dojo Board** (`GET /leaderboard/weekly`): one aggregation over this week's `xpevents` grouped by user, sorted by
 XP, then by who reached it first (earliest last award), then id. Pages are offsets inside the top 50; the `me` row
@@ -290,7 +308,7 @@ scale with the `{weekKey, userId}` index. Later: a cached `weeklyXP` counter per
 
 | Layer | Covers | Tool | Command |
 |---|---|---|---|
-| API smoke tests (gitignored) | critical paths: auth and lockout, answer-key leakage, double submit, XP once, streak, Daily Kata once, mastery and adaptivity, revisits, board, achievements, mode rounds and boss incidents, duel join race, timers per format, Sudden Death, tie-break, expiry, win-bonus cap, content audit, weighted sampling, per-player selection variety (89 tests) | Vitest + Supertest + mongodb-memory-server | `cd .scratch/api-tests && npx vitest run` |
+| API smoke tests (gitignored) | critical paths: auth and lockout, answer-key leakage, double submit, XP once, streak, Daily Kata once, mastery and adaptivity, revisits, board, achievements, mode rounds and boss incidents, live duels (REST lobby rules and join race, socket auth and validation, full match sync, deadline advance, late/duplicate/wrong-index answers, deadline race, no key before reveal, Sudden Death, reconnect/forfeit/abandon, two devices, boot recovery, win-bonus once and cap), pure engine rules, V1 duel migration, content audit, weighted sampling, per-player selection variety (136 tests) | Vitest + Supertest + mongodb-memory-server | `cd .scratch/api-tests && npx vitest run` |
 | Frontend | each phase's click-through checklist | manual on Expo Go (Rajdeep) | — |
 | Static | lint + typecheck all workspaces | ESLint, tsc | `npm run lint && npm run typecheck` |
 

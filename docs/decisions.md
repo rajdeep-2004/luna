@@ -1860,3 +1860,127 @@ shedding; blameless postmortems.
 
 **Revisit** when players report a question as wrong or mis-levelled (fix the text, keep the slug), or when the bank grows
 past the `SELECTION.poolMax` headroom (D-050).
+
+### D-052 — Live duel backend (P13): Socket.IO, a server-owned state machine, and how races are made safe
+
+**Context.** V1 duels were asynchronous: each player played their own DUEL session within 48 hours, and the duel was
+settled when both had finished. V2 (plan §6) makes duels live: both players see the same question at the same moment,
+the server owns the clock, and the result is decided as the match is played. P13 builds the backend; P14 builds the app
+screens. This is the riskiest phase in V2 because it introduces timers, concurrency between a deadline and an answer,
+and players who disconnect.
+
+**Decision.**
+
+- *Transport: Socket.IO, WebSocket only,* attached to the same HTTP server as the Express API
+  (`server/src/modules/duels/live/socket.ts`). The JWT is read from the handshake `auth.token` and checked with the same
+  `verifyToken` that `requireAuth` now uses, so REST and sockets can't drift apart. Every client event goes through one
+  wrapper: a per-socket token bucket (`SOCKET_LIMITS`, 10 burst, 3/s), Zod validation with the shared schemas, and an
+  ack that is either `{ ok: true, data }` or `{ ok: false, error: { code, message } }` with the same error codes as REST.
+  A handler that throws never crashes Socket.IO; unknown errors are logged and returned as `INTERNAL`.
+- *State machine in Mongo, decisions in pure functions.* The duel document holds `phase`, `currentIndex`,
+  `questionStartedAt`, `deadlineAt`, `phaseEndsAt`, `lobbyExpiresAt` and per-seat `connected`/`lastSeenAt`/`readyAt`.
+  `live/engine.ts` is pure: `decide(duel, answeredCount, now, timings)` returns the one action that is due (cancel,
+  reopen, start countdown, start question, reveal, end reveal, forfeit, abandon) and `nextWakeAt` says when to look
+  again. `live/store.ts` applies an action as **one conditional update** whose filter names the state it was decided
+  from (for example `{ phase: 'QUESTION', currentIndex: 3 }`). `live/runtime.ts` has a single entry point, `tick(duelId)`:
+  read, decide, apply, run that step's side effects only if *this* call made the move, then arm one timer per duel.
+  Timers, answers, presence changes, REST calls and boot recovery all call `tick`, so there is exactly one place where
+  state moves.
+- *Answers* go into a new `duelanswers` collection with a unique index on `(duelId, userId, index)`. An answer is
+  accepted only for the current index, in QUESTION, until `deadlineAt + networkGraceMs` (750 ms). Response time is
+  measured on the server from `questionStartedAt` and clamped to the question timer. A repeat submit returns the stored
+  receipt. The ack only says the answer is locked in; correctness is revealed to both players at the same time.
+- *Reveal.* When the reveal wins its conditional update, the engine writes a timeout row for any player without an answer
+  (an insert-only upsert), then emits both results, the correct answer and the explanation for that question only.
+- *Sudden Death* ends at the first question where exactly one player is wrong; when both miss, play continues. *Winner:*
+  more correct answers, then lower total server-measured response time in milliseconds, otherwise a draw.
+- *Progress and XP* reuse the existing pipeline. When the countdown starts, each player gets a normal DUEL session on the
+  duel's questions. Every stored duel answer (real or timeout) is written as an AnswerAttempt through a new shared
+  `recordAttempt` function in `sessions.service.ts`, which is the same code REST answers use (attempt insert as the
+  idempotency guard, then topic progress, revisit queue, first-correct XP). When the duel ends, `finalizeDuel` pays the
+  win bonus with the existing claim-then-ledger logic and completes both sessions through a shared `finishSession`, so
+  summaries, streak rules and achievements behave as in every other mode.
+- *Presence.* A dropped player keeps their seat for `reconnectGraceMs` (20 s); reconnecting sends `duel:join-room`,
+  whose ack is a full snapshot. Past the grace, if the rival is connected, the absent player forfeits; if both are gone
+  the duel is ABANDONED. In a lobby, a creator offline for 60 s or a lobby past its 10-minute TTL cancels it; a joiner
+  who never shows up (or leaves) frees the seat again (READY → LOBBY). Two devices: the last socket to join a duel holds
+  the seat, the earlier one gets `duel:superseded` and its events are refused; a replaced socket disconnecting does not
+  mark the seat offline. Leaving on purpose (`duel:leave`) during a match sets the seat offline with its grace already
+  used up, so the normal forfeit/abandon rule applies at once.
+- *REST is thin:* `POST /duels` (LOBBY; one open duel per creator, enforced for LOBBY by a unique partial index so two
+  concurrent creates can't both succeed), `POST /duels/join` (one atomic `findOneAndUpdate` guarded on `phase: LOBBY,
+  opponentId: null`, unexpired, not your own), `POST /duels/:id/cancel` (creator, LOBBY/READY), `GET /duels/:id`
+  (snapshot), `GET /duels` (cursor-paginated history). The V1 `/duels/:id/play` route and the asynchronous settle path
+  are gone; REST answers and completion for DUEL sessions now return 409.
+- *Migration.* `migrateV1Duels` (run on every boot and from `npm run seed`) gives every V1 row a phase: OPEN/ACTIVE
+  become `EXPIRED` with phase CANCELLED, finished ones keep their result with phase COMPLETED. It only touches rows with
+  no phase, so it is idempotent.
+- *Recovery.* On boot, every LOBBY…REVEAL duel is ticked: timers are re-armed from the stored `deadlineAt`/`phaseEndsAt`,
+  and a deadline that passed while the server was down is advanced as a timeout. Because no socket survives a restart,
+  every seat is marked offline with a fresh `lastSeenAt`, which gives players the normal grace period to reconnect
+  instead of losing by forfeit for the server's downtime. Ended duels that were never finalized (crash between steps)
+  are finalized again. Shutdown stops the timers first, then closes sockets and HTTP, then the database.
+- *Logging.* Every transition is logged with `duelId`, `from`, `to`, the action and index; rejected answers, presence
+  changes, superseded seats and finalization are logged too.
+
+**Alternatives rejected.**
+
+- *A Mongo transaction per transition.* Conditional single-document updates already make each move exactly-once and
+  keep the D-015 "no multi-document transactions" rule. The side effects that touch other collections are each
+  idempotent (unique indexes, ledger keys), so a crash between them is healed by re-running them.
+- *An in-memory state machine with Mongo as a backup.* Simpler to write but loses duels on a restart and can't scale out.
+  Keeping Mongo authoritative means recovery is just "tick every open duel".
+- *Separate timers per concern (deadline timer, grace timer, lobby timer).* One timer per duel, always armed to the
+  earliest future time the engine could act, can't leave a stale timer behind. Only *future* times are armed: a time
+  already past that the engine declined (one player gone while the other is still inside their grace) must not re-arm
+  immediately, or the timer would spin.
+- *Correctness in the answer ack.* Telling a player right/wrong before the rival answers would let a shared screen or a
+  friend on a call leak the result. Both learn together at the reveal.
+- *A win bonus for forfeits.* Kept as V1: only a PLAYED duel pays, so a second account that disconnects can't farm it.
+- *Whole-second tie-break (V1 `compareResults`).* Live answers are timed by the server to the millisecond on the same
+  clock for both players, so the plan's "lower total response time" is applied exactly.
+
+**Assumptions I made (not confirmed).** The duel answer stores the raw answer string (option id or line number) rather
+than separate `optionId`/`lineNumber` fields, matching AnswerAttempt. A joiner leaving a READY duel reopens the lobby
+rather than cancelling it. The app's duel screens were adapted only enough to compile against the new contract (list,
+create, join, lobby/result page); the live match screen is P14, so duels can be created and joined but not played in the
+app until then.
+
+**How the race is made safe (plain language).** Imagine the deadline timer and the second player's answer arrive in the
+same millisecond. Both call `tick`. Both read "question 3, one answer" or "question 3, two answers", and both decide
+"reveal question 3". Both send `update where phase = QUESTION and currentIndex = 3`. MongoDB applies updates to one
+document one at a time, so the first changes the phase to REVEAL and the second finds nothing to match. Only the winner
+writes timeouts and emits the reveal. If the answer's insert lands after the timeout row, the unique index rejects it and
+the player gets the stored timeout back. The test suite fires an answer and three ticks at once and checks that question
+0 is revealed exactly once and question 1 follows.
+
+**Files.** `shared/src/liveDuel.ts`, `shared/src/competition.ts`; `server/src/models/{Duel,DuelAnswer}.ts`;
+`server/src/db/migrations.ts`; `server/src/modules/duels/{duels.service,duels.routes,duels.view,duels.settle}.ts`;
+`server/src/modules/duels/live/{engine,store,runtime,scheduler,answers,progress,room,socket,recovery}.ts`;
+`server/src/modules/sessions/{sessions.service,sessions.settle}.ts`; `server/src/middleware/requireAuth.ts`;
+`server/src/lib/tokenBucket.ts`; `server/src/config/{game,security}.ts`; `server/src/index.ts`; the app's duel screens
+and `app/src/lib/duelScore.ts`. New dependency: `socket.io` (server), justified by plan §6 (reconnects, acks and rooms
+for free; works in Expo Go and on Render).
+
+**Concepts worth learning.** Optimistic concurrency with conditional updates (compare-and-set); idempotency through
+unique indexes; why a server-owned clock prevents cheating; token-bucket rate limiting; WebSocket handshake
+authentication; graceful shutdown ordering; designing pure decision functions so the hard logic is unit-testable without
+a database.
+
+**Revisit** when running more than one API instance: add the Socket.IO Redis adapter so rooms span instances, and a
+lease field on each duel (`ownerId`, `leaseUntil`, renewed by the owning instance) so exactly one instance arms its
+timers. Recovery then only marks seats offline for duels whose lease expired.
+
+**Review (P13).** One cavecrew backend reviewer pass over `git diff main...HEAD`: 0 critical, 4 high, 6 medium, 6 low.
+Fixed: (1) a step that threw (a transient database error) left the duel with no timer; `tick` now re-arms a retry after
+2 s, and an ended duel that was never finalized is finalized on the next tick, not only at boot. (2) A crash between the
+REVEAL move and its side effects lost that question's AnswerAttempts; the end of every reveal now re-runs the timeout fill
+and the attempt sync (both idempotent), and a test deletes the attempts mid-match and sees them restored. (3) A retried
+attempt that hit the unique index skipped its XP; it now runs the same `repairAnsweredXP` as REST retries (progress
+replay stays out of scope, D-015). (4) Creator-absence cancel within 60 s is *kept as the plan specifies*: the share sheet
+is an in-app modal, so the socket stays up; P14 must keep the socket connected (or reconnect) on the lobby screen, noted
+in `TODOS.md`. Mediums fixed: the deadline is checked again just before the answer insert; a duel that ends mid-question
+(forfeit, abandon) no longer shows that question's key in the snapshot (a round counts only once both answers exist,
+which the reveal guarantees); a player seated in another live duel can't join a second one; and a late disconnect write
+no longer overwrites a newer reconnect (the offline write is guarded on `lastSeenAt`). Not fixed, in `TODOS.md`: JWT
+re-verification after the handshake, a crash-safe win-bonus key, multi-instance presence, and five lows.

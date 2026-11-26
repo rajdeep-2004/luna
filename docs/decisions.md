@@ -1531,3 +1531,84 @@ not end the duel. A dropped player has 20 s to reconnect before forfeiting.
 **Files.** `docs/v2/*`, `scripts/v2/run-phases.sh`, `docs/prd.md`, `docs/decisions.md`.
 
 **Revisit** if a phase is blocked, or if Rajdeep wants different duel timings.
+
+---
+
+### D-048 — Per-player random selection, level rubric and content audit
+
+- **Date:** 2026-11-26 · **Step:** P9 — V2 selection variety · **Status:** Active · **Type:** product + technical
+
+**Context.** V1 picked every set by scoring candidates (unseen, difficulty distance, topic preferences, topic spread)
+and taking the lowest score, plus a small random jitter so ties broke differently. The jitter (0.5) was smaller than
+every real score gap, so two players with the same profile and history got almost the same Daily Kata and the same
+practice rounds. V2 (D-047) asks for sets that differ between players, a written bar for each level, and a tool that
+checks the question bank before the content phases (P10–P12) grow it to 290 questions.
+
+**Decision.**
+
+1. *Level rubric.* The plan's level table and question rules now live in `docs/product/benchmarks.md` §4, so every
+   content phase writes against one reference. For Engineer's Choice, "an option without `optionFeedback`" was read as
+   *a wrong option* without feedback: the correct option is covered by `explanation`, and every V1 question already
+   follows that shape.
+2. *Content audit.* `server/src/seed/audit.ts` (run as `npm run audit:content -w server`) validates the bank with the
+   existing Zod seed schema and reports coverage per topic × type × level against `CONTENT_TARGETS` in
+   `config/game.ts`. Errors (exit 1): schema failures, duplicate slugs, duplicate prompt + snippet, a Bug Hunt answer
+   outside the snippet or on a blank line, a wrong Choice option without feedback. Warnings: answer-position skew,
+   the "correct option is the longest" tell, cells under target; `--strict` makes under-target an error. The
+   multiple-choice checks count incident stages as questions too, since each stage has four options. A
+   `--content <file>` flag audits another module, which is how the duplicate-slug fixture test runs. The tool is
+   never imported by the server, and `tsup` only builds `index.ts` and `seed.ts`, so it stays out of the deploy.
+3. *Weighted random sampling.* `server/src/lib/sampling.ts` adds `weightedPick`, `sampleWithoutReplacement`,
+   `pickByScore`, `bestTier` and `tieredOrder`. All take an injectable `rng: () => number`; the default is backed by
+   `crypto.randomInt`. Weight = `exp(-score / SELECTION.temperature)`, with the scores shifted so the best one has
+   weight 1 (same ratios, and no underflow to zero when every score is large).
+4. *Hard rules stay hard.* "Unseen before seen" and "nearest difficulty" are applied as **tiers**, not as weights: the
+   selector first keeps only the best tier (unseen and at the right level when possible) and samples inside it. The
+   soft preferences (weakest topic, preferred topics, topic spread) become the sampling weight. Practice, incident and
+   checkpoint picks use `tieredOrder`, a random order inside each tier, so a round still takes the best tier first and
+   tops up from the next. `temperature` is 0.5: a preferred topic is drawn about 2.7× as often as another, the weakest
+   about 4.5×, and a topic already in the Kata about 0.2× as often.
+5. *"Seen" includes recently served.* A challenge served in one of the player's sessions in the last 7 days
+   (`SELECTION.recentDays`) counts as seen even if it was never answered, so quitting a round and starting another
+   (a mode round in the same topic, or a new Incident Room run) does not replay the same questions. The read is
+   bounded to the 50 most recent sessions and uses the existing `{userId, createdAt}` index, so no new index.
+6. *Daily Kata stability* is unchanged and now tested twice: reopening returns the stored set, and concurrent first
+   opens still build one Kata through the `{userId, dailyDate}` unique index.
+
+**Alternatives rejected.** *Putting difficulty distance and "seen" into the weight* (the plan's literal formula):
+with a temperature soft enough to give variety, an intermediate player would get an off-level question about one
+time in five, and a seen question could beat an unseen one. That breaks the "keep the hard rules" requirement, so
+those two became tiers. *A bigger jitter:* it only reshuffles near-ties and gives no control over how often each
+topic appears. *`Math.random`:* fine for games, but the plan asks for a `crypto`-backed source and the cost is
+negligible.
+
+**Trade-off accepted.** Topic spread in duels and the Kata is now a strong preference, not a guarantee: with a
+repeat penalty of 2 and temperature 0.5, a repeat topic is about 55× less likely than a fresh one, so a duel almost
+always covers five topics but occasionally covers four. The variety test asserts at least four.
+
+**How to check it.** `.scratch/api-tests/selection.test.ts` seeds a V2-sized synthetic bank: two identical users get
+different Katas with a fixed RNG pair (and the same seed reproduces the same Kata); over 20 identical users the mean
+pairwise Kata overlap is below 2 of 5; practice rounds differ between identical users; a second round prefers
+unseen; an abandoned round's questions are avoided; duels differ. `sampling.test.ts` checks the weights
+statistically and that weight-0 items are never picked; `audit.test.ts` checks the audit's exit codes.
+
+**First audit of the V1 bank (58 questions):** 0 errors, 64 warnings. Every topic has answer-position skew
+(57–85 % on one letter) and four of five show the length tell; every cell is under target. The content phases
+P10–P12 fix these as they rewrite and extend each topic.
+
+**Review (P9 backend review).** No critical or high findings. Fixed the one medium: the audit ran its checks on the
+raw bank, so a malformed entry crashed it with a TypeError instead of reporting a schema error; it now validates each
+entry first and runs every other check on the valid ones only. Also fixed two lows: `seenTier` is derived from the
+difficulty range (so it always outranks any gap), and single picks (incident, checkpoint) take one draw from the best
+tier instead of ordering the whole pool. The remaining lows (unbounded `distinct` over answer history, the 50-session
+cap, O(n²) sampling, NaN tiers, the audit's location under `src`) are in `TODOS.md`.
+
+**Concepts worth learning.** Softmax / Boltzmann sampling (temperature controls how greedy a weighted draw is);
+sampling without replacement; dependency injection of randomness for deterministic tests.
+
+**Files.** `server/src/lib/sampling.ts`, `server/src/seed/audit.ts`, `server/src/config/game.ts`,
+`server/src/modules/{daily,sessions,duels}/*.selection.ts`, `server/package.json`, `docs/product/benchmarks.md`,
+`docs/architecture.md`.
+
+**Revisit** if players report off-topic Katas (lower the temperature), or when the bank is complete (P12) and the
+audit moves to `--strict`.

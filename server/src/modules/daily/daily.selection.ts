@@ -1,5 +1,6 @@
 import type { ChallengeType, TopicSlug } from '@luna/shared';
-import { DAILY_KATA_SLOTS, KATA_WEIGHTS, REVISIT } from '../../config/game';
+import { DAILY_KATA_SLOTS, KATA_WEIGHTS, REVISIT, SELECTION } from '../../config/game';
+import { bestTier, cryptoRng, pickByScore, type Rng } from '../../lib/sampling';
 import type { ChallengeDoc } from '../../models/Challenge';
 import { UserTopicProgressModel } from '../../models/UserTopicProgress';
 import { challengesRepo } from '../challenges/challenges.repository';
@@ -17,29 +18,36 @@ type Context = {
   weakest: TopicSlug | null;
 };
 
-function slotScore(c: ChallengeDoc, ctx: Context, topicsUsed: Map<string, number>): number {
+/** Hard tier (lower first): unseen before seen, then nearest to the user's level in that topic. */
+function slotTier(c: ChallengeDoc, ctx: Context): number {
   const target = ctx.difficulty.get(c.topicSlug) ?? 1;
   return (
-    (ctx.seen.has(c._id.toString()) ? W.seen : 0) +
-    Math.abs(c.difficulty - target) +
+    (ctx.seen.has(c._id.toString()) ? SELECTION.seenTier : 0) + Math.abs(c.difficulty - target)
+  );
+}
+
+/** Soft preference inside the tier (lower is likelier): weakest and preferred topics, spread. */
+function slotScore(c: ChallengeDoc, ctx: Context, topicsUsed: Map<string, number>): number {
+  return (
     (ctx.preferred.has(c.topicSlug) ? W.preferred : 0) +
     (c.topicSlug === ctx.weakest ? W.weakest : 0) +
-    (topicsUsed.get(c.topicSlug) ?? 0) * W.repeatTopic +
-    Math.random() * W.jitter
+    (topicsUsed.get(c.topicSlug) ?? 0) * W.repeatTopic
   );
 }
 
 /**
  * game-modes.md §2 and progression.md §5. Five slots (Trace, Bug Hunt, 2 × Choice, Incident).
  * Up to 2 due revisits (missed before today) take a slot of their own type first. Every other
- * slot takes the best-scoring challenge of its type: unseen, near the user's difficulty for that
- * topic, leaning to the weakest and preferred topics, spread across topics. A type with no unseen
+ * slot draws one challenge of its type at random (D-048) from the best tier (unseen first, then
+ * nearest the user's difficulty for that topic), weighted toward the weakest and preferred topics
+ * and away from topics already in the Kata, so two identical players get different Katas. A type with no unseen
  * challenge falls back to seen ones (that's the review-XP case); a type with none at all is skipped.
  */
 export async function pickDaily(
   userId: string,
   preferredTopics: string[],
   today: string,
+  rng: Rng = cryptoRng,
 ): Promise<PickedItem[]> {
   const [pool, seen, rows, revisitIds] = await Promise.all([
     challengesRepo.findActive({}),
@@ -70,11 +78,10 @@ export async function pickDaily(
   }
   DAILY_KATA_SLOTS.forEach((type: ChallengeType, i) => {
     if (slots[i]) return;
-    const best = pool
-      .filter((c) => c.type === type && !used.has(c._id.toString()))
-      .map((c) => ({ c, s: slotScore(c, ctx, topicsUsed) }))
-      .sort((a, b) => a.s - b.s)[0];
-    if (best) take(i, best.c, false);
+    const eligible = pool.filter((c) => c.type === type && !used.has(c._id.toString()));
+    const tier = bestTier(eligible, (c) => slotTier(c, ctx));
+    const pick = pickByScore(tier, (c) => slotScore(c, ctx, topicsUsed), rng);
+    if (pick) take(i, pick, false);
   });
   return slots.filter((x): x is PickedItem => x !== null);
 }

@@ -1,8 +1,10 @@
 import { TOPIC_SLUGS, type PracticeMode, type TopicSlug } from '@luna/shared';
 import { AnswerAttemptModel } from '../../models/AnswerAttempt';
 import type { ChallengeDoc } from '../../models/Challenge';
+import { SessionModel } from '../../models/Session';
 import { AppError } from '../../lib/errors';
-import { CHECKPOINT, PICK_WEIGHTS, REVISIT, SESSION } from '../../config/game';
+import { CHECKPOINT, REVISIT, SELECTION, SESSION } from '../../config/game';
+import { bestTier, cryptoRng, tieredOrder, weightedPick, type Rng } from '../../lib/sampling';
 import { localDateKey } from '../../lib/time';
 import { challengesRepo } from '../challenges/challenges.repository';
 import { getDifficulty } from '../progress/topicProgress.service';
@@ -16,27 +18,50 @@ export type PickedItem = {
 };
 const fresh = (challenge: ChallengeDoc): PickedItem => ({ challenge, isRevisit: false });
 
-export async function seenIds(userId: string): Promise<Set<string>> {
-  const ids = await AnswerAttemptModel.distinct('challengeId', { userId });
-  return new Set(ids.map(String));
-}
+const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Unseen first, then closest to the target difficulty; random among equals. */
-function rank(pool: ChallengeDoc[], seen: Set<string>, difficulty: number): ChallengeDoc[] {
-  return pool
-    .map((c) => ({
-      c,
-      score:
-        (seen.has(c._id.toString()) ? PICK_WEIGHTS.seen : 0) +
-        Math.abs(c.difficulty - difficulty) +
-        Math.random() * PICK_WEIGHTS.jitter,
-    }))
-    .sort((a, b) => a.score - b.score)
-    .map((x) => x.c);
+/**
+ * Challenges that count as seen for ranking: every one the user has answered, plus every one served
+ * in their sessions of the last `SELECTION.recentDays` days, answered or not (D-048). So quitting a
+ * round and starting another doesn't replay the questions just shown. The session read is bounded
+ * and served by the `{userId, createdAt}` index.
+ */
+export async function seenIds(userId: string, now = new Date()): Promise<Set<string>> {
+  const since = new Date(now.getTime() - SELECTION.recentDays * DAY_MS);
+  const [answered, recent] = await Promise.all([
+    AnswerAttemptModel.distinct('challengeId', { userId }),
+    SessionModel.find({ userId, createdAt: { $gte: since } })
+      .sort({ createdAt: -1 })
+      .limit(SELECTION.recentSessionsMax)
+      .select('items.challengeId')
+      .lean(),
+  ]);
+  const served = recent.flatMap((s) => s.items.map((i) => i.challengeId));
+  return new Set([...answered, ...served].map(String));
 }
 
 /**
- * Topic Practice: up to one due revisit, then the best-ranked fresh picks (progression.md §5).
+ * A random order (D-048) that keeps the hard rules: unseen before seen, then closest to the target
+ * difficulty. Only the order inside one tier is random, so a round takes the best tier first.
+ */
+const tierFn = (seen: Set<string>, difficulty: number) => (c: ChallengeDoc) =>
+  (seen.has(c._id.toString()) ? SELECTION.seenTier : 0) + Math.abs(c.difficulty - difficulty);
+
+function rank(
+  pool: ChallengeDoc[],
+  seen: Set<string>,
+  difficulty: number,
+  rng: Rng,
+): ChallengeDoc[] {
+  return tieredOrder(pool, tierFn(seen, difficulty), rng);
+}
+
+/** One pick from the best tier, without ordering the whole pool. */
+const pickOne = (pool: ChallengeDoc[], seen: Set<string>, difficulty: number, rng: Rng) =>
+  weightedPick(bestTier(pool, tierFn(seen, difficulty)), () => 1, rng);
+
+/**
+ * Topic Practice: up to one due revisit, then fresh picks in sampled order (progression.md §5).
  * With a `mode` it is a mode round (D-039): only that challenge kind, this topic's first, then
  * topped up to the round size from the same kind in other topics, so a thin topic still fills.
  */
@@ -45,6 +70,7 @@ export async function pickPractice(
   topicSlug: TopicSlug,
   timezone: string,
   mode?: PracticeMode,
+  rng: Rng = cryptoRng,
 ): Promise<PickedItem[]> {
   const [pool, seen, difficulty, revisitIds] = await Promise.all([
     challengesRepo.findActive(mode ? { type: mode } : { topicSlug, type: { $ne: 'INCIDENT' } }),
@@ -65,12 +91,14 @@ export async function pickPractice(
     inTopic.filter((c) => !revisits.includes(c)),
     seen,
     difficulty,
+    rng,
   );
   const others = mode
     ? rank(
         pool.filter((c) => c.topicSlug !== topicSlug),
         seen,
         difficulty,
+        rng,
       )
     : [];
   const rest = [...ownPicks, ...others].slice(0, SESSION.practiceSize - revisits.length);
@@ -85,6 +113,7 @@ export async function pickIncident(
   userId: string,
   challengeId?: string,
   topicSlug?: TopicSlug,
+  rng: Rng = cryptoRng,
 ): Promise<PickedItem[]> {
   if (challengeId) {
     const c = await challengesRepo.findById(challengeId);
@@ -97,17 +126,17 @@ export async function pickIncident(
     seenIds(userId),
   ]);
   const inTopic = topicSlug ? pool.filter((c) => c.topicSlug === topicSlug) : [];
-  const first = rank(inTopic.length ? inTopic : pool, seen, 1)[0];
+  const first = pickOne(inTopic.length ? inTopic : pool, seen, 1, rng);
   if (!first) throw new AppError('NOT_FOUND', 'No incidents available');
   return [fresh(first)];
 }
 
 /** One beginner single challenge per topic (users.md §5). */
-export async function pickBaseline(): Promise<PickedItem[]> {
+export async function pickBaseline(rng: Rng = cryptoRng): Promise<PickedItem[]> {
   const pool = await challengesRepo.findActive({ difficulty: 1, type: { $ne: 'INCIDENT' } });
   return TOPIC_SLUGS.flatMap((slug) => {
     const options = pool.filter((c) => c.topicSlug === slug);
-    const pick = options[Math.floor(Math.random() * options.length)];
+    const pick = weightedPick(options, () => 1, rng);
     return pick ? [fresh(pick)] : [];
   });
 }
@@ -116,14 +145,14 @@ export async function pickBaseline(): Promise<PickedItem[]> {
  * benchmarks.md §1: one intermediate single challenge per topic, unseen first, so the "after"
  * score isn't inflated by memory. Falls back to any single challenge in the topic.
  */
-export async function pickCheckpoint(userId: string): Promise<PickedItem[]> {
+export async function pickCheckpoint(userId: string, rng: Rng = cryptoRng): Promise<PickedItem[]> {
   const [pool, seen] = await Promise.all([
     challengesRepo.findActive({ type: { $ne: 'INCIDENT' } }),
     seenIds(userId),
   ]);
   return TOPIC_SLUGS.flatMap((slug) => {
     const inTopic = pool.filter((c) => c.topicSlug === slug);
-    const pick = rank(inTopic, seen, CHECKPOINT.difficulty)[0];
+    const pick = pickOne(inTopic, seen, CHECKPOINT.difficulty, rng);
     return pick ? [fresh(pick)] : [];
   });
 }

@@ -11,6 +11,11 @@ Backlog, deferred ideas and known debt. Scope changes go here first; nothing her
 - Push notifications for streak reminders.
 
 ## Known debt / revisit
+- P9 review (low): `seenIds` reads `AnswerAttempt.distinct('challengeId')` over the user's whole history on every pick (index-covered); move to a per-user seen set if it shows in profiling.
+- P9 review (low): the recently-served read is capped at 50 sessions in 7 days; a heavier player can replay older served questions. Raise the cap if that becomes real.
+- P9 review (low): `tieredOrder` / `sampleWithoutReplacement` are O(n²) per pool; fine at ~300 challenges, switch to a per-tier Fisher–Yates if the bank grows by 10×.
+- P9 review (low): a NaN difficulty would empty `bestTier` silently; the seed schema prevents it today.
+- P9 review (low): `audit.ts` sits under `server/src` (typechecked, not bundled by tsup). Move to `server/scripts/` if a plain `tsc` build is ever added.
 - No API test covers the per-account login lockout (5 failures → 15 min). Add one to `.scratch/api-tests/auth.test.ts`.
 - Refresh tokens instead of a single 7-day JWT (D-008).
 - Cached `weeklyXP` counter if the leaderboard aggregation gets slow (architecture §12).

@@ -219,6 +219,20 @@ own day. Selection: 1 TRACE, 1 BUG_HUNT, 2 ENGINEER_CHOICE,
 missed ones (missed ≥3 questions ago), and weight towards weak and preferred topics. Fall back to any
 active challenge of that type if a pool is empty.
 
+**Selection variety (V2, D-048).** Every set (Kata slots, practice and mode rounds, incidents,
+checkpoint, baseline, duels) is drawn by weighted random sampling (`server/src/lib/sampling.ts`, random
+source `crypto.randomInt`, injectable for tests), not "best score". Hard tiers come first: unseen before
+seen, then nearest difficulty; sampling happens only inside the best tier. Inside it the weight is
+`exp(-softScore / SELECTION.temperature)` (preferred/weakest topic, topic spread). "Seen" means answered,
+or served in one of the player's sessions in the last `SELECTION.recentDays` days (at most
+`recentSessionsMax` sessions, read through the `{userId, createdAt}` index), so an abandoned round is not
+replayed. The Kata is still stored per user and day, so reopening returns the same set. A duel is picked
+once and shared by both players.
+
+**Content audit** (`npm run audit:content -w server`, dev only, not in the server build): validates the
+bank and reports coverage against `CONTENT_TARGETS` (benchmarks.md §4). Errors exit 1; `--strict` makes
+an under-target cell an error.
+
 **Streak** (local calendar day in `users.timezone`): same day → no change; yesterday → +1;
 otherwise → 1. `longestStreak = max(...)`. A timezone change can't be used to farm streaks,
 because the streak only moves when a Daily Kata completes and `lastDailyDate` is compared as a date string.
@@ -271,7 +285,7 @@ scale with the `{weekKey, userId}` index. Later: a cached `weeklyXP` counter per
 
 | Layer | Covers | Tool | Command |
 |---|---|---|---|
-| API smoke tests (gitignored) | critical paths: auth and lockout, answer-key leakage, double submit, XP once, streak, Daily Kata once, mastery and adaptivity, revisits, board, achievements, mode rounds and boss incidents, duel join race, timers per format, Sudden Death, tie-break, expiry, win-bonus cap (66 tests) | Vitest + Supertest + mongodb-memory-server | `cd .scratch/api-tests && npx vitest run` |
+| API smoke tests (gitignored) | critical paths: auth and lockout, answer-key leakage, double submit, XP once, streak, Daily Kata once, mastery and adaptivity, revisits, board, achievements, mode rounds and boss incidents, duel join race, timers per format, Sudden Death, tie-break, expiry, win-bonus cap, content audit, weighted sampling, per-player selection variety (89 tests) | Vitest + Supertest + mongodb-memory-server | `cd .scratch/api-tests && npx vitest run` |
 | Frontend | each phase's click-through checklist | manual on Expo Go (Rajdeep) | — |
 | Static | lint + typecheck all workspaces | ESLint, tsc | `npm run lint && npm run typecheck` |
 

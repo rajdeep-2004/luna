@@ -248,7 +248,7 @@ export const JS_ASYNC_INCIDENTS: ChallengeSeed[] = [
         evidence: 'The stream should stop when the client disconnects.',
         prompt: 'What is the fix?',
         options: opts(
-          "Remove the listener when the request closes: req.on('close', () => priceFeed.off('update', handler))",
+          "Remove the listener when the response closes: res.on('close', () => priceFeed.off('update', onUpdate))",
           'Restart the server every 3 hours',
           'Raise the max-listeners limit',
           'Add more memory',

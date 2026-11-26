@@ -431,11 +431,11 @@ export const HTTP_APIS_CHOICE: ChallengeSeed[] = [
       'In memory on each instance, at 100 per key',
       'In memory, with sticky sessions so each API key always hits one instance',
       'In memory, at 100 ÷ 6 ≈ 17 per key per instance',
-      'In Redis, with an atomic INCR and EXPIRE per key and window',
+      'In Redis: one counter per key and window, INCR + TTL set atomically',
     ),
     answerKey: 'd',
     explanation:
-      'A shared store gives every instance the same count, and INCR is atomic, so concurrent requests on different instances cannot both slip under the limit. It stays correct as instances are added or removed.',
+      'A shared store gives every instance the same count, and INCR is atomic, so concurrent requests on different instances cannot both slip under the limit. Setting the TTL in the same atomic step (a Lua script, MULTI, or SET key 0 NX EX first) means a crash cannot leave a counter that never expires. It stays correct as instances are added or removed.',
     misconception:
       'Per-instance state is not per-service state. Anything that must be global needs a shared, atomic store.',
     optionFeedback: {

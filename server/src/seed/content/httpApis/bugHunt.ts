@@ -183,12 +183,12 @@ export const HTTP_APIS_BUG_HUNT: ChallengeSeed[] = [
     type,
     difficulty: 2,
     prompt:
-      'A request with a typo in its body takes 6 s to fail with 400, and the partner complains about repeated bad requests. Which line is the bug?',
+      'A request with a typo in its body takes 6 s to fail with 400, and the partner complains about repeated bad requests. Which line has the wrong condition?',
     codeSnippet:
       "async function sendWithRetry(body, attempts = 3) {\n  for (let i = 1; i <= attempts; i++) {\n    const res = await fetch(PARTNER_URL, { method: 'PUT', body });\n    if (res.ok) return res.json();\n    if (i === attempts) throw new Error(`HTTP ${res.status}`);\n    await sleep(1000 * 2 ** i);\n  }\n}",
     answerKey: '5',
     explanation:
-      'Every non-2xx response is retried, including 400, which will fail the same way every time. Only retry what can succeed later (network errors, 429, 502–504): throw immediately when res.status is a 4xx other than 408 or 429.',
+      'Line 5 only gives up on the last attempt, so every non-2xx response is retried, including 400, which will fail the same way every time. Only retry what can succeed later (network errors, 408, 429, 5xx): if (i === attempts || !isRetryable(res.status)) throw ....',
     misconception:
       'Retries are for transient failures. A 4xx says the request itself is wrong; sending it again is wasted load.',
   },
@@ -259,7 +259,7 @@ export const HTTP_APIS_BUG_HUNT: ChallengeSeed[] = [
       "app.get('/login/callback', async (req, res) => {\n  const session = await finishLogin(req.query.code);\n  setSessionCookie(res, session);\n  res.redirect(req.query.next || '/');\n});",
     answerKey: '4',
     explanation:
-      'The redirect target comes straight from the URL, so anyone can make your trusted domain forward users anywhere. Allow only relative paths on your own site (starts with "/" but not "//"), or map next to a list of known destinations.',
+      'The redirect target comes straight from the URL, so anyone can make your trusted domain forward users anywhere. Resolve it against your own origin and reject it unless it stays there (new URL(next, origin).origin === origin), or map next to a list of known destinations. A prefix check like "starts with /" is not enough: browsers treat //evil.example and /\\evil.example as other sites.',
     misconception:
       'A redirect is not harmless because it is only a Location header. Users trust the domain they started on.',
   },

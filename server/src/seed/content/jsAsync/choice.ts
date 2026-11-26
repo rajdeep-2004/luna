@@ -390,7 +390,7 @@ export const JS_ASYNC_CHOICE: ChallengeSeed[] = [
     ),
     answerKey: 'a',
     explanation:
-      'Keeping a Map from document id to the tail of its chain (tail = tail.then(() => apply(update))) serialises updates per document while separate documents run concurrently. Remove the entry when its chain empties so the map does not grow forever.',
+      'Keeping a Map from document id to the tail of its chain (tail = tail.catch(logError).then(() => apply(update))) serialises updates per document while separate documents run concurrently. The catch matters: without it, one failed update rejects the chain and every later update for that document is silently skipped. Remove the entry when its chain empties so the map does not grow forever.',
     misconception:
       'Arriving in order is not applying in order: once each message awaits I/O, a later write can finish first.',
     optionFeedback: {
@@ -438,11 +438,11 @@ export const JS_ASYNC_CHOICE: ChallengeSeed[] = [
       'Add a 500 ms timeout to every backend call',
       'Cache results so the next user gets them free',
       'Nothing: the work finishes anyway, the results are discarded, and it is harmless',
-      "Abort every backend call when the client disconnects (req 'close')",
+      "Abort every backend call when the client disconnects (res 'close')",
     ),
     answerKey: 'd',
     explanation:
-      "Create one AbortController per request, abort it on req 'close', and pass its signal to every backend call. When a user leaves, every outstanding call is cancelled at once, so you stop paying for results nobody will see. Users who stay get full results as before.",
+      "Create one AbortController per request, abort it in res.on('close') when the response has not finished (!res.writableFinished), and pass its signal to every backend call. (On current Node, req 'close' fires as soon as the request body is read, so it is the wrong event.) When a user leaves, every outstanding call is cancelled at once, so you stop paying for results nobody will see. Users who stay get full results as before.",
     misconception:
       'A request handler does not stop when its client disconnects. Unless you cancel it, the work runs to the end.',
     optionFeedback: {

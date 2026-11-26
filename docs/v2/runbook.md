@@ -17,6 +17,9 @@ git checkout main && git pull --ff-only
 git checkout -b phase/p<n>-<slug>   # name from the phase file
 ```
 
+If the branch already exists (an earlier run was interrupted), check it out, merge `main` into it, read
+`git log main..HEAD` to see what is done, and continue from there instead of starting over.
+
 Set the phase to `building` in `docs/prd.md` §9.
 
 ## 3. Build

@@ -246,7 +246,7 @@ export const DEBUGGING_PROD_TRACE: ChallengeSeed[] = [
     ),
     answerKey: 'b',
     explanation:
-      "Express 5 does pass a rejected async handler to the error chain, so it neither hangs nor crashes. But middleware runs in the order it was registered, and the error handler sits before the route, so no error handler comes after it. Express falls back to its built-in handler, which sends a plain 500 page; your JSON format and your logger.error never run. Register error handlers last.",
+      "Express 5 does pass a rejected async handler to the error chain, so it neither hangs nor crashes. But middleware runs in the order it was registered, and the error handler sits before the route, so no error handler comes after it. Express falls back to its built-in handler, which sends an HTML 500 page (with the stack trace unless NODE_ENV is production) and prints the error to stderr; your JSON format and your logger.error call never run. Register error handlers last.",
     misconception:
       'An error handler is not global. It only catches errors from the routes and middleware registered before it.',
   },
@@ -307,7 +307,7 @@ export const DEBUGGING_PROD_TRACE: ChallengeSeed[] = [
     prompt:
       'At t = 0 all 1,000 clients fail together because the API restarted. It is healthy again at t = 2 s and can take about 300 requests per second. What does it see next?',
     codeSnippet:
-      'for (let attempt = 1; attempt <= 3; attempt++) {\n  try {\n    return await callApi();\n  } catch {\n    await sleep(1000 * 2 ** (attempt - 1));\n  }\n}',
+      'for (let attempt = 1; attempt <= 3; attempt++) {\n  try {\n    return await callApi();\n  } catch {\n    await sleep(1000 * 2 ** (attempt - 1));\n  }\n}\nthrow new Error(\'api unavailable\');',
     options: opts(
       'A steady 300 requests per second, because the delays double',
       'About 1,000 requests at t = 3 s, all at once',
@@ -384,7 +384,7 @@ export const DEBUGGING_PROD_TRACE: ChallengeSeed[] = [
     ),
     answerKey: 'b',
     explanation:
-      'The budget is 0.1% of a month of requests. Failing 1.44% means burning it 14.4 times faster than the rate that would last exactly 30 days, so it lasts 30 days / 14.4 ≈ 50 hours. That "burn rate" is how SLO alerts decide urgency: 14.4× is a classic page-now threshold, because two days of budget can go in one weekend.',
+      'The budget is 0.1% of a month of requests. Failing 1.44% means burning it 14.4 times faster than the rate that would last exactly 30 days, so it lasts 30 days / 14.4 ≈ 50 hours. That "burn rate" is how SLO alerts decide urgency: 14.4× is a classic page-now threshold, because the whole month\'s budget can be gone in about two days.',
     misconception:
       'An error rate of 1.44% sounds small. Measured against a 0.1% budget it is an emergency.',
   },

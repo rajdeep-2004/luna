@@ -103,7 +103,7 @@ export const DEBUGGING_PROD_BUG_HUNT: ChallengeSeed[] = [
       "app.use((req, res, next) => {\n  const start = Date.now();\n  next();\n  logger.info({ path: req.path, ms: Date.now() - start }, 'request done');\n});",
     answerKey: '4',
     explanation:
-      'next() starts the rest of the chain and returns as soon as the handler reaches its first await. It does not wait for the response. The log line runs straight away and measures almost nothing. Log inside res.on("finish", ...), which fires when the response has been sent.',
+      'next() starts the rest of the chain, and with an async handler it returns as soon as the handler reaches its first await. It does not wait for the response. The log line runs straight away and measures almost nothing. Log inside res.on("finish", ...), which fires when the response has been sent.',
     misconception:
       'Middleware code after next() does not run "after the request". With async handlers it runs while the request is still in progress.',
     hint: 'Does next() wait for the handler to finish?',
@@ -229,7 +229,7 @@ export const DEBUGGING_PROD_BUG_HUNT: ChallengeSeed[] = [
       "process.on('SIGTERM', async () => {\n  logger.info('SIGTERM: draining');\n  await mongoose.disconnect();\n  server.close(() => process.exit(0));\n});",
     answerKey: '3',
     explanation:
-      'The database connection is closed first, while the HTTP server is still serving the requests that were in flight and even accepting new ones. Those requests then hit a closed client. Shut down in reverse order of startup: stop taking traffic and wait for in-flight requests (server.close), then disconnect from the database, then exit.',
+      'The database connection is closed first, while the HTTP server is still serving the requests that were in flight and even accepting new ones. Those requests then hit a closed client. Shut down in reverse order of startup: stop taking traffic and wait for in-flight requests (server.close), then disconnect from the database, then exit. Add a force-exit timer shorter than the platform grace period, because server.close() waits forever on a request that hangs.',
     misconception:
       'A graceful shutdown is about order. Close what depends on a resource before you close the resource.',
   },

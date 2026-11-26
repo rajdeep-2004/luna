@@ -163,7 +163,7 @@ export const DEBUGGING_PROD_INCIDENTS: ChallengeSeed[] = [
       {
         title: 'Investigate',
         evidence:
-          'Two heap snapshots an hour apart: +180 MB, mostly closures named onPrice, held in the listener array of the prices EventEmitter (41,000 listeners). Logs show "MaxListenersExceededWarning" since Tuesday\'s release, which added the /prices/stream live feed.',
+          'Two heap snapshots an hour apart: +270 MB, mostly closures named onPrice, held in the listener array of the prices EventEmitter (41,000 listeners). Logs show "MaxListenersExceededWarning" since Tuesday\'s release, which added the /prices/stream live feed.',
         prompt: 'What is leaking?',
         options: opts(
           'V8 garbage collection is falling behind and cannot keep up with the load',

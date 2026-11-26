@@ -202,11 +202,11 @@ export const DEBUGGING_PROD_CHOICE: ChallengeSeed[] = [
       'Remove the health check, since it is causing the restarts',
       "Raise the platform's health-check timeout to 15 s",
       'Cache the five-table result and refresh it every minute',
-      'Make /health lightweight: check the process is up and do a quick DB ping',
+      'Make /health answer fast from the process alone; check the database in readiness',
     ),
     answerKey: 'd',
     explanation:
-      'A health check should answer "can this instance serve traffic?" quickly. Heavy checks fail under load, the platform restarts healthy instances, and load gets even worse.',
+      'A health check that triggers restarts should answer "is this process alive?" quickly, without calling the database: a restart cannot fix a slow database. Heavy checks fail under load, the platform restarts healthy instances, and load gets even worse. Dependency checks belong in a readiness check, which only stops traffic.',
     misconception:
       'A more thorough health check is not a safer one. It becomes a source of outages.',
     optionFeedback: {
@@ -249,7 +249,7 @@ export const DEBUGGING_PROD_CHOICE: ChallengeSeed[] = [
     type,
     difficulty: 2,
     prompt:
-      'You roll a release out to 5% of servers first (a canary). After an hour of steady traffic, the error rate on those servers is double the rest, which look normal. What next?',
+      'You roll a release out to 5% of servers first (a canary). After an hour, the canary has served 20,000 requests with 400 errors (2%), while the other servers sit at 1%. What next?',
     options: opts(
       'Stop the rollout and roll the canary back, then investigate',
       'Roll out to 100% to get a bigger sample',
@@ -258,7 +258,7 @@ export const DEBUGGING_PROD_CHOICE: ChallengeSeed[] = [
     ),
     answerKey: 'a',
     explanation:
-      'This is exactly what a canary is for: catching a bad release while it affects few users. An hour of steady traffic with double the errors is a clear signal, so you halt and roll back before it reaches everyone.',
+      'This is exactly what a canary is for: catching a bad release while it affects few users. 400 errors where about 200 were expected, over 20,000 requests, is far beyond chance, so you halt and roll back before it reaches everyone.',
     misconception:
       'Canary results are not noise to average away. A difference between canary and baseline is the signal.',
     optionFeedback: {
@@ -311,7 +311,7 @@ export const DEBUGGING_PROD_CHOICE: ChallengeSeed[] = [
     ),
     answerKey: 'd',
     explanation:
-      'An optional dependency must never take the page down with it. A tight timeout caps how long it can delay you, and a fallback (no recommendations, or a cached list) keeps the page useful. Your own deadline (10 s) should always be longer than the sum of the timeouts beneath it.',
+      'An optional dependency must never take the page down with it. A tight timeout caps how long it can delay you, and a fallback (no recommendations, or a cached list) keeps the page useful. Your own deadline (10 s) should be longer than the longest chain of calls made one after another beneath it.',
     misconception:
       'No timeout means "wait as long as the slowest dependency". Every outbound call needs an explicit deadline and a plan for when it passes.',
     optionFeedback: {
@@ -356,7 +356,7 @@ export const DEBUGGING_PROD_CHOICE: ChallengeSeed[] = [
     type,
     difficulty: 3,
     prompt:
-      'Release v42 added a NOT NULL column orders.channel (no default) and code that fills it. v42 also broke order search. v41 knows nothing about channel. Orders keep flowing in. What do you do?',
+      'Release v42 added a NOT NULL column orders.channel (no default) and code that fills it. v42 also broke order search. v41 knows nothing about channel. Orders keep flowing in, and the channel of every order placed since v42 must be kept. What do you do?',
     options: opts(
       'Roll back to v41 right away: rollbacks come first',
       'Roll back to v41 and run the down-migration that drops channel',
@@ -370,7 +370,7 @@ export const DEBUGGING_PROD_CHOICE: ChallengeSeed[] = [
       'A rollback is only safe if the old code works with the new schema. Migrations can make the "last good version" incompatible.',
     optionFeedback: {
       a: 'v41 inserts without channel, so every new order fails the NOT NULL constraint.',
-      b: 'Dropping the column throws away the channel data written since v42, and the down-migration needs its own lock and deploy under pressure.',
+      b: 'Dropping the column throws away the channel data you were told to keep, and the down-migration needs its own lock and deploy under pressure.',
       d: 'Search stays broken for every user until a full fix lands, when a one-commit revert would restore it now.',
     },
   },
@@ -434,7 +434,7 @@ export const DEBUGGING_PROD_CHOICE: ChallengeSeed[] = [
     type,
     difficulty: 3,
     prompt:
-      'An engineer pushed a config change with a typo. The config system applied it to every region within 20 seconds, and the site was down for 40 minutes. Which postmortem action best prevents a repeat?',
+      'An engineer pushed a config change with a typo. The config system applied it to every region within 20 seconds, and the site was down for 40 minutes. Which postmortem action best stops one bad change from reaching every region again?',
     options: opts(
       'Roll config out region by region with automatic validation and health checks between steps',
       'Take config access away from the engineer who made the typo',
@@ -449,7 +449,7 @@ export const DEBUGGING_PROD_CHOICE: ChallengeSeed[] = [
     optionFeedback: {
       b: 'Blame teaches people to hide mistakes, and the next person makes the same typo.',
       c: 'Relies on people never being tired or rushed, which is the failure that just happened.',
-      d: 'Helps a little, but reviewers miss typos too, and the change still reaches every region at once.',
+      d: 'Worth having, but reviewers miss typos too, and a change that slips through still reaches every region at once.',
     },
   },
   {

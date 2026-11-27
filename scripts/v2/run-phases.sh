@@ -56,6 +56,22 @@ status_of() {
   else echo todo; fi
 }
 
+# An interrupted session (usage limit, timeout) can leave uncommitted work. Commit it to the phase
+# branch it was on, never to main, so the next run resumes from it (runbook §2).
+save_wip() {
+  local id="$1" branch
+  cd "$ROOT"
+  [[ -z "$(git status --porcelain)" ]] && return 0
+  branch="$(git rev-parse --abbrev-ref HEAD)"
+  if [[ "$branch" == main ]]; then
+    echo "$id left uncommitted changes on main; stashing them (git stash list)" >&2
+    git stash push -u -q -m "run-phases: $id leftovers"
+    return 0
+  fi
+  git add -A && git commit -q -m "wip: $id interrupted, saved by run-phases.sh" && git push -q origin "$branch" || true
+  echo "$id: saved uncommitted work to $branch"
+}
+
 PHASES=()
 while IFS= read -r f; do PHASES+=("$f"); done < <(ls "$PHASE_DIR"/p*.md | sort -V)
 
@@ -93,6 +109,7 @@ for f in "${PHASES[@]}"; do
     (cd "$ROOT" && "${cmd[@]}" </dev/null >"$log" 2>&1) || echo "$id: claude exited non-zero (see log)"
   fi
 
+  save_wip "$id"
   (cd "$ROOT" && git checkout main -q && git pull --ff-only -q)
   if [[ "$(status_of "$id")" != DONE ]]; then
     echo "✗ $id did not finish DONE on main. Stopping. Log: $log" >&2; exit 3

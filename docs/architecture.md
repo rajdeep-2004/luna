@@ -71,8 +71,9 @@ luna/
 │   └── src/
 │       ├── navigation/       RootNavigator, AuthStack, OnboardingStack, MainTabs, AppStack, typed params
 │       ├── screens/          one folder per area: auth, onboarding, dojo, explore, game, duel, board, profile
-│       ├── api/              fetch client (timeout, GET retries, envelope parsing), endpoints, query client
-│       ├── store/            Zustand: auth (token in SecureStore), onboarding, connection (cold start)
+│       ├── api/              fetch client (timeout, GET retries, envelope parsing), endpoints, query client,
+│       │                     socket.ts (the one Socket.IO client for live duels)
+│       ├── store/            Zustand: auth (token in SecureStore), onboarding, connection (cold start), liveDuel
 │       ├── art/              Kiri-e Den cut-paper art as react-native-svg components on a 390-wide grid:
 │       │                     DojoScene, Lantern, RankScroll, Enso, KataScroll, EmaPlaque, YokaiMask,
 │       │                     HankoStamp/HankoStrike, TopicBanner, ModeArt, FaceOff, Crest, WinSeal, Kanji
@@ -283,6 +284,15 @@ plays it.
   Socket.IO Redis adapter (rooms across instances) and a lease on each duel (`ownerId`, `leaseUntil`) so exactly one
   instance drives its timers; recovery then only takes over duels whose lease expired. The first bottleneck is the
   per-tick duel read plus answer count, fine at capstone scale with the indexes above.
+- *App side (P14, D-053):* one Socket.IO client (`app/src/api/socket.ts`, connected only while a live duel screen is
+  open) and a Zustand store (`store/liveDuel.ts`) holding the latest snapshot; pure reducers in `lib/live/state.ts`
+  fold each event in and decide nothing. `duel:ping` acks the server's time; the app keeps the shortest of three round
+  trips as its clock offset and draws every countdown from `deadlineAt − offset`. `screens/duel/LiveDuelScreen.tsx`
+  picks a stage from the phase (lobby, face-off + 3-2-1, play + reveal) and replaces itself with `DuelResult` when the
+  match ends. Leaving by any route asks first (cancel or forfeit). Failure handling: answers aren't buffered while
+  offline; a banner counts down my seat's grace or the rival's; "Waking the dojo…" covers a cold Render start; another
+  device taking the seat shows a "Play on this phone" panel; coming back from the background forces a reconnect and a
+  fresh snapshot; the store re-sends ready whenever a reopened lobby clears it.
 
 **Dojo Board** (`GET /leaderboard/weekly`): one aggregation over this week's `xpevents` grouped by user, sorted by
 XP, then by who reached it first (earliest last award), then id. Pages are offsets inside the top 50; the `me` row
@@ -308,7 +318,7 @@ scale with the `{weekKey, userId}` index. Later: a cached `weeklyXP` counter per
 
 | Layer | Covers | Tool | Command |
 |---|---|---|---|
-| API smoke tests (gitignored) | critical paths: auth and lockout, answer-key leakage, double submit, XP once, streak, Daily Kata once, mastery and adaptivity, revisits, board, achievements, mode rounds and boss incidents, live duels (REST lobby rules and join race, socket auth and validation, full match sync, deadline advance, late/duplicate/wrong-index answers, deadline race, no key before reveal, Sudden Death, reconnect/forfeit/abandon, two devices, boot recovery, win-bonus once and cap), pure engine rules, V1 duel migration, content audit, weighted sampling, per-player selection variety (136 tests) | Vitest + Supertest + mongodb-memory-server | `cd .scratch/api-tests && npx vitest run` |
+| API smoke tests (gitignored) | critical paths: auth and lockout, answer-key leakage, double submit, XP once, streak, Daily Kata once, mastery and adaptivity, revisits, board, achievements, mode rounds and boss incidents, live duels (REST lobby rules and join race, socket auth and validation, full match sync, deadline advance, late/duplicate/wrong-index answers, deadline race, no key before reveal, Sudden Death, reconnect/forfeit/abandon, two devices, boot recovery, win-bonus once and cap), pure engine rules, V1 duel migration, the app's live clock maths, reducers and store against a real server (P14), content audit, weighted sampling, per-player selection variety (149 tests) | Vitest + Supertest + mongodb-memory-server | `cd .scratch/api-tests && npx vitest run` |
 | Frontend | each phase's click-through checklist | manual on Expo Go (Rajdeep) | — |
 | Static | lint + typecheck all workspaces | ESLint, tsc | `npm run lint && npm run typecheck` |
 

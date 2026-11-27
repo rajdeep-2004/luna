@@ -1984,3 +1984,99 @@ in `TODOS.md`. Mediums fixed: the deadline is checked again just before the answ
 which the reveal guarantees); a player seated in another live duel can't join a second one; and a late disconnect write
 no longer overwrites a newer reconnect (the offline write is guarded on `lastSeenAt`). Not fixed, in `TODOS.md`: JWT
 re-verification after the handshake, a crash-safe win-bonus key, multi-instance presence, and five lows.
+
+### D-053 — Live duel app (P14): one screen drawn from the server's snapshot
+
+- **Date:** 2026-11-27 · **Step:** P14 · **Status:** Active · **Type:** product + technical
+
+**Context.** P13 (D-052) made duels live on the server: the server owns the state machine and the clock and pushes
+every change over Socket.IO. Before P14 the app could create and join a duel but not play it. P14 builds the match in
+the app: the lobby, the face-off, the synced question screen, the reveal, the result, and what the player sees when a
+connection drops. The plan's rule: the server is the source of truth, so the app holds no game logic.
+
+**Decision.**
+
+- *One socket, one store.* `app/src/api/socket.ts` holds one lazily created Socket.IO client (WebSocket only, JWT read
+  fresh on every reconnect through the `auth` callback, Socket.IO's reconnect with exponential backoff and jitter, all
+  numbers in `config/env.ts`). It connects only while a live duel screen is open. `store/liveDuel.ts` (Zustand) keeps
+  the latest server snapshot. Every server event is folded in by a pure reducer in `lib/live/state.ts`. A full
+  `duel:state` snapshot replaces everything, and the reducers only copy what the server sent. None of them decides a
+  phase, a score or a winner.
+- *Clock offset.* A new `duel:ping` event (the only server change) acks with the server's time. On each connect the app
+  sends three pings and keeps the one with the shortest round trip: offset = server time minus the midpoint of that
+  ping. Every countdown is `deadlineAt − (device now + offset)`, so both phones show the same second. The countdown
+  never acts at zero. The server moves the duel and the app redraws from its push.
+- *One screen for the whole match* (`screens/duel/LiveDuelScreen.tsx`), choosing a stage from the phase: LOBBY →
+  `LobbyStage` (the big code, Share, Cancel, the invite's closing time); READY/COUNTDOWN → `FaceOffStage` (both masks,
+  then a 3 · 2 · 1 in Dela Gothic); QUESTION/REVEAL → `PlayStage` (the practice renderers for Trace, Bug Hunt and
+  Engineer's Choice, question i/N, the timer ring, the rival's "thinking"/"answered", my answer locked from the tap of
+  Strike until the ack, then both results, the right answer and one line of explanation). An ended match replaces the
+  screen with `DuelResult` after a short pause. An expired or cancelled lobby shows one line explaining why.
+- *Create no longer opens the share sheet by itself.* The creator lands on the lobby, and the Share button is the one
+  primary action there. Opening the sheet straight after create hid the lobby the player had just made.
+- *Being on the screen is being ready.* No "I'm ready" button: the store says ready whenever a snapshot shows my seat
+  not ready before the start. This matters when a joiner leaves and the lobby reopens, because the server then clears
+  the creator's ready. Without re-sending it, the next joiner would wait on the face-off forever (a test covers this).
+- *Leaving always asks.* The ✕, the Android back button and a swipe all go through one `beforeRemove` guard and a
+  confirm dialog: "Cancel the duel?" for the creator before the start, "Leave the duel?" for a joiner, "Forfeit the
+  duel?" in a match. If the socket is down, a creator's cancel falls back to `POST /duels/:id/cancel`. In a match a
+  failed leave still leaves, because the server forfeits an empty seat once the 20 s grace runs out.
+- *Connection states* (`live/LiveBanners.tsx`): "Waking the dojo…" when the first connect takes longer than the cold
+  start notice (Render's free tier sleeps); "Reconnecting… your seat is held for N s" with the grace counting down on
+  this device's clock; "@rival lost connection. They have N s to come back."; and a panel when another of my devices
+  took the seat, offering "Play on this phone". The countdowns are hints only. The server alone decides a forfeit.
+- *Back from the background reconnects at once.* A phone that slept can keep a dead socket that still looks connected
+  until the heartbeat times out, about 45 s, which is longer than the seat's 20 s grace. When the app becomes active
+  again, the screen drops the socket and reconnects, and the join ack brings a fresh snapshot.
+- *Result and history.* The result page shows the winner's seal, the score, each question's 正/誤 with the server's time
+  for both players, and the win bonus. A duel that is still live, opened from the list, moves on to the live screen.
+  The Duel tab's lists ("Live", "Finished") page through `GET /duels` with an "Older duels" button.
+- *Async UI removed.* The session screen's duel timer, the auto-advancing verdict, the timeout answer and the "the
+  clock keeps running" leave warning are gone. A DUEL session opened by mistake now says duels are played from the
+  Duel tab.
+- *Accessibility.* The timer's screen-reader label only changes at 30/20/10/5 s, so it isn't read out every second.
+  Every control is labelled, the score and the rival's status have spoken labels, and Reduce Motion turns the countdown
+  pop into a plain swap. Vermilion stays off text backgrounds (DESIGN.md), so the reconnect strip is tatami with a seal
+  edge and the urgent timer number turns amber while the ring turns vermilion.
+
+**Alternatives rejected.**
+
+- *Separate screens per phase (Lobby, FaceOff, Match).* Each navigation would race the server's pushes, and a reconnect
+  would have to work out which screen to be on. One screen keyed on the snapshot's phase redraws correctly from any
+  snapshot.
+- *A local timer that submits a timeout at zero (the V1 approach).* That is game logic on the client, and two clocks
+  could disagree. The server fills in timeouts itself at the deadline.
+- *Averaging the clock samples.* One slow sample skews an average. The shortest round trip bounds the error at half
+  that round trip (the NTP idea).
+- *Socket.IO's offline buffer.* It would deliver an answer typed while offline after reconnecting, when the question may
+  be over. `emitAck` refuses to send while offline and the player sees "Reconnecting…".
+
+**Assumptions I made (not confirmed).** The leaver doesn't stay to watch their own forfeit, so they go straight to the
+result page, which reads the outcome over REST. A player who restarts the app mid-match gets back in through the Duel
+tab's "Live" list, not automatically. After an app restart the locked answer is shown as locked, but the option I
+picked isn't highlighted, because the receipt in the snapshot doesn't carry it (in `TODOS.md`).
+
+**How it works (plain language).** Think of the app as a TV showing a live match. The server is the referee and the
+scoreboard. Each time something happens, the server sends the whole scoreboard (or a small update) and the app redraws.
+If the TV loses signal, it shows "reconnecting", and when the signal is back it asks for the whole scoreboard again.
+The timer on screen is only the TV's copy of the referee's stopwatch, adjusted for how far apart the two clocks are.
+
+**Files.** `app/src/api/socket.ts`, `app/src/store/liveDuel.ts`, `app/src/lib/live/{clock,state,useNow}.ts`,
+`app/src/config/env.ts`, `app/src/screens/duel/{LiveDuelScreen,DuelResultScreen,DuelScreen,useDuelActions}.tsx`,
+`app/src/screens/duel/live/{LobbyStage,FaceOffStage,PlayStage,RevealPanel,TimerRing,LiveBanners}.tsx`,
+`app/src/screens/game/{SessionScreen,SessionHeader,useAnswerFlow,bodyTypes,BugHuntBody,ChoiceBody,OptionList}.ts(x)`
+(DuelCountdown and DuelVerdict deleted), `app/src/navigation/*`; server `duels/live/socket.ts` and `shared/src/liveDuel.ts`
+(the ping). New dependency: `socket.io-client` (app), the client half of D-052's transport.
+
+**Tests.** `.scratch/api-tests/live-app.test.ts` (clock maths, the ping, a whole match folded through the reducers
+equals the server's final snapshot, reducers ignore stale or foreign events) and `live-store.test.ts` (the real store
+and socket client against a real server: re-ready after a reopened lobby, a double-tapped Strike locks one answer, the
+rival never sees the choice, leave forfeits, no sending while offline, resume after the background, a non-participant
+is fatal).
+
+**Concepts worth learning.** Server-authoritative clients (the "dumb terminal" pattern), clock-offset estimation with a
+minimum-round-trip filter, idempotent acks over a socket, navigation guards (`beforeRemove`), and mobile app lifecycle
+(why a backgrounded socket can lie about being connected).
+
+**Revisit** if players complain about the reconnect experience (auto-resume a live duel on app launch), or when the
+snapshot can carry my locked choice.

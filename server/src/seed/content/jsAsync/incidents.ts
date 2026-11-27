@@ -216,9 +216,9 @@ export const JS_ASYNC_INCIDENTS: ChallengeSeed[] = [
         prompt: 'Which lead do you follow first?',
         options: opts(
           'The MaxListenersExceededWarning',
-          'Traffic spikes',
-          'Database latency',
-          'Disk space',
+          'GC pressure: tune the young-generation size with --max-semi-space-size',
+          'A slow downstream call that keeps requests open for longer',
+          'Large response bodies being buffered in full before they are sent',
         ),
         answerKey: 'a',
         explanation:
@@ -232,9 +232,9 @@ export const JS_ASYNC_INCIDENTS: ChallengeSeed[] = [
         prompt: 'Why does memory grow?',
         options: opts(
           'Each request adds a listener that is never removed, keeping its closure (and the response) alive',
-          'res.write is slow',
-          'The garbage collector is disabled',
-          'The price feed sends too much data',
+          'res.write buffers data that slow clients have not read yet',
+          'The closures form a reference cycle, which the garbage collector cannot free',
+          'The feed emits faster than the handlers run, so updates queue up in memory',
         ),
         answerKey: 'a',
         explanation:
@@ -249,9 +249,9 @@ export const JS_ASYNC_INCIDENTS: ChallengeSeed[] = [
         prompt: 'What is the fix?',
         options: opts(
           "Remove the listener when the response closes: res.on('close', () => priceFeed.off('update', onUpdate))",
-          'Restart the server every 3 hours',
+          'Call priceFeed.removeAllListeners() every few minutes to clear the old ones',
           'Raise the max-listeners limit',
-          'Add more memory',
+          "Subscribe with priceFeed.once('update', ...) instead of on",
         ),
         answerKey: 'a',
         explanation:

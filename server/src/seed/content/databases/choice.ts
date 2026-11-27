@@ -359,7 +359,7 @@ export const DATABASES_CHOICE: ChallengeSeed[] = [
     prompt:
       'Accounts are soft-deleted (deleted_at is set). Emails must be unique among active accounts, but someone who deleted their account must be able to sign up again with the same email. What do you build?',
     options: opts(
-      'Keep UNIQUE(email) and tell users to contact support',
+      'Replace UNIQUE(email) with UNIQUE(email, deleted_at), so deleted rows no longer clash',
       'Drop the constraint and check for active duplicates in the API',
       'A unique index on email WHERE deleted_at IS NULL',
       'Rename the email to "deleted-<id>-asha@uni.edu" on delete',
@@ -370,7 +370,7 @@ export const DATABASES_CHOICE: ChallengeSeed[] = [
     misconception:
       'Uniqueness does not have to cover the whole table. Partial indexes let a constraint follow a business rule exactly.',
     optionFeedback: {
-      a: 'Turns a normal flow into a support ticket.',
+      a: 'Active rows all have deleted_at NULL, and NULLs are never equal in a unique index, so two active accounts with the same email are allowed.',
       b: 'Two concurrent signups both pass the check; the guarantee is gone.',
       d: 'Works, but corrupts audit data and breaks if the mangled value is ever too long or reused.',
     },
@@ -387,8 +387,8 @@ export const DATABASES_CHOICE: ChallengeSeed[] = [
     options: opts(
       'Add display_name, write both columns, backfill, switch reads, then drop fullname in a later deploy',
       'ALTER TABLE ... RENAME COLUMN in the same deploy as the code change',
-      'Rename the column first, then deploy the new code as fast as possible',
-      'Create a new users table and copy everything over in one transaction',
+      'Add display_name as a generated column computed from fullname, deploy code that uses it, then drop fullname',
+      'Add display_name and backfill it in one migration, deploy code that reads and writes only display_name, then drop fullname',
     ),
     answerKey: 'a',
     explanation:
@@ -397,8 +397,8 @@ export const DATABASES_CHOICE: ChallengeSeed[] = [
       'A schema change and a code change never land at the same instant. During a rolling deploy, both versions must work with the schema.',
     optionFeedback: {
       b: 'Old instances still running query fullname and fail until they are replaced.',
-      c: 'Every old instance breaks the moment the rename lands.',
-      d: 'Locks or doubles a large table, and writes during the copy are lost.',
+      c: "A generated column cannot be written, so the new code's saves fail, and it cannot outlive the column it is computed from.",
+      d: 'Old instances keep writing only fullname during the rollout, so names changed in those minutes never reach display_name.',
     },
     hint: 'Which versions of the app are running while the migration lands?',
   },
@@ -412,10 +412,10 @@ export const DATABASES_CHOICE: ChallengeSeed[] = [
     prompt:
       'A live event shows a global "people watching" counter. Every join runs UPDATE stats SET viewers = viewers + 1 WHERE id = 1, about 3,000 times a second, and p99 latency for joins is now 2 s. The number may lag by a few seconds. What do you do?',
     options: opts(
-      'Switch to SERIALIZABLE so the updates are correct',
+      'Send each increment to a queue and let workers run the same UPDATE',
       'Count in memory or Redis per instance and flush the sums to the row every few seconds',
-      'Read the value, add 1 in code and write it back',
-      'Add an index on stats.id',
+      'Raise the connection pool size so more of the UPDATEs can run in parallel',
+      'Move the stats table to a bigger instance with faster disks and more CPU cores',
     ),
     answerKey: 'b',
     explanation:
@@ -423,9 +423,9 @@ export const DATABASES_CHOICE: ChallengeSeed[] = [
     misconception:
       'An atomic increment is correct but not free: on one hot row, writers serialise on the row lock.',
     optionFeedback: {
-      a: 'Same lock queue plus serialization failures to retry.',
-      c: 'Loses updates, and still takes the same row lock to write.',
-      d: 'id is the primary key and already indexed; finding the row is not the slow part.',
+      a: 'Moves the requests off the join path, but workers still run 3,000 updates a second on one row and queue behind its lock.',
+      c: 'More parallel writers on one row means a longer lock queue, not more throughput.',
+      d: 'The writers wait on one row lock, not on disk or CPU, so bigger hardware barely helps.',
     },
   },
   {
@@ -439,8 +439,8 @@ export const DATABASES_CHOICE: ChallengeSeed[] = [
       'A new orders.region column must be filled from the shipping address for 50 million existing rows, while the shop keeps taking orders. How do you run the backfill?',
     options: opts(
       'One UPDATE orders SET region = ... for the whole table, at night',
-      'Load all orders into the app, compute regions, write them back in one transaction',
-      'Make region NOT NULL with a default and let the database fill it',
+      'Update in pages of 10,000 rows using ORDER BY id LIMIT 10000 OFFSET n, one transaction per page',
+      'Add region as a stored generated column computed from the address, so no backfill job is needed',
       'Update in batches of a few thousand by primary-key range, each in its own short transaction, with a pause between batches',
     ),
     answerKey: 'd',
@@ -450,8 +450,8 @@ export const DATABASES_CHOICE: ChallengeSeed[] = [
       '"Run it at night" does not make a huge transaction safe; locks, bloat and replica lag still hit live traffic.',
     optionFeedback: {
       a: 'Locks millions of rows for a long time and rolls everything back on any failure.',
-      b: 'Memory blow-up and the same giant transaction, plus a network trip for every row.',
-      c: "A constant default cannot compute a value from each row's address.",
+      b: 'Batching is right, but OFFSET re-reads every skipped row, so each page gets slower; by the end each batch scans tens of millions of rows.',
+      c: 'Adding a stored generated column rewrites the whole 50M-row table under an exclusive lock, so checkouts block until it finishes.',
     },
   },
   {

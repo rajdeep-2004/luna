@@ -77,6 +77,19 @@ export async function createDuel(
   throw new AppError('INTERNAL', 'Could not create a duel code, please try again');
 }
 
+/** Duels where `userId` sits in a match that has a rival (READY or playing). */
+function liveSeatOf(userId: string) {
+  return {
+    $or: [{ creatorId: userId }, { opponentId: userId }],
+    opponentId: { $ne: null },
+    phase: { $in: ['READY' as const, ...PLAYING_PHASES] },
+  };
+}
+
+async function seatedElsewhere(userId: string, duelId: Types.ObjectId): Promise<boolean> {
+  return Boolean(await DuelModel.exists({ _id: { $ne: duelId }, ...liveSeatOf(userId) }));
+}
+
 /**
  * `POST /duels/join`. One atomic conditional update: only an unexpired LOBBY with no opponent,
  * created by someone else, can be joined, so two people racing for one code get exactly one
@@ -85,12 +98,7 @@ export async function createDuel(
 export async function joinDuel(userId: string, code: string): Promise<DuelSnapshot> {
   const now = new Date(runtime.now());
   // One live match at a time: not while already seated in another duel that has a rival.
-  const busy = await DuelModel.exists({
-    code: { $ne: code },
-    $or: [{ creatorId: userId }, { opponentId: userId }],
-    opponentId: { $ne: null },
-    phase: { $in: ['READY', ...PLAYING_PHASES] },
-  });
+  const busy = await DuelModel.exists({ code: { $ne: code }, ...liveSeatOf(userId) });
   if (busy) throw conflict('Finish or leave your current duel first');
   const joined = await DuelModel.findOneAndUpdate(
     {
@@ -110,6 +118,16 @@ export async function joinDuel(userId: string, code: string): Promise<DuelSnapsh
     { returnDocument: 'after' },
   );
   if (joined) {
+    // The busy check above and this join are two writes, so two codes joined at once could seat
+    // the same user twice (P15 review). Re-check now that this seat is taken; on a clash, give
+    // the seat back while nobody has started, so the lobby reopens and the user is told why.
+    if (await seatedElsewhere(userId, joined._id)) {
+      await DuelModel.updateOne(
+        { _id: joined._id, phase: 'READY', opponentId: userId, 'opponentSeat.readyAt': null },
+        { $set: { opponentId: null, phase: 'LOBBY', opponentSeat: null } },
+      );
+      throw conflict('Finish or leave your current duel first');
+    }
     await runtime.pushState(joined);
     await runtime.tick(joined._id.toString());
     return toSnapshot(userId, joined, now.getTime());

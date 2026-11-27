@@ -158,6 +158,15 @@ export const DUEL = {
   repeatTopicPenalty: 2,
   /** How long a winner's completion waits for a concurrent bonus payment (D-033). */
   bonusWait: { tries: 10, delayMs: 50 },
+  /** The live duel runtime's internal pacing (D-052). */
+  runtime: {
+    /** Safety bound on how many transitions one tick may chain (recovery can chain a few). */
+    maxStepsPerTick: 8,
+    /** After a lost race the duel is re-checked this soon, never in a tight loop. */
+    raceRetryMs: 250,
+    /** After a failed step (a transient database error) the duel is retried this soon. */
+    errorRetryMs: 2_000,
+  },
 } as const;
 
 /**

@@ -326,8 +326,8 @@ export const CACHING_QUEUES_CHOICE: ChallengeSeed[] = [
     prompt:
       'The homepage key expires. In the next second, 5,000 requests miss the cache, all run the same heavy query, and the database falls over. What prevents this?',
     options: opts(
-      'Use a shorter TTL so each rebuild is smaller',
-      'Remove the cache so load on the database is steady',
+      'Add random jitter to the TTL so keys expire at different times',
+      'Retry the homepage query with exponential backoff when the database times out',
       'Add a read replica for the homepage query and change nothing else',
       'Let one request rebuild while others serve the stale value',
     ),
@@ -337,8 +337,8 @@ export const CACHING_QUEUES_CHOICE: ChallengeSeed[] = [
     misconception:
       'A cache miss is not one event. On a hot key it is thousands of identical misses at once.',
     optionFeedback: {
-      a: 'More expiries mean more stampedes, and the query is the same size.',
-      b: 'The database takes the full load all the time.',
+      a: 'Jitter spreads out many keys expiring together; here one key expires and 5,000 requests miss it at once.',
+      b: 'The 5,000 queries still run, and each retry adds more load to a database that is already falling over.',
       c: 'A replica absorbs some of the spike but still runs the query thousands of times.',
     },
     hint: 'How many of those 5,000 requests actually need to run the query?',
@@ -380,7 +380,7 @@ export const CACHING_QUEUES_CHOICE: ChallengeSeed[] = [
       'During a sale, producers enqueue 2,000 jobs/s. Each job calls a partner API that is contractually capped at 500 requests/s. The queue grows by millions and Redis memory is close to full. What do you do?',
     options: opts(
       'Add workers until consumption matches the 2,000 jobs/s coming in',
-      'Retry partner 429s immediately so jobs drain faster',
+      'Rate-limit the workers to 500 calls/s and let the queue absorb the rest until the sale ends',
       'Raise Redis maxmemory and wait for the sale to end',
       'Bound the queue and push back on producers when it is full',
     ),
@@ -391,7 +391,7 @@ export const CACHING_QUEUES_CHOICE: ChallengeSeed[] = [
       'A queue absorbs bursts; it cannot absorb a sustained gap between arrival and service rates. That gap has to be pushed back to whoever is producing.',
     optionFeedback: {
       a: 'Throughput is capped by the partner at 500/s; extra workers only add rejected calls.',
-      b: 'Retrying at once multiplies traffic against the cap.',
+      b: 'Respects the partner, but 1,500 jobs a second still pile up in a Redis that is almost full.',
       c: 'Buys minutes; the backlog grows by 1,500 jobs every second.',
     },
     hint: 'What limits throughput, no matter how many workers you add?',
@@ -409,7 +409,7 @@ export const CACHING_QUEUES_CHOICE: ChallengeSeed[] = [
       'Add more shards to the cluster',
       'A 1–2 s in-process cache for that key on each API instance',
       "Raise the key's TTL from 60 s to 1 hour so it is never missed",
-      'Move the post back to Postgres',
+      'Pipeline the reads from each API instance so they reach Redis in batches',
     ),
     answerKey: 'b',
     explanation:
@@ -419,7 +419,7 @@ export const CACHING_QUEUES_CHOICE: ChallengeSeed[] = [
     optionFeedback: {
       a: 'The key still hashes to one shard; the new shards stay idle.',
       c: 'The problem is reads per second, not misses; a longer TTL does not reduce reads.',
-      d: 'Postgres handles 200,000 reads/s far worse than Redis.',
+      d: 'Fewer round trips, but the shard still executes 200,000 GETs a second on one CPU.',
     },
   },
   {
@@ -460,7 +460,7 @@ export const CACHING_QUEUES_CHOICE: ChallengeSeed[] = [
     options: opts(
       'SET webhook:<id> NX in Redis before processing, and skip the event if it already exists',
       'Check whether the order is already marked paid before applying the update',
-      'Ask the provider to stop retrying',
+      'Process webhooks from a single consumer, one at a time, so they never run concurrently',
       'Insert the event id under a unique constraint in the same transaction as the update',
     ),
     answerKey: 'd',
@@ -471,7 +471,7 @@ export const CACHING_QUEUES_CHOICE: ChallengeSeed[] = [
     optionFeedback: {
       a: 'If the process crashes after the SET but before the update, every retry is skipped and the payment is never applied.',
       b: 'Two concurrent deliveries both see "not paid" and both add points.',
-      c: 'Retries are how the provider guarantees delivery; you need them.',
+      c: 'Removes the concurrency, but a duplicate that arrives later is still applied a second time.',
     },
     hint: 'What happens to each approach if the process crashes halfway?',
   },

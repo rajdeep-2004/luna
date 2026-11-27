@@ -412,7 +412,7 @@ export const JS_ASYNC_CHOICE: ChallengeSeed[] = [
       'Raise the heap limit with --max-old-space-size',
       'Write events in bigger Promise.all batches so each round trip carries more of them',
       'Pause reading when in-flight writes hit a limit; resume as they finish',
-      'Drop events when memory passes 80%',
+      'Put an in-process queue between reader and writer so reading never has to wait',
     ),
     answerKey: 'c',
     explanation:
@@ -422,7 +422,7 @@ export const JS_ASYNC_CHOICE: ChallengeSeed[] = [
     optionFeedback: {
       a: 'Only delays the crash; the backlog keeps growing.',
       b: 'Batching can help a database that has headroom, but this one is at its limit, and unbounded batches still pile up in memory.',
-      d: 'Breaks the rule that every event must be stored.',
+      d: 'That queue is the same unbounded buffer with a new name: input still outruns output, so it fills RAM.',
     },
   },
   {
@@ -437,7 +437,7 @@ export const JS_ASYNC_CHOICE: ChallengeSeed[] = [
     options: opts(
       'Add a 500 ms timeout to every backend call',
       'Cache results so the next user gets them free',
-      'Nothing: the work finishes anyway, the results are discarded, and it is harmless',
+      'Debounce the search box by 500 ms on the client so fewer searches are sent',
       "Abort every backend call when the client disconnects (res 'close')",
     ),
     answerKey: 'd',
@@ -448,7 +448,7 @@ export const JS_ASYNC_CHOICE: ChallengeSeed[] = [
     optionFeedback: {
       a: 'Cuts off normal 2 s calls, so users who wait lose results.',
       b: 'Helps repeated queries only; most searches are unique, so you still pay for abandoned ones.',
-      c: 'You pay for about 40% of calls that nobody reads.',
+      c: 'Cuts searches sent while typing, but a submitted search is still paid for in full when the user leaves.',
     },
   },
   {

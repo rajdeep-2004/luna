@@ -3,12 +3,14 @@
 Backlog, deferred ideas and known debt. Scope changes go here first; nothing here is built without approval.
 
 ## Deferred (P2, from docs/luna-idea.md)
-- Real-time duels (WebSockets).
 - AI tutor and AI question generation with human review.
 - More tracks: DSA, DevOps, AI/ML, networking, system design.
 - Drag-and-drop architecture games.
 - Clubs, friends lists, social challenges.
 - Push notifications for streak reminders.
+
+## Release (needs Rajdeep's Expo account)
+- **Build the 2.0.0 APK** (P15). Versions are already 2.0.0 (`app.json` version, Android `versionCode` 2). From `app/`: `npx eas-cli@latest login`, then `npx eas-cli@latest build -p android --profile apk`. Install it over 1.0 and run the P14 click-through checklist (`docs/v2/progress.md`) on two phones. Then update the APK link in the README.
 
 ## Known debt / revisit
 - P9 review (low): `seenIds` reads `AnswerAttempt.distinct('challengeId')` over the user's whole history on every pick (index-covered); move to a per-user seen set if it shows in profiling.
@@ -30,8 +32,9 @@ Backlog, deferred ideas and known debt. Scope changes go here first; nothing her
 - P13 review (low): boot recovery ticks every open duel before `listen`; boot time grows with open duels. Tick in the background if that becomes slow.
 - P13 review (low): `migrateV1Duels` scans for `phase: {$exists: false}` on every boot (no index). Drop the call once production has been migrated.
 - P13 review (low): if a duel's challenge is deactivated mid-match, the question/reveal event is skipped silently while the phase still advances. Log at error, or cancel the duel.
-- P13 review (low): socket rate limit is per socket (a user can open many); `POST /duels` and `POST /duels/:id/cancel` have no route limiter beyond the global one.
-- P14 done: the app no longer reads `stepElapsedMs`/`endedEarly` and the lobby keeps its socket while sharing. Left for P15: drop `SessionView.stepElapsedMs`/`endedEarly` and `DUEL_TIMEOUT_ANSWER` from `shared` and the server if nothing else uses them.
+- P13/P15 review (low): `POST /duels` and `POST /duels/:id/cancel` have no route limiter beyond the global 300/min one, and `pickDuelChallenges` loads the full active pool (up to `SELECTION.poolMax`, no projection) on every create. Add a per-user create limiter and project only the fields the picker uses. (The per-socket limit is now per user, with a socket cap: P15.)
+- P15: the per-user socket bucket and socket count live in process memory, like `seats`; they move to Redis with the rest of the live state when the API scales out.
+- P15: a user who joins two lobbies at the exact same moment can get 409 on both (each join sees the other and gives its seat back). Safe, and a retry works; make it deterministic only if users hit it.
 - P14: after an app restart mid-question the answer shows as locked but the option I picked isn't highlighted (`DuelAnswerReceipt` has no `answer`). Add it to the receipt in the snapshot.
 - P14: a player who kills the app mid-match gets back through the Duel tab's "Live" list; consider auto-opening a live duel on launch.
 

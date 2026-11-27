@@ -333,7 +333,7 @@ export const DEBUGGING_PROD_CHOICE: ChallengeSeed[] = [
       'The pricing service is overloaded and fails 60% of requests with 503. Your 40 API instances each retry a failed call 3 times immediately. Pricing cannot be scaled for another hour. What do you change in your API?',
     options: opts(
       'A circuit breaker that stops calling pricing for a while after repeated failures, plus backoff with jitter',
-      'More retries (5), so more requests eventually get through',
+      'Retry only once, after a fixed 1 s delay, instead of three times immediately',
       'Scale your API to 80 instances so more requests are in flight',
       'Raise the call timeout from 2 s to 20 s so slow requests can finish',
     ),
@@ -343,7 +343,7 @@ export const DEBUGGING_PROD_CHOICE: ChallengeSeed[] = [
     misconception:
       'Retries are a load multiplier. Against an overloaded service, the kind thing is to stop calling it for a while.',
     optionFeedback: {
-      b: 'More retries mean even more load on the overloaded service, and fewer successes.',
+      b: 'Less load, but every instance still retries in step on the same 1 s beat, and nothing stops calls while pricing is down.',
       c: 'Twice the callers sending twice the retries. Pricing is the bottleneck, not your API.',
       d: 'Requests pile up in flight on both sides, which deepens the overload.',
     },
@@ -410,20 +410,20 @@ export const DEBUGGING_PROD_CHOICE: ChallengeSeed[] = [
     prompt:
       'Heap use grows by about 50 MB an hour on every instance, and each one is killed for running out of memory every 8 hours. Taking a heap snapshot pauses the process for several seconds and needs extra memory. How do you find the cause?',
     options: opts(
-      'Raise the memory limit to 4 GB so instances last for days',
+      'Take one heap snapshot on the busiest instance and look at the largest objects',
       'On one instance taken out of the load balancer, take two heap snapshots an hour apart and compare what grew',
       'Snapshot every instance at once at peak traffic, for the biggest sample',
-      'Restart every instance on a 6-hour schedule',
+      'Turn on --trace-gc and read which objects the garbage collector fails to free',
     ),
     answerKey: 'b',
     explanation:
       'Comparing two snapshots shows which objects (and which code that retains them) grew between them. Doing it on an instance with no traffic avoids a multi-second pause for users and an out-of-memory crash during the snapshot. The other options keep the service up for longer but never tell you what leaks.',
     misconception:
-      'Restarts and bigger limits are mitigations, not fixes. A leak is found by comparing what memory holds over time.',
+      'One snapshot shows what is big, not what is growing. A leak is found by comparing what memory holds over time.',
     optionFeedback: {
-      a: 'Buys time, but the leak is still there and the crashes come later.',
+      a: 'One snapshot shows what is big, not what grows, and it pauses a live instance under load.',
       c: 'Pauses every instance during peak traffic, and a snapshot can push a nearly full instance over its limit.',
-      d: 'A reasonable stopgap, but it hides the leak instead of finding it.',
+      d: '--trace-gc logs pause times and heap sizes, not which objects are retained.',
     },
   },
   {
@@ -437,7 +437,7 @@ export const DEBUGGING_PROD_CHOICE: ChallengeSeed[] = [
       'An engineer pushed a config change with a typo. The config system applied it to every region within 20 seconds, and the site was down for 40 minutes. Which postmortem action best stops one bad change from reaching every region again?',
     options: opts(
       'Roll config out region by region with automatic validation and health checks between steps',
-      'Take config access away from the engineer who made the typo',
+      'Add a schema check for config in CI so typos fail before they are pushed',
       'Add a checklist item: "double-check config changes before pushing"',
       'Require a second reviewer to approve every config change',
     ),
@@ -447,7 +447,7 @@ export const DEBUGGING_PROD_CHOICE: ChallengeSeed[] = [
     misconception:
       'Postmortems are blameless for a reason: people always make mistakes, so the useful question is why one mistake could reach everyone at once.',
     optionFeedback: {
-      b: 'Blame teaches people to hide mistakes, and the next person makes the same typo.',
+      b: 'Worth adding, but it catches only malformed values; a valid-looking bad change still reaches every region at once.',
       c: 'Relies on people never being tired or rushed, which is the failure that just happened.',
       d: 'Worth having, but reviewers miss typos too, and a change that slips through still reaches every region at once.',
     },
@@ -462,7 +462,7 @@ export const DEBUGGING_PROD_CHOICE: ChallengeSeed[] = [
     prompt:
       'A marketing push sends 3× normal traffic. The database is at 100% CPU, p99 is 30 s and checkout is failing along with everything else. A bigger database or read replicas take 20 minutes. What do you do now?',
     options: opts(
-      'Restart the database to clear the overload',
+      'Scale the API from 10 to 30 instances to spread the extra traffic',
       'Raise every timeout so slow requests can finish',
       'Shed load: quickly reject or degrade non-critical endpoints (recommendations, search) so checkout gets the capacity',
       'Increase each API instance pool from 10 to 50 connections',
@@ -473,7 +473,7 @@ export const DEBUGGING_PROD_CHOICE: ChallengeSeed[] = [
     misconception:
       'Under overload, serving everyone slowly means serving no one. Rejecting some requests quickly is how the important ones succeed.',
     optionFeedback: {
-      a: 'All the traffic comes straight back to a cold database, and in-flight work is lost.',
+      a: 'The database is the bottleneck; three times the API instances send it even more concurrent queries.',
       b: 'More requests are in flight at once, which means more queueing on the database.',
       d: 'More concurrent queries on a database already at 100% CPU make each one slower.',
     },

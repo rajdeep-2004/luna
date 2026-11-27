@@ -146,10 +146,10 @@ export const HTTP_APIS_INCIDENTS: ChallengeSeed[] = [
           'After the database recovered, the API received 6–9× its normal request rate even though active users were flat. Error rate stayed above 80% and fell only when traffic was blocked at the edge.',
         prompt: 'What explains the extra traffic?',
         options: opts(
-          'A marketing push brought new users',
-          'A DDoS attack started at the same moment',
+          'A one-off thundering herd of clients reconnecting, which should fade on its own',
+          'Load-balancer health checks hammering the instances that had failed',
           'Retries: failed requests were being sent again, and again',
-          'The database recovered with a smaller cache',
+          'The database came back with a cold cache, so every query is slower',
         ),
         answerKey: 'c',
         explanation:
@@ -164,9 +164,9 @@ export const HTTP_APIS_INCIDENTS: ChallengeSeed[] = [
         prompt: 'Why can the system not recover by itself?',
         options: opts(
           'Retries at three layers multiply (up to 64 attempts per tap), all in sync',
-          'The 100 ms delay is too long',
-          'The database is still too slow',
-          'The gateway has a bug',
+          'The API connection pools were exhausted in the outage and never refilled',
+          'The database failed over to a smaller replica that cannot take normal load',
+          "The gateway's circuit breaker is stuck open",
         ),
         answerKey: 'a',
         explanation:
@@ -182,8 +182,8 @@ export const HTTP_APIS_INCIDENTS: ChallengeSeed[] = [
         prompt: 'What do you ship?',
         options: opts(
           'Remove all retries everywhere',
-          'Add more database replicas',
-          'Increase all timeouts to 30 s',
+          'Keep retries at all three layers, but switch each to exponential backoff',
+          'Retry only in the mobile app: 3 times, with a fixed 100 ms delay',
           'Retry at one layer, with exponential backoff, jitter and a budget; honour Retry-After and shed load with 503',
         ),
         answerKey: 'd',

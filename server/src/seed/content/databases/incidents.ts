@@ -219,7 +219,7 @@ export const DATABASES_INCIDENTS: ChallengeSeed[] = [
         options: opts(
           'A query ran past the statement timeout',
           'Two transactions each hold a lock the other needs, so the database aborts one',
-          'The database ran out of connections',
+          'Two transactions waited on each other until the lock timeout expired',
           'A row was updated by two transactions, so both were rolled back',
         ),
         answerKey: 'b',
@@ -235,7 +235,7 @@ export const DATABASES_INCIDENTS: ChallengeSeed[] = [
         prompt: 'Why do these two deadlock?',
         options: opts(
           'The isolation level is too low',
-          'Both transfers are too large',
+          "The payout run's transactions are long, so lock waits pile up",
           'They lock the same two rows in opposite order',
           'The accounts table is missing an index',
         ),
@@ -252,14 +252,15 @@ export const DATABASES_INCIDENTS: ChallengeSeed[] = [
         prompt: 'What is the robust fix?',
         options: opts(
           'Run transfers one at a time globally',
-          'Remove transactions from transfers',
+          'Lock with FOR UPDATE NOWAIT and fail the transfer if a row is busy',
           'Increase the lock timeout',
           'Lock both rows in a fixed order (lowest account id first) and retry the rare deadlock',
         ),
         answerKey: 'd',
         explanation:
           'If every transaction takes locks in the same global order, no cycle can form. A small retry on deadlock errors covers any remaining edge cases safely. A global queue works but throws away all concurrency.',
-        misconception: 'Removing transactions trades a deadlock for corrupted balances.',
+        misconception:
+          'NOWAIT or a longer lock timeout only changes how a lock cycle fails. The cycle comes from lock order, so fix the order.',
       },
     ],
     rootCause:

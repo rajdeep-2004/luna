@@ -216,8 +216,8 @@ export const CACHING_QUEUES_INCIDENTS: ChallengeSeed[] = [
         prompt: 'Busy workers but nothing sent. What do you check?',
         options: opts(
           'Add ten more workers right away',
-          'Purge the whole queue and start fresh',
-          'Check the database indexes',
+          "The email provider's status page and API error rate",
+          'A CPU profile of a worker, to find the hot function',
           'Worker logs for what they are processing',
         ),
         answerKey: 'd',
@@ -233,8 +233,8 @@ export const CACHING_QUEUES_INCIDENTS: ChallengeSeed[] = [
         options: opts(
           'The email provider is down',
           'A poison message that fails and is retried forever',
-          'The queue has run out of space',
-          'A memory leak in the workers',
+          'The visibility timeout is shorter than a send, so messages are redelivered mid-send',
+          'The workers are deadlocked waiting to acknowledge messages',
         ),
         answerKey: 'b',
         explanation:
@@ -248,9 +248,9 @@ export const CACHING_QUEUES_INCIDENTS: ChallengeSeed[] = [
         prompt: 'What do you do?',
         options: opts(
           'Delete the message by hand and change nothing',
-          'Retry faster so the message gets through',
+          'Catch the template error and ack the message so the worker moves on',
           'Cap retries, dead-letter what still fails, fix the null name',
-          'Stop sending confirmation emails until the template is rewritten',
+          'Send new confirmations to a fresh queue and let the old one drain',
         ),
         answerKey: 'c',
         explanation:

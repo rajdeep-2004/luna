@@ -323,10 +323,10 @@ export const HTTP_APIS_CHOICE: ChallengeSeed[] = [
     prompt:
       'You must rename "user_name" to "username" in a public API. An installed mobile app reads "user_name", and many users update slowly. What do you do?',
     options: opts(
-      'Rename it today; the app will update eventually',
+      'Ship /v2 with "username" and retire /v1 the day the updated app is released',
       'Send both, deprecate the old one, remove it when unused',
-      'Return 410 Gone to old clients so they are forced to update',
-      'Rename it and force everyone to update the app tomorrow',
+      'Rename it, and map it back to "user_name" when the User-Agent shows an old app build',
+      'Send both fields for one release cycle, then remove "user_name"',
     ),
     answerKey: 'b',
     explanation:
@@ -334,9 +334,9 @@ export const HTTP_APIS_CHOICE: ChallengeSeed[] = [
     misconception:
       'You cannot deploy a mobile client the way you deploy a server. Old versions live for months.',
     optionFeedback: {
-      a: 'Every user on the old version breaks immediately.',
-      c: 'Turns a rename into an outage for old clients.',
-      d: 'Forced updates frustrate users and still leave a broken window.',
+      a: 'Versioning is fine, but retiring /v1 on release day breaks everyone who has not updated yet, which is most users for weeks.',
+      c: 'User-Agent sniffing is fragile, and a public API has web and third-party clients whose User-Agent says nothing about the field they read.',
+      d: 'Close, but the calendar is not the signal. Slow updaters are still on the old build after one cycle; remove the field when usage data shows it is unused.',
     },
     hint: 'Can you make the change without removing anything yet?',
   },
@@ -353,7 +353,7 @@ export const HTTP_APIS_CHOICE: ChallengeSeed[] = [
       'Fulfil the order inside the handler, then reply 200 when it is done',
       'Reply 200 at once, then fulfil in the same process',
       'Verify, store the event id (unique), enqueue a job, reply 200',
-      'Reply 500 so the provider retries when you are less busy',
+      'Verify, enqueue a job, reply 200; the job skips orders already marked shipped',
     ),
     answerKey: 'c',
     explanation:
@@ -363,7 +363,7 @@ export const HTTP_APIS_CHOICE: ChallengeSeed[] = [
     optionFeedback: {
       a: 'Every call times out at 10 s, so each event is delivered again and fulfilled several times.',
       b: 'Fast, but a crash or deploy mid-fulfilment loses the order, and duplicates still ship twice.',
-      d: 'Every event fails on purpose; the provider eventually gives up and orders are lost.',
+      d: 'Close, but the check races: two deliveries of the same event can both run, both see "not shipped" and both ship. A unique event id stops the duplicate before it is queued.',
     },
   },
   {
@@ -378,8 +378,8 @@ export const HTTP_APIS_CHOICE: ChallengeSeed[] = [
     options: opts(
       'A /home endpoint that gathers the data server-side in one call',
       'Turn on HTTP/2 so all the calls are multiplexed over one connection',
-      'Cache every response on the phone for 24 hours',
-      'Rewrite the whole API in GraphQL',
+      'Fire all 14 calls in parallel with Promise.all at app start',
+      'Move the API to edge regions closer to users to cut the latency of each call',
     ),
     answerKey: 'a',
     explanation:
@@ -388,8 +388,8 @@ export const HTTP_APIS_CHOICE: ChallengeSeed[] = [
       'Parallel transport does not fix sequential dependencies. HTTP/2 can only overlap requests the client is able to send at once.',
     optionFeedback: {
       b: 'Helps independent requests, but each call here waits for the previous answer, so the chain stays.',
-      c: 'Cold start has nothing cached yet, and a day-old home screen is stale.',
-      d: 'Could solve it, but not safely in two weeks across the whole API.',
+      c: 'The calls form chains: each needs the previous answer, so they cannot all be sent at once.',
+      d: 'Most of a 3G round trip is the radio link, not distance, and the chain still makes 14 sequential trips over it.',
     },
   },
   {

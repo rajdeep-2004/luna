@@ -41,6 +41,11 @@ type Actions = {
   answer: (index: number, answer: string) => Promise<Failure | null>;
   /** After `duel:superseded`: take the seat back on this device. */
   takeSeat: () => void;
+  /**
+   * Back from the background: reconnect now. A phone that slept can keep a dead socket that looks
+   * connected until the heartbeat times out (longer than the seat's grace), so don't wait for it.
+   */
+  resume: () => void;
 };
 
 const JOIN_RETRY_MS = 1_000;
@@ -142,7 +147,7 @@ export const useLiveDuel = create<LiveState & Actions>((set, get) => {
     open(duelId, seed) {
       if (joinRetry) clearTimeout(joinRetry);
       clockSynced = false;
-        set({
+      set({
         ...initialLiveState,
         duelId,
         snapshot: seed && seed.id === duelId ? seed : null,
@@ -177,8 +182,15 @@ export const useLiveDuel = create<LiveState & Actions>((set, get) => {
       return null;
     },
 
+    resume() {
+      if (!get().duelId) return;
+      const s = getSocket();
+      if (s.connected) s.disconnect();
+      s.connect();
+    },
+
     takeSeat() {
-        set({ superseded: false });
+      set({ superseded: false });
       void join();
     },
   };

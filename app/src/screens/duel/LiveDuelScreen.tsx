@@ -1,7 +1,7 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, StyleSheet, View } from 'react-native';
 import {
   ENDED_PHASES,
   LIVE_DUEL,
@@ -74,6 +74,19 @@ export function LiveDuelScreen({ route, navigation }: Props) {
     useLiveDuel.getState().open(duelId, seed);
     return () => useLiveDuel.getState().close();
   }, [duelId, queryClient]);
+
+  // Returning from the background reconnects at once and redraws from a fresh snapshot.
+  useEffect(() => {
+    let wasAway = false;
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'background') wasAway = true;
+      if (next === 'active' && wasAway) {
+        wasAway = false;
+        useLiveDuel.getState().resume();
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   if (duel?.lobbyExpiresAt) lobbyEnds.current = duel.lobbyExpiresAt;
   const phase = duel?.phase ?? null;

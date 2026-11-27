@@ -21,7 +21,11 @@ export function AppStack() {
       <Stack.Screen name="Summary" component={SummaryScreen} options={{ gestureEnabled: false }} />
       <Stack.Screen name="BaselineIntro" component={BaselineIntroScreen} />
       <Stack.Screen name="DojoBoard" component={DojoBoardScreen} />
-      <Stack.Screen name="LiveDuel" component={LiveDuelScreen} options={{ gestureEnabled: false }} />
+      <Stack.Screen
+        name="LiveDuel"
+        component={LiveDuelScreen}
+        options={{ gestureEnabled: false }}
+      />
       <Stack.Screen name="DuelResult" component={DuelResultScreen} />
     </Stack.Navigator>
   );

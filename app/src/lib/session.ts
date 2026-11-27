@@ -49,4 +49,3 @@ export function answeredCount(session: SessionView): number {
 export function progressOf(session: SessionView): number {
   return session.totalAnswers > 0 ? answeredCount(session) / session.totalAnswers : 0;
 }
-

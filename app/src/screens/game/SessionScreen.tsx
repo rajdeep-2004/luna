@@ -41,10 +41,7 @@ export function SessionScreen({ route, navigation }: Props) {
 
   // Live duels are played on their own screen (P14); their DUEL session only records progress.
   const isDuel = session?.type === 'DUEL';
-  const allDone =
-    !!session &&
-    session.items.length > 0 &&
-    (session.endedEarly === true || session.items.every((i) => i.isComplete));
+  const allDone = !!session && session.items.length > 0 && session.items.every((i) => i.isComplete);
   const goToSummary = () =>
     navigation.replace('Summary', { sessionId, rootCause: rootCause.current });
 

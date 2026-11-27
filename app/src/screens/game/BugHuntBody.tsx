@@ -4,7 +4,13 @@ import { spacing } from '../../theme';
 import type { BodyProps, ChallengeStep } from './bodyTypes';
 
 /** Bug Hunt: tap the line that contains the bug. The answer is the 1-based line number as a string. */
-export function BugHuntBody({ step, selected, result, onSelect, locked }: BodyProps<ChallengeStep>) {
+export function BugHuntBody({
+  step,
+  selected,
+  result,
+  onSelect,
+  locked,
+}: BodyProps<ChallengeStep>) {
   const { challenge } = step.item;
   const lineStates: Record<number, MarkState> = {};
   if (selected) lineStates[Number(selected)] = 'selected';

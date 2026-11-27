@@ -1,16 +1,8 @@
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useQuery } from '@tanstack/react-query';
+import { useFocusEffect } from '@react-navigation/native';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
-import {
-  DUEL_FORMATS,
-  DuelCode,
-  ENDED_PHASES,
-  type DuelFormat,
-  type DuelPhase,
-  type DuelView,
-} from '@luna/shared';
+import { DUEL_FORMATS, DuelCode, type DuelFormat, type DuelView, type Page } from '@luna/shared';
 import { duelsApi, userMessage } from '../../api';
 import { FaceOff } from '../../art/FaceOff';
 import { Kanji } from '../../art/Kanji';
@@ -24,18 +16,17 @@ import {
   Screen,
 } from '../../components';
 import { BLADES } from '../../lib/duelFormats';
-import type { AppStackParams } from '../../navigation/types';
 import { useAuthStore } from '../../store/auth';
 import { colors, layout, radii, spacing } from '../../theme';
 import { DuelRow } from './DuelRow';
-import { DUELS_KEY, useDuelActions } from './useDuelActions';
+import { DUELS_KEY, isEndedDuel, useDuelActions } from './useDuelActions';
 
 type Tab = 'open' | 'finished';
 const TABS: { key: Tab; label: string; empty: string }[] = [
-  { key: 'open', label: 'Open', empty: 'No open duels. Challenge a friend.' },
+  { key: 'open', label: 'Live', empty: 'No live duels. Challenge a friend.' },
   { key: 'finished', label: 'Finished', empty: 'Your finished duels appear here.' },
 ];
-const isEnded = (d: DuelView) => (ENDED_PHASES as readonly DuelPhase[]).includes(d.phase);
+const isEnded = isEndedDuel;
 const tabOf = (d: DuelView): Tab => (isEnded(d) ? 'finished' : 'open');
 const CODE_LENGTH = 6;
 
@@ -44,10 +35,15 @@ const CODE_LENGTH = 6;
  * Blitz, Sudden Death), challenge a friend, or type a code into six cells; the three lists below.
  */
 export function DuelScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<AppStackParams>>();
   const user = useAuthStore((s) => s.user);
   const { width } = useWindowDimensions();
-  const list = useQuery({ queryKey: DUELS_KEY, queryFn: () => duelsApi.list() });
+  // History is paged by the server (newest first); "Older duels" fetches the next page.
+  const list = useInfiniteQuery({
+    queryKey: DUELS_KEY,
+    queryFn: ({ pageParam }) => duelsApi.list(pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last: Page<DuelView>) => last.nextCursor ?? undefined,
+  });
   const actions = useDuelActions();
   const [tab, setTab] = useState<Tab>('open');
   const [format, setFormat] = useState<DuelFormat>('CLASSIC');
@@ -70,9 +66,9 @@ export function DuelScreen() {
     if (duel) setCode('');
   }
 
-  const open = (duel: DuelView) => navigation.navigate('DuelResult', { duelId: duel.id });
+  const open = (duel: DuelView) => actions.openDuel(duel);
 
-  const all = list.data?.items ?? [];
+  const all = list.data?.pages.flatMap((p) => p.items) ?? [];
   const rows = all.filter((d) => tabOf(d) === tab);
   const current = TABS.find((t) => t.key === tab)!;
   // The face-off shows the rival in your newest open duel, else the unknown friend.
@@ -194,6 +190,14 @@ export function DuelScreen() {
               onPress={() => open(d)}
             />
           ))}
+          {tab === 'finished' && list.hasNextPage ? (
+            <Button
+              label="Older duels"
+              variant="ghost"
+              pending={list.isFetchingNextPage}
+              onPress={() => void list.fetchNextPage()}
+            />
+          ) : null}
         </View>
       </ScrollView>
     </Screen>

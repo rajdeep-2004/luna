@@ -16,24 +16,26 @@ import { FaceOff } from '../../art/FaceOff';
 import { HankoStamp } from '../../art/HankoStamp';
 import { WinSeal } from '../../art/WinSeal';
 import { AppText, Button, ErrorState, Screen } from '../../components';
-import { formatClock, formatRemaining } from '../../lib/duration';
-import { bladeOf, formatOrClassic, rulesLine } from '../../lib/duelFormats';
+import { formatClock } from '../../lib/duration';
+import { bladeOf, formatOrClassic } from '../../lib/duelFormats';
 import { duelLines, type PlayerLine } from '../../lib/duelScore';
 import { haptic } from '../../lib/haptics';
 import { useReduceMotion } from '../../lib/motion';
 import type { AppStackParams } from '../../navigation/types';
 import { colors, layout, radii, spacing } from '../../theme';
-import { shareDuelCode, useDuelActions } from './useDuelActions';
+import { duelKey, isEndedDuel, useDuelActions } from './useDuelActions';
+import { answerTime } from './live/RevealPanel';
 
 type Props = NativeStackScreenProps<AppStackParams, 'DuelResult'>;
 
 /**
- * competition.md §2 "Result screen", or the lobby until the match is played. The live match screen
- * arrives in P14 (D-052).
+ * competition.md §2 "Result screen": the winner's seal, the score, per-question ✓/✗ and times for
+ * both, and the win bonus. A duel that is still live (opened from the list or a stale link) moves
+ * on to the live screen instead.
  */
 export function DuelResultScreen({ route, navigation }: Props) {
   const { duelId } = route.params;
-  const query = useQuery({ queryKey: ['duel', duelId], queryFn: () => duelsApi.get(duelId) });
+  const query = useQuery({ queryKey: duelKey(duelId), queryFn: () => duelsApi.get(duelId) });
   const actions = useDuelActions();
   const { width } = useWindowDimensions();
   const [clash, setClash] = useState(0);
@@ -45,13 +47,17 @@ export function DuelResultScreen({ route, navigation }: Props) {
     }, [refetch]),
   );
   const home = () => navigation.popToTop();
+  const live = !!query.data && !isEndedDuel(query.data);
+  useEffect(() => {
+    if (live) navigation.replace('LiveDuel', { duelId });
+  }, [live, navigation, duelId]);
 
   async function rematch() {
     await actions.create(formatOrClassic(query.data?.format));
   }
 
   const d = query.data;
-  if (query.isPending)
+  if (query.isPending || live)
     return (
       <Screen>
         <View style={styles.center}>
@@ -84,15 +90,15 @@ export function DuelResultScreen({ route, navigation }: Props) {
           rivalLabel={d.rival ? `@${d.rival.username}` : 'A friend'}
           playKey={clash}
         />
-        <View style={styles.inner}>{d.result ? <Result duel={d} /> : <Waiting duel={d} />}</View>
-        {!d.result ? (
-          <Button
-            label="Check again"
-            variant="ghost"
-            pending={query.isFetching}
-            onPress={() => void query.refetch()}
-          />
-        ) : null}
+        <View style={styles.inner}>
+          {d.result ? (
+            <Result duel={d} />
+          ) : (
+            <AppText variant="title" style={styles.centerText}>
+              This duel ended without a result
+            </AppText>
+          )}
+        </View>
       </ScrollView>
       <View style={styles.actions}>
         {actions.error ? (
@@ -111,42 +117,6 @@ export function DuelResultScreen({ route, navigation }: Props) {
         <Button label="Back home" variant={d.result ? 'ghost' : 'primary'} onPress={home} />
       </View>
     </Screen>
-  );
-}
-
-function Waiting({ duel }: { duel: DuelView }) {
-  return (
-    <View style={styles.waiting}>
-      <AppText variant="title" style={styles.centerText}>
-        {duel.rival ? `@${duel.rival.username} has joined` : 'Waiting for someone to join…'}
-      </AppText>
-      <AppText color="muted" style={styles.centerText}>
-        {rulesLine(duel.format)} No hints.
-        {duel.lobbyExpiresAt
-          ? ` The invite closes in ${formatRemaining(duel.lobbyExpiresAt)}.`
-          : ''}
-      </AppText>
-      {!duel.rival ? (
-        <View style={styles.codeSlip}>
-          <AppText variant="label" color="wood">
-            Duel code
-          </AppText>
-          <AppText
-            variant="display"
-            color="onShoji"
-            style={styles.codeText}
-            accessibilityLabel={duel.code.split('').join(' ')}
-          >
-            {duel.code}
-          </AppText>
-          <Button
-            label="Share code"
-            variant="ghost"
-            onPress={() => void shareDuelCode(duel.code, duel.format)}
-          />
-        </View>
-      ) : null}
-    </View>
   );
 }
 
@@ -235,9 +205,12 @@ type BreakdownProps = {
   rivals: PlayerLine | null;
   rivalName: string;
 };
-type Q = { isCorrect: boolean; timedOut: boolean } | undefined;
+type Q = { isCorrect: boolean; timedOut: boolean; timeTakenMs: number } | undefined;
 
-/** One stamp per answer: 正 in seal ink, 誤 in grey sumi; a dash where the run never reached. */
+/**
+ * One stamp per answer: 正 in seal ink, 誤 in grey sumi, with the server-measured time under it;
+ * a dash where the run never reached.
+ */
 function Mark({ q }: { q: Q }) {
   if (!q)
     return (
@@ -246,8 +219,11 @@ function Mark({ q }: { q: Q }) {
       </AppText>
     );
   return (
-    <View style={styles.bCell}>
+    <View style={[styles.bCell, styles.mark]}>
       <HankoStamp glyph={q.isCorrect ? '正' : '誤'} size={24} tone={q.isCorrect ? 'seal' : 'ink'} />
+      <AppText variant="code" color="muted">
+        {answerTime({ ...q, responseMs: q.timeTakenMs })}
+      </AppText>
     </View>
   );
 }
@@ -256,7 +232,11 @@ function Mark({ q }: { q: Q }) {
 function Breakdown({ mine, rivals, rivalName }: BreakdownProps) {
   const rows = Math.max(mine?.perQuestion?.length ?? 0, rivals?.perQuestion?.length ?? 0);
   const said = (q: Q) =>
-    !q ? 'not reached' : q.isCorrect ? 'correct' : q.timedOut ? 'timed out' : 'wrong';
+    !q
+      ? 'not reached'
+      : q.timedOut
+        ? 'timed out'
+        : `${q.isCorrect ? 'correct' : 'wrong'} in ${(q.timeTakenMs / 1000).toFixed(1)} seconds`;
   return (
     <View style={styles.breakdown}>
       <View style={styles.bRow}>
@@ -308,16 +288,6 @@ const styles = StyleSheet.create({
   inner: { paddingHorizontal: layout.screenPadding, marginTop: spacing.lg, gap: spacing.lg },
   center: { flex: 1, justifyContent: 'center', gap: spacing.md },
   centerText: { textAlign: 'center' },
-  waiting: { alignItems: 'center', gap: spacing.md },
-  codeSlip: {
-    alignItems: 'center',
-    alignSelf: 'stretch',
-    backgroundColor: colors.shoji,
-    borderRadius: radii.md,
-    padding: spacing.lg,
-    gap: spacing.xs,
-  },
-  codeText: { letterSpacing: 6 },
   result: { gap: spacing.md },
   scoreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   sealSlot: { width: 72, alignItems: 'center' },
@@ -331,5 +301,6 @@ const styles = StyleSheet.create({
   bRow: { flexDirection: 'row', alignItems: 'center', minHeight: 30 },
   bTime: { borderTopWidth: 1, borderTopColor: colors.wood, paddingTop: spacing.sm },
   bCell: { flex: 1, textAlign: 'center', alignItems: 'center' },
+  mark: { gap: 2 },
   actions: { gap: spacing.sm, paddingBottom: spacing.lg, paddingHorizontal: layout.screenPadding },
 });

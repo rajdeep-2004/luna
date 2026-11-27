@@ -35,5 +35,12 @@ export const config = {
     clockSamples: 3,
     /** The timer's screen-reader label only changes at these seconds left (and on each new question). */
     timerAnnounceAtSec: [30, 20, 10, 5] as readonly number[],
+    /** How often the question timer redraws, and the banners' grace countdowns. */
+    timerTickMs: 200,
+    bannerTickMs: 500,
+    /** Under this many seconds the timer turns to seal ink. */
+    urgentSec: 5,
+    /** A beat between the last reveal and the result screen. */
+    toResultMs: 900,
   },
 } as const;

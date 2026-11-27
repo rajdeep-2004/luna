@@ -1,10 +1,10 @@
 import { View } from 'react-native';
 import { OptionRow } from '../../components';
 import { spacing } from '../../theme';
-import { optionState, type BodyProps } from './bodyTypes';
+import { optionState, type BodyProps, type ChallengeStep } from './bodyTypes';
 
 /** The four shuffled options, used by Trace, Engineer's Choice and each incident stage. */
-export function OptionList({ step, selected, result, onSelect, locked }: BodyProps) {
+export function OptionList({ step, selected, result, onSelect, locked }: BodyProps<ChallengeStep>) {
   return (
     <View style={{ gap: spacing.md }} accessibilityRole="radiogroup">
       {step.options.map((o) => (

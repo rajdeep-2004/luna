@@ -3,12 +3,22 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Share } from 'react-native';
-import type { DuelFormat, DuelSnapshot } from '@luna/shared';
+import {
+  ENDED_PHASES,
+  type DuelFormat,
+  type DuelPhase,
+  type DuelSnapshot,
+  type DuelView,
+} from '@luna/shared';
 import { bladeOf, rulesLine } from '../../lib/duelFormats';
 import { duelsApi, userMessage } from '../../api';
 import type { AppStackParams } from '../../navigation/types';
 
 export const DUELS_KEY = ['duels'] as const;
+/** One duel's snapshot in the query cache; create/join seed it so the live screen draws at once. */
+export const duelKey = (duelId: string) => ['duel', duelId] as const;
+export const isEndedDuel = (d: Pick<DuelView, 'phase'>) =>
+  (ENDED_PHASES as readonly DuelPhase[]).includes(d.phase);
 
 /** Opens the system share sheet with the code. Dismissing it is not an error. */
 export async function shareDuelCode(code: string, format?: DuelFormat): Promise<void> {
@@ -23,8 +33,8 @@ export async function shareDuelCode(code: string, format?: DuelFormat): Promise<
 
 /**
  * Create and join, each guarded by `pending` so a double tap never sends a second request (a second
- * create would hit the one-open-duel rule). Live play arrives in P14 (D-052); until then both open
- * the duel's page, which shows the lobby or the result.
+ * create would hit the one-open-duel rule). Both go straight to the live duel screen (P14): the
+ * creator lands on the lobby with the code and a Share button, the joiner on the face-off.
  */
 export function useDuelActions() {
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParams>>();
@@ -47,24 +57,25 @@ export function useDuelActions() {
     }
   }
 
-  const openDuel = (duelId: string) => navigation.navigate('DuelResult', { duelId });
+  /** A live duel opens the match screen; an ended one its result. */
+  const openDuel = (duel: Pick<DuelView, 'id' | 'phase'>) =>
+    navigation.navigate(isEndedDuel(duel) ? 'DuelResult' : 'LiveDuel', { duelId: duel.id });
+
+  const enter = (duel: DuelSnapshot) => {
+    queryClient.setQueryData(duelKey(duel.id), duel);
+    void refresh();
+    openDuel(duel);
+  };
 
   async function create(format: DuelFormat): Promise<DuelSnapshot | null> {
     const duel = await run('create', () => duelsApi.create(format));
-    if (duel) {
-      void refresh();
-      await shareDuelCode(duel.code, duel.format);
-      openDuel(duel.id);
-    }
+    if (duel) enter(duel);
     return duel;
   }
 
   async function join(code: string): Promise<DuelSnapshot | null> {
     const duel = await run('join', () => duelsApi.join(code));
-    if (duel) {
-      void refresh();
-      openDuel(duel.id);
-    }
+    if (duel) enter(duel);
     return duel;
   }
 

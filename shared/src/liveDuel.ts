@@ -64,6 +64,8 @@ export const DUEL_EVENTS = {
   ready: 'duel:ready',
   answer: 'duel:answer',
   leave: 'duel:leave',
+  /** Clock sync: the ack carries the server's time (P14, D-053). */
+  ping: 'duel:ping',
   // server → client
   state: 'duel:state',
   question: 'duel:question',
@@ -80,6 +82,13 @@ const DuelId = z.string().regex(/^[a-f0-9]{24}$/, 'Invalid duel id');
 
 export const DuelRoomPayload = z.object({ duelId: DuelId });
 export type DuelRoomPayload = z.infer<typeof DuelRoomPayload>;
+
+/** `duel:ping` takes no fields. */
+export const DuelPingPayload = z.object({});
+export type DuelPingPayload = z.infer<typeof DuelPingPayload>;
+
+/** The ping ack: the server's clock in epoch ms, so the app can estimate its clock offset. */
+export type DuelPong = { serverNow: number };
 
 /** An option id, or a Bug Hunt line number as a string. */
 export const DuelAnswerPayload = z.object({

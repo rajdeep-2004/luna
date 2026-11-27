@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { DUEL_TIMEOUT_ANSWER, type AnswerResult } from '@luna/shared';
+import type { AnswerResult } from '@luna/shared';
 import { ApiError, sessionsApi, userMessage } from '../../api';
 import type { Step } from '../../lib/session';
 
@@ -23,7 +23,6 @@ export function useAnswerFlow(sessionId: string, step: Step | null) {
     setError(null);
   };
 
-  /** `answer` overrides the selection: the duel timer sends a timeout with nothing selected. */
   async function submit(answer: string | null = selected) {
     if (!step || !answer || submitting || result) return;
     setSubmitting(true);
@@ -61,8 +60,6 @@ export function useAnswerFlow(sessionId: string, step: Step | null) {
     }
   }
 
-  const submitTimeout = () => submit(DUEL_TIMEOUT_ANSWER);
-
   return {
     selected,
     setSelected,
@@ -71,7 +68,6 @@ export function useAnswerFlow(sessionId: string, step: Step | null) {
     submitting,
     error,
     submit,
-    submitTimeout,
     revealHint,
     reset,
   };

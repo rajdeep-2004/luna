@@ -9,27 +9,18 @@ type Props = {
   total: number;
   onLeave: () => void;
   clock: ReactNode;
-  /** Body of the "Leave?" alert; duels warn that the clock keeps running. */
-  leaveMessage?: string;
 };
 
 /** Top of every game screen: leave, "n / total", the clock, and one brush mark per answer (DESIGN.md: no progress bars). */
 const DEFAULT_LEAVE = 'Your answers are saved. You can pick it up again later.';
 
-export function SessionHeader({
-  progress,
-  position,
-  total,
-  onLeave,
-  clock,
-  leaveMessage = DEFAULT_LEAVE,
-}: Props) {
+export function SessionHeader({ progress, position, total, onLeave, clock }: Props) {
   return (
     <View style={styles.wrap}>
       <View style={styles.row}>
         <PressableSink
           onPress={() =>
-            Alert.alert('Leave this session?', leaveMessage, [
+            Alert.alert('Leave this session?', DEFAULT_LEAVE, [
               { text: 'Keep playing', style: 'cancel' },
               { text: 'Leave', style: 'destructive', onPress: onLeave },
             ])

@@ -2,19 +2,15 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from 'react-native';
-import { DUEL_FORMAT_RULES } from '@luna/shared';
 import { sessionsApi, userMessage } from '../../api';
 import { AppText, Button, ErrorState, Screen } from '../../components';
-import { formatOrClassic } from '../../lib/duelFormats';
 import { haptic } from '../../lib/haptics';
-import { answeredCount, DUEL_VERDICT_MS, findStep, progressOf } from '../../lib/session';
+import { answeredCount, findStep, progressOf } from '../../lib/session';
 import type { AppStackParams } from '../../navigation/types';
 import { colors, radii, spacing } from '../../theme';
 import { BugHuntBody } from './BugHuntBody';
 import { ChoiceBody } from './ChoiceBody';
-import { DuelCountdown } from './DuelCountdown';
 import { CorrectCelebration } from './CorrectCelebration';
-import { DuelVerdict } from './DuelVerdict';
 import { ElapsedClock } from './ElapsedClock';
 import { FeedbackSheet } from './FeedbackSheet';
 import { IncidentBody } from './IncidentBody';
@@ -43,15 +39,9 @@ export function SessionScreen({ route, navigation }: Props) {
   const [explain, setExplain] = useState(false);
   const rootCause = useRef<string | undefined>(undefined);
 
+  // Live duels are played on their own screen (P14); their DUEL session only records progress.
   const isDuel = session?.type === 'DUEL';
-  const rules = DUEL_FORMAT_RULES[formatOrClassic(session?.duelFormat)];
-  // Blitz's 10 s clock restarts at each answer on the server, so its verdict is shorter.
-  const verdictMs = session?.duelFormat === 'BLITZ' ? DUEL_VERDICT_MS / 2 : DUEL_VERDICT_MS;
-  // A Sudden Death run that ended at a miss is finished even though questions are left.
-  const allDone =
-    !!session &&
-    session.items.length > 0 &&
-    (session.endedEarly === true || session.items.every((i) => i.isComplete));
+  const allDone = !!session && session.items.length > 0 && session.items.every((i) => i.isComplete);
   const goToSummary = () =>
     navigation.replace('Summary', { sessionId, rootCause: rootCause.current });
 
@@ -75,18 +65,6 @@ export function SessionScreen({ route, navigation }: Props) {
     }
   }
 
-  // Duels have no feedback sheet: the server's clock runs from the last answer, so reading time
-  // would eat the next 60 s. Show the verdict briefly, then move on by itself.
-  const nextRef = useRef(next);
-  useEffect(() => {
-    nextRef.current = next;
-  });
-  useEffect(() => {
-    if (!isDuel || !flow.result) return;
-    const t = setTimeout(() => void nextRef.current(), verdictMs);
-    return () => clearTimeout(t);
-  }, [isDuel, flow.result, verdictMs]);
-
   function confirmHint() {
     Alert.alert('Use a hint?', 'Using a hint halves the XP for this question.', [
       { text: 'Cancel', style: 'cancel' },
@@ -104,6 +82,14 @@ export function SessionScreen({ route, navigation }: Props) {
           retrying={query.isFetching}
         />
         <Button label="Leave" variant="ghost" onPress={() => navigation.goBack()} />
+      </Centered>
+    );
+  }
+  if (isDuel) {
+    return (
+      <Centered>
+        <AppText variant="title">Duels are played live from the Duel tab.</AppText>
+        <Button label="Back" variant="ghost" onPress={() => navigation.goBack()} />
       </Centered>
     );
   }
@@ -129,24 +115,7 @@ export function SessionScreen({ route, navigation }: Props) {
         position={answeredCount(session) + 1}
         total={session.totalAnswers}
         onLeave={() => navigation.goBack()}
-        leaveMessage={
-          isDuel
-            ? `Your answers are saved, but the ${rules.timerMs / 1000}-second clock keeps running on the server.`
-            : undefined
-        }
-        clock={
-          isDuel ? (
-            <DuelCountdown
-              key={stepKey}
-              remainingMs={rules.timerMs - (session.stepElapsedMs ?? 0)}
-              totalMs={rules.timerMs}
-              paused={flow.submitting || !!flow.result}
-              onExpire={() => void flow.submitTimeout()}
-            />
-          ) : (
-            <ElapsedClock key={stepKey} />
-          )
-        }
+        clock={<ElapsedClock key={stepKey} />}
       />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {type === 'BUG_HUNT' ? (
@@ -172,14 +141,7 @@ export function SessionScreen({ route, navigation }: Props) {
             {flow.error}
           </AppText>
         ) : null}
-        {isDuel && flow.result ? (
-          <DuelVerdict
-            result={flow.result}
-            timerMs={rules.timerMs}
-            endsRun={rules.endsOnMiss && !flow.result.isCorrect}
-          />
-        ) : null}
-        {step.hasHint && !flow.hint && !isDuel ? (
+        {step.hasHint && !flow.hint ? (
           <Button label="Need a hint?" variant="ghost" onPress={confirmHint} />
         ) : null}
         <Button
@@ -190,7 +152,7 @@ export function SessionScreen({ route, navigation }: Props) {
         />
       </View>
 
-      {flow.result && !isDuel && flow.result.isCorrect && !explain ? (
+      {flow.result && flow.result.isCorrect && !explain ? (
         <CorrectCelebration
           xpEarned={flow.result.xpEarned}
           nextLabel={flow.result.sessionReadyToComplete ? 'Finish' : 'Next'}
@@ -198,7 +160,7 @@ export function SessionScreen({ route, navigation }: Props) {
           onNext={() => void next()}
           onExplain={() => setExplain(true)}
         />
-      ) : flow.result && !isDuel ? (
+      ) : flow.result ? (
         <FeedbackSheet
           result={flow.result}
           options={step.options}

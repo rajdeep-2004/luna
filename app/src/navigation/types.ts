@@ -13,5 +13,7 @@ export type AppStackParams = {
   Summary: { sessionId: string; rootCause?: string };
   BaselineIntro: undefined;
   DojoBoard: undefined;
+  /** The live match (lobby, face-off, play); ends by replacing itself with DuelResult. */
+  LiveDuel: { duelId: string };
   DuelResult: { duelId: string };
 };

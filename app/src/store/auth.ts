@@ -2,6 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { create } from 'zustand';
 import type { PublicUser } from '@luna/shared';
 import { ApiError, configureApi, queryClient, usersApi } from '../api';
+import { configureSocket } from '../api/socket';
 
 const TOKEN_KEY = 'luna.token';
 
@@ -60,3 +61,5 @@ configureApi({
     if (useAuthStore.getState().status !== 'signedOut') void useAuthStore.getState().signOut();
   },
 });
+
+configureSocket(() => useAuthStore.getState().token);

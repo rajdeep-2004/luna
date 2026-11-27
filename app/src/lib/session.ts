@@ -49,6 +49,3 @@ export function answeredCount(session: SessionView): number {
 export function progressOf(session: SessionView): number {
   return session.totalAnswers > 0 ? answeredCount(session) / session.totalAnswers : 0;
 }
-
-/** How long a duel shows ✓/✗ before moving on by itself. */
-export const DUEL_VERDICT_MS = 900;

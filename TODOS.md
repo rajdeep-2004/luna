@@ -31,7 +31,9 @@ Backlog, deferred ideas and known debt. Scope changes go here first; nothing her
 - P13 review (low): `migrateV1Duels` scans for `phase: {$exists: false}` on every boot (no index). Drop the call once production has been migrated.
 - P13 review (low): if a duel's challenge is deactivated mid-match, the question/reveal event is skipped silently while the phase still advances. Log at error, or cancel the duel.
 - P13 review (low): socket rate limit is per socket (a user can open many); `POST /duels` and `POST /duels/:id/cancel` have no route limiter beyond the global one.
-- P14: remove the V1 DUEL-session bits the app still reads (`SessionView.stepElapsedMs`, `endedEarly`, the duel timer in `SessionScreen`) once the live match screen replaces them; the app must keep the duel socket connected (or reconnect within 60 s) after sharing a lobby code, or the lobby is cancelled.
+- P14 done: the app no longer reads `stepElapsedMs`/`endedEarly` and the lobby keeps its socket while sharing. Left for P15: drop `SessionView.stepElapsedMs`/`endedEarly` and `DUEL_TIMEOUT_ANSWER` from `shared` and the server if nothing else uses them.
+- P14: after an app restart mid-question the answer shows as locked but the option I picked isn't highlighted (`DuelAnswerReceipt` has no `answer`). Add it to the receipt in the snapshot.
+- P14: a player who kills the app mid-match gets back through the Duel tab's "Live" list; consider auto-opening a live duel on launch.
 
 ## Product backlog (from docs/product/)
 - **P8: new Explore mini-games** (Rajdeep, D-037): fast formats beyond the four quiz modes, such as a 60-second blitz or a swipe true/false round. Needs new content and engine work.

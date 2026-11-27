@@ -10,7 +10,9 @@ type Round = DuelSnapshot['rounds'][number];
 type Props = { duel: DuelSnapshot; round: Round };
 
 /** "4.2s", or "time" for a timeout. */
-export function answerTime(r: DuelRoundResult | null | undefined): string {
+export function answerTime(
+  r: Pick<DuelRoundResult, 'responseMs' | 'timedOut'> | null | undefined,
+): string {
   if (!r) return '–';
   if (r.timedOut) return 'time';
   return `${(r.responseMs / 1000).toFixed(1)}s`;

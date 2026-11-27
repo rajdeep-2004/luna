@@ -138,7 +138,12 @@ export function PlayStage({ duel, offsetMs, answer, onLeave }: Props) {
             {duel.rivalAnswered ? 'Both struck…' : `Locked in. ${rivalName} is thinking…`}
           </AppText>
         ) : timeUp ? (
-          <AppText variant="title" color="muted" style={styles.center} accessibilityLiveRegion="polite">
+          <AppText
+            variant="title"
+            color="muted"
+            style={styles.center}
+            accessibilityLiveRegion="polite"
+          >
             Time&apos;s up…
           </AppText>
         ) : (

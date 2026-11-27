@@ -52,6 +52,8 @@ export const useLiveDuel = create<LiveState & Actions>((set, get) => {
   let bound = false;
   let joinRetry: ReturnType<typeof setTimeout> | null = null;
   let clockSynced = false;
+  /** A ready is on its way: a burst of snapshots while it flies sends it once. */
+  let readyInFlight = false;
 
   const fold = (fn: (s: LiveState) => LiveState) => set((s) => fn(s));
 
@@ -70,10 +72,22 @@ export const useLiveDuel = create<LiveState & Actions>((set, get) => {
       const rough = offsetFromPush(snap.serverNow, Date.now());
       if (rough !== null) set({ offsetMs: rough });
     }
+    onSnapshot(snap);
+  }
+
+  /**
+   * Folds a full snapshot in. Being on the duel screen is being ready, so whenever the server
+   * shows my seat not ready before the start (first join, or a joiner left and the lobby reopened,
+   * which clears ready), say ready again. The server's update is conditional, so a repeat is a no-op.
+   */
+  function onSnapshot(snap: DuelSnapshot) {
     fold((s) => applySnapshot(s, snap, Date.now()));
-    // Being on the face-off is being ready: the countdown starts once both seats are in.
-    if (isPregame(snap.phase) && !snap.seats.me.ready) {
-      void emitAck(DUEL_EVENTS.ready, { duelId });
+    if (snap.id !== get().duelId || get().superseded) return;
+    if (isPregame(snap.phase) && !snap.seats.me.ready && !readyInFlight) {
+      readyInFlight = true;
+      void emitAck(DUEL_EVENTS.ready, { duelId: snap.id }).finally(() => {
+        readyInFlight = false;
+      });
     }
   }
 
@@ -107,9 +121,7 @@ export const useLiveDuel = create<LiveState & Actions>((set, get) => {
       }
       set({ connectingSince: get().connectingSince ?? Date.now() });
     });
-    s.on(DUEL_EVENTS.state, (snap: DuelSnapshot) =>
-      fold((st) => applySnapshot(st, snap, Date.now())),
-    );
+    s.on(DUEL_EVENTS.state, (snap: DuelSnapshot) => onSnapshot(snap));
     s.on(DUEL_EVENTS.question, (e: DuelQuestionEvent) => fold((st) => applyQuestion(st, e)));
     s.on(DUEL_EVENTS.reveal, (e: DuelRevealEvent) => fold((st) => applyReveal(st, e)));
     s.on(DUEL_EVENTS.opponentAnswered, (e: { duelId: string; index: number; userId: string }) =>
@@ -130,7 +142,7 @@ export const useLiveDuel = create<LiveState & Actions>((set, get) => {
     open(duelId, seed) {
       if (joinRetry) clearTimeout(joinRetry);
       clockSynced = false;
-      set({
+        set({
         ...initialLiveState,
         duelId,
         snapshot: seed && seed.id === duelId ? seed : null,
@@ -166,7 +178,7 @@ export const useLiveDuel = create<LiveState & Actions>((set, get) => {
     },
 
     takeSeat() {
-      set({ superseded: false });
+        set({ superseded: false });
       void join();
     },
   };

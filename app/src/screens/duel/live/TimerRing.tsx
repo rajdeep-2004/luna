@@ -35,10 +35,19 @@ export function TimerRing({ leftMs, totalMs, stopped, size = 56 }: Props) {
       style={{ width: size, height: size }}
       accessible
       accessibilityRole="timer"
-      accessibilityLabel={stopped ? 'Question closed' : timerLabel(leftMs, config.live.timerAnnounceAtSec)}
+      accessibilityLabel={
+        stopped ? 'Question closed' : timerLabel(leftMs, config.live.timerAnnounceAtSec)
+      }
     >
       <Svg width={size} height={size}>
-        <Circle cx={size / 2} cy={size / 2} r={r} stroke={colors.tatami} strokeWidth={STROKE} fill="none" />
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={colors.tatami}
+          strokeWidth={STROKE}
+          fill="none"
+        />
         <Circle
           cx={size / 2}
           cy={size / 2}
@@ -54,7 +63,7 @@ export function TimerRing({ leftMs, totalMs, stopped, size = 56 }: Props) {
         />
       </Svg>
       <View style={styles.center} pointerEvents="none">
-        <AppText variant="title" color={urgent ? 'seal' : 'text'} style={styles.secs}>
+        <AppText variant="title" color={urgent ? 'primary' : 'text'} style={styles.secs}>
           {stopped ? '·' : seconds}
         </AppText>
       </View>
@@ -63,6 +72,6 @@ export function TimerRing({ leftMs, totalMs, stopped, size = 56 }: Props) {
 }
 
 const styles = StyleSheet.create({
-  center: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  center: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   secs: { fontSize: 20, lineHeight: 24 },
 });

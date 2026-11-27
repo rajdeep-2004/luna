@@ -83,7 +83,12 @@ function CountNumber({ n }: { n: number }) {
   }));
   return (
     <Animated.View style={[styles.count, style]} accessibilityLiveRegion="assertive">
-      <AppText variant="number" color="primary" style={styles.countText} accessibilityLabel={`${n}`}>
+      <AppText
+        variant="number"
+        color="primary"
+        style={styles.countText}
+        accessibilityLabel={`${n}`}
+      >
         {n}
       </AppText>
     </Animated.View>
@@ -96,5 +101,9 @@ const styles = StyleSheet.create({
   center: { textAlign: 'center' },
   count: { alignItems: 'center' },
   countText: { fontSize: 96, lineHeight: 110 },
-  actions: { marginTop: 'auto', paddingHorizontal: layout.screenPadding, paddingBottom: spacing.lg },
+  actions: {
+    marginTop: 'auto',
+    paddingHorizontal: layout.screenPadding,
+    paddingBottom: spacing.lg,
+  },
 });

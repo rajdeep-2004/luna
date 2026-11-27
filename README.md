@@ -17,10 +17,10 @@ _Shogun 将軍_, keep the lantern lit, and duel your friends.
 ![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?logo=mongodb&logoColor=white)
 ![Zod](https://img.shields.io/badge/Zod-4-3E67B1?logo=zod&logoColor=white)
-![API tests](https://img.shields.io/badge/API%20tests-66%20passing-F2A93B)
-![Status](https://img.shields.io/badge/V1-live%20on%20Render-D9442B)
+![API tests](https://img.shields.io/badge/API%20tests-152%20passing-F2A93B)
+![Version](https://img.shields.io/badge/version-2.0.0-D9442B)
 
-[The dojo](#道-the-idea) · [Play](#遊-how-you-play) · [Duels](#刀-duels) · [Ranks](#侍-ranks-and-progress) ·
+[The dojo](#道-the-idea) · [V2](#新-whats-new-in-v2-200) · [Play](#遊-how-you-play) · [Duels](#刀-duels) · [Ranks](#侍-ranks-and-progress) ·
 [Design](#紙-the-look-kiri-e-den) · [Architecture](#築-how-it-works) · [Install the APK](#install-the-apk-android) ·
 [Run it](#始-run-it-yourself) ·
 [API](#api-reference) · [Engineering](#守-engineering-notes) · [Docs](#書-documentation)
@@ -57,6 +57,25 @@ _"p99 just spiked after a deploy: what do you check first?"_, and explains every
 | **A session**    | 2–6 minutes. A mode round is 5 questions; the Daily Kata is 5 challenges (7 answers)                  |
 | **The loop**     | Open the dojo → play today's kata → stamp → XP → rank up → duel a friend → come back tomorrow         |
 | **The feel**     | Cut-paper Japanese den at night: lantern amber, vermilion seals, brush kanji, everything is an object |
+
+---
+
+## 新 What's new in V2 (2.0.0)
+
+V1 proved the loop; players then ran out of questions within a week and kept seeing the same ones as their
+friends. V2 (phases P8–P15, D-047) fixes that and makes duels live.
+
+- **A five times bigger bank: 290 questions.** Every topic now has 6 Trace, 6 Bug Hunt and 6 Engineer's
+  Choice per level, plus 4 Incident Rooms (270 singles + 20 incidents; V1 had 58). Each one is written to a
+  level rubric ([`docs/product/benchmarks.md`](docs/product/benchmarks.md) §4), and level-3 wrong options are
+  the mistakes a capable engineer makes, not obviously harmful ones.
+- **A content audit in the build.** `npm run audit:content -w server -- --strict` fails on a cell below
+  target, a skewed answer position or a "longest option is right" tell. The bank passes with 0 warnings.
+- **Your set, not everyone's.** Daily Kata, mode rounds, incidents and duels are drawn by weighted random
+  sampling (unseen first, nearest difficulty), so two players with the same profile get different questions.
+- **Live duels.** Both players are online and see the same question at the same moment, the reveal together,
+  and the result together. The server owns the clock and the state machine, over Socket.IO; drops get a
+  20-second grace, a server restart resumes the match.
 
 ---
 
@@ -106,26 +125,28 @@ questions of that kind from the topic, topped up from other topics when the topi
 - **End of round:** a grade seal (_Kanpeki · Sugoi · Yoshi · Mada mada_), the XP count-up, the lantern
   relighting if the streak grew, and your weak topics as _Train again_ buttons.
 
-The question bank holds **58 hand-written items** (13 Trace, 13 Bug Hunt, 24 Engineer's Choice and
-8 Incident Rooms) across 5 topics × 3 difficulties. Each one is validated against a schema when it's
-seeded.
+The question bank holds **290 hand-written items** (90 Trace, 90 Bug Hunt, 90 Engineer's Choice and
+20 Incident Rooms) across 5 topics × 3 difficulties, 6 per topic, kind and level. Each one is validated
+against a schema when it's seeded and checked by the content audit.
 
 ---
 
 ## 刀 Duels
 
-Asynchronous friend duels: nobody needs to be online at the same time. You create a duel, share a
-6-character code (`KX7P2M`, with no ambiguous `0/O/1/I`), and your friend types it into six cells. You
-both play the **same questions in the same option order**. Choose your blade:
+Live friend duels (V2). You create a duel, share a 6-character code (`KX7P2M`, with no ambiguous
+`0/O/1/I`), and your friend types it into six cells. After a face-off and 3 · 2 · 1 you both get the
+**same question at the same moment**, in the same option order. You see whether your rival has answered,
+never what. When both have struck (or the timer runs out) you both see the reveal, and the next question
+arrives by itself. Choose your blade:
 
-| Blade            | Kanji | Rules                                                        |
-| ---------------- | :---: | ------------------------------------------------------------ |
-| **Classic**      |  刀   | 5 questions × 60 s                                           |
-| **Blitz**        |  雷   | 10 questions × 10 s                                          |
-| **Sudden Death** |  一   | Up to 10 questions × 30 s. **Your first miss ends the run.** |
+| Blade            | Kanji | Rules                                                                                 |
+| ---------------- | :---: | ------------------------------------------------------------------------------------- |
+| **Classic**      |  刀   | 5 questions × 60 s                                                                    |
+| **Blitz**        |  雷   | 10 questions × 10 s                                                                   |
+| **Sudden Death** |  一   | Up to 10 questions × 30 s. **Ends at the first question only one of you gets wrong.** |
 
-Most correct wins, then the lower total time (compared in whole seconds), else a draw. There are no
-hints. Duels expire after 48 h, and a no-show loses by default. A win pays **+10 XP**, at most 3 times a
+Most correct wins, then the lower total server-measured time, else a draw. There are no hints. An invite
+closes after 10 minutes. A player who drops has 20 seconds to come back, then loses by default. A win pays **+10 XP**, at most 3 times a
 day. The result is a face-off: both masks slide in and clash, the winner gets the **勝** seal, and each
 answer is stamped 正 or 誤.
 
@@ -197,8 +218,9 @@ flowchart LR
     S["Zustand + SecureStore<br/>(JWT)"] -.-> C
   end
   C -- "HTTPS / JSON<br/>/api/v1" --> API
+  C -- "WebSocket (Socket.IO)<br/>live duels" --> API
   subgraph Server["🖥️ Express 5 API (stateless)"]
-    API["routes<br/>auth · Zod validation · rate limits"] --> SVC["services<br/>sessions · progress · daily<br/>leaderboard · duels · achievements"]
+    API["routes + Socket.IO<br/>auth · Zod validation · rate limits"] --> SVC["services<br/>sessions · progress · daily<br/>leaderboard · duels · achievements"]
     SVC --> M["Mongoose models"]
   end
   M --> DB[("MongoDB Atlas")]
@@ -242,6 +264,7 @@ sequenceDiagram
 | Server state | TanStack Query 5                                  | Caching, refetch on focus, infinite lists                                      |
 | Client state | Zustand + expo-secure-store                       | Tiny stores; the JWT lives in the OS keychain                                  |
 | API          | **Node 20, Express 5**, TypeScript                | Async errors handled natively, small surface                                   |
+| Realtime     | **Socket.IO 4** (WebSocket only)                  | Live duels: rooms, acks and reconnects without hand-rolling them on raw `ws`   |
 | Validation   | **Zod 4** (shared package)                        | One schema per request, used by both server and app                            |
 | Database     | **MongoDB Atlas** + Mongoose 9                    | Flexible challenge documents; unique and partial indexes do the integrity work |
 | Auth         | JWT (HS256, 7 days) + bcrypt (cost 12)            | Stateless and simple for a mobile client                                       |
@@ -437,26 +460,27 @@ Base URL `/api/v1`. Every endpoint except health, register and login needs
 with codes `VALIDATION_ERROR` 400 · `UNAUTHORIZED` 401 · `NOT_FOUND` 404 · `CONFLICT` 409 ·
 `RATE_LIMITED` 429 · `INTERNAL` 500 · `DB_UNAVAILABLE` 503. Error responses never include stack traces.
 
-| Method          | Endpoint                         | Purpose                                                                                                         |
-| --------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `GET`           | `/health`                        | Liveness and DB ping                                                                                            |
-| `POST`          | `/auth/register` · `/auth/login` | Create an account or log in → token + user (rate-limited, account lockout)                                      |
-| `GET` · `PATCH` | `/users/me`                      | Profile; onboarding fields (mask, topics, level, timezone)                                                      |
-| `GET`           | `/users/me/progress`             | Rank, streak, topic mastery, assessments, and `stats` (katas, duels won / lost / drawn)                         |
-| `GET`           | `/users/me/sessions`             | Run history (keyset cursor)                                                                                     |
-| `GET`           | `/users/me/achievements`         | All five crests, earned and locked                                                                              |
-| `GET`           | `/topics`                        | The five topics                                                                                                 |
-| `POST`          | `/sessions`                      | Start or resume: `PRACTICE {topicSlug, mode?}`, `INCIDENT {topicSlug?, challengeId?}`, `BASELINE`, `CHECKPOINT` |
-| `GET`           | `/sessions/:id`                  | Resume a session (no answer keys, ever; duels carry `duelFormat` and a server-measured `stepElapsedMs`)         |
-| `POST`          | `/sessions/:id/answers`          | Submit an answer → verdict, explanation, XP, next stage                                                         |
-| `POST`          | `/sessions/:id/hint`             | Reveal the hint (halves that answer's XP; none in duels)                                                        |
-| `POST`          | `/sessions/:id/complete`         | Finish → summary with bonuses, streak, rank-up, new crests (idempotent)                                         |
-| `GET`           | `/daily`                         | Today's Daily Kata (built once per player per local day)                                                        |
-| `GET`           | `/leaderboard/weekly`            | `?cursor&limit` weekly ranking + your own row                                                                   |
-| `GET` · `POST`  | `/duels`                         | Your duel lists · create a duel `{ format?: CLASSIC \| BLITZ \| SUDDEN_DEATH }`                                 |
-| `POST`          | `/duels/join`                    | `{ code }` → join (atomic, rate-limited)                                                                        |
-| `GET`           | `/duels/:id`                     | Status, and the result with the per-question breakdown (participants only)                                      |
-| `POST`          | `/duels/:id/play`                | Start or resume your duel session                                                                               |
+| Method          | Endpoint                         | Purpose                                                                                                                                           |
+| --------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`           | `/health`                        | Liveness and DB ping                                                                                                                              |
+| `POST`          | `/auth/register` · `/auth/login` | Create an account or log in → token + user (rate-limited, account lockout)                                                                        |
+| `GET` · `PATCH` | `/users/me`                      | Profile; onboarding fields (mask, topics, level, timezone)                                                                                        |
+| `GET`           | `/users/me/progress`             | Rank, streak, topic mastery, assessments, and `stats` (katas, duels won / lost / drawn)                                                           |
+| `GET`           | `/users/me/sessions`             | Run history (keyset cursor)                                                                                                                       |
+| `GET`           | `/users/me/achievements`         | All five crests, earned and locked                                                                                                                |
+| `GET`           | `/topics`                        | The five topics                                                                                                                                   |
+| `POST`          | `/sessions`                      | Start or resume: `PRACTICE {topicSlug, mode?}`, `INCIDENT {topicSlug?, challengeId?}`, `BASELINE`, `CHECKPOINT`                                   |
+| `GET`           | `/sessions/:id`                  | Resume a session (no answer keys, ever)                                                                                                           |
+| `POST`          | `/sessions/:id/answers`          | Submit an answer → verdict, explanation, XP, next stage                                                                                           |
+| `POST`          | `/sessions/:id/hint`             | Reveal the hint (halves that answer's XP; none in duels)                                                                                          |
+| `POST`          | `/sessions/:id/complete`         | Finish → summary with bonuses, streak, rank-up, new crests (idempotent)                                                                           |
+| `GET`           | `/daily`                         | Today's Daily Kata (built once per player per local day)                                                                                          |
+| `GET`           | `/leaderboard/weekly`            | `?cursor&limit` weekly ranking + your own row                                                                                                     |
+| `GET` · `POST`  | `/duels`                         | Your duels, newest first (`?cursor&limit`) · create a lobby `{ format?: CLASSIC \| BLITZ \| SUDDEN_DEATH }`                                   |
+| `POST`          | `/duels/join`                    | `{ code }` → take the seat (atomic, rate-limited; one live match per user)                                                                        |
+| `GET`           | `/duels/:id`                     | Your snapshot: phase, seats, revealed rounds, result (participants only)                                                                          |
+| `POST`          | `/duels/:id/cancel`              | Creator cancels a lobby (idempotent)                                                                                                              |
+| `WS`            | `/socket.io` (WebSocket)         | Live duel events: `duel:join-room`, `ready`, `answer`, `leave`, `ping` (acked) · server pushes `state`, `question`, `reveal`, `ended`, `presence` |
 
 ---
 
@@ -520,11 +544,11 @@ The parts that make the game hard to cheat or break.
 
 ## Testing
 
-| Layer           | What                                                                                                                                                                                                                                                                                                                                                                           | How                                        |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ |
-| API smoke tests | **66 tests** over real HTTP against an in-memory MongoDB: auth and lockout, answer-key leakage, double submits, XP once, streak rules, Daily Kata once under concurrency, mastery and adaptivity, revisits, the board, crests, mode rounds and boss incidents, the duel join race, timers per format, Sudden Death (including crash recovery), tie-break, expiry and bonus cap | Vitest + Supertest + mongodb-memory-server |
-| Static          | Lint and a strict typecheck of all three workspaces                                                                                                                                                                                                                                                                                                                            | `npm run lint && npm run typecheck`        |
-| App             | A click-through checklist per phase on a real phone, judged for feel against the design preview                                                                                                                                                                                                                                                                                | Manual, in Expo Go                         |
+| Layer           | What                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | How                                        |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| API smoke tests | **152 tests** over real HTTP against an in-memory MongoDB: auth and lockout, answer-key leakage, double submits, XP once, streak rules, Daily Kata once under concurrency, mastery and adaptivity, revisits, the board, crests, mode rounds and boss incidents, live duels over a real Socket.IO server (lobby and join races, synced play, deadlines, late and duplicate answers, no key before the reveal, Sudden Death, reconnect, forfeit, two devices, boot recovery, per-user socket limits), the app's live store against a real server, the content audit, weighted sampling and per-player variety | Vitest + Supertest + mongodb-memory-server |
+| Static          | Lint and a strict typecheck of all three workspaces                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | `npm run lint && npm run typecheck`        |
+| App             | A click-through checklist per phase on a real phone, judged for feel against the design preview                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Manual, in Expo Go                         |
 
 > The API suite lives in `.scratch/api-tests/`, which is **intentionally gitignored** (D-002, D-005):
 > the pushed repo holds product code only, and the suite runs locally before every commit with
@@ -577,8 +601,9 @@ The repo is the source of truth, and everything below is written to be read.
   grinding easy questions can't fake skill.
 - **A weekly board, not all-time,** so a newcomer can win. Leagues were cut because they feel empty
   below about 30 active players per group.
-- **Asynchronous duels with blades.** Friends don't need to be online together, and Blitz and Sudden
-  Death give the same questions a different tension. A default win pays no bonus, so an idle second
+- **Live duels with blades (V2).** V1 duels were asynchronous; playing the same question at the same
+  moment is what makes a duel feel like a duel, so V2 rebuilt them on Socket.IO with a server-owned clock.
+  Blitz and Sudden Death give the same questions a different tension. A default win pays no bonus, so an idle second
   account can't farm it.
 - **Explanations on demand.** A miss always shows why. A hit celebrates first, and the reason is one tap
   away.
@@ -597,11 +622,15 @@ The repo is the source of truth, and everything below is written to be read.
 |   ✅   | **P5** Competition and profile: Dojo Board, duels, achievements, history                 |
 |   🔨   | **P6** Polish, deploy and demo prep: deployed; network pass and acceptance run remaining |
 |   ✅   | **P7** Game redesign: Kiri-e Den, the Dojo room, mode rounds, Blitz and Sudden Death     |
-|   ⏳   | **P8** New mini-games for Explore                                                        |
+|   ✅   | **P8–P9** V2 plan; per-player random selection, level rubric, content audit              |
+|   ✅   | **P10–P12** V2 bank: 290 questions across all five topics                                |
+|   ✅   | **P13–P14** V2 live duels: Socket.IO backend and app                                     |
+|   ✅   | **P15** V2 hardening, docs, 2.0.0                                                        |
+|   ⏳   | **P16** New mini-games for Explore                                                       |
 
-**After V1:** a bigger question bank (the first priority), a streak freeze, public duel matchmaking, and
-leagues once there are enough players. Real-time duels, an AI sparring partner and new tracks (DSA,
-DevOps, system design) are parked in [`TODOS.md`](TODOS.md).
+**After V2:** the 2.0.0 APK build, a streak freeze, public duel matchmaking, and leagues once there are
+enough players. An AI sparring partner and new tracks (DSA, DevOps, system design) are parked in
+[`TODOS.md`](TODOS.md).
 
 ---
 

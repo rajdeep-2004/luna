@@ -27,7 +27,8 @@ Confirmed in chat on 2026-11-22 (see `decisions.md` D-002, D-005, D-006).
 An Expo (React Native, TypeScript) app talks over HTTPS/JSON to a stateless Express API
 (TypeScript), which stores everything in MongoDB Atlas through Mongoose. The server owns all game
 logic: it chooses challenges, hides answer keys, evaluates answers, awards XP, updates streaks and
-topic progress, ranks the leaderboard and settles duels. The app is a thin client that renders
+topic progress, ranks the leaderboard and runs live duels (V2: a server-owned state machine pushed over
+Socket.IO on the same HTTP server, §12). The app is a thin client that renders
 challenge data and shows results. A small `shared/` package holds the Zod schemas and TypeScript
 types for the API contract, so the app and the server can't drift apart.
 
@@ -45,22 +46,22 @@ flowchart LR
 
 ## 3. Tech stack
 
-| Layer | Choice | Why |
-|---|---|---|
-| Mobile | Expo (latest stable SDK), React Native, TypeScript | Course requirement. Expo Go means no native build setup (D-003) |
-| Navigation | **React Navigation** (native stack + bottom tabs), not Expo Router | Chosen by Rajdeep (D-003) |
-| Server state | TanStack Query | Caching, retries, loading and error states (D-003) |
-| Client state | Zustand | Auth token and in-progress session UI state only (D-003) |
-| Token storage | expo-secure-store | Keychain/Keystore, not plain AsyncStorage (D-003) |
-| Backend | Node.js (LTS), Express 5, TypeScript | From the brainstorm. Express 5 forwards async errors (D-003) |
-| Validation | Zod, shared between app and server | One schema validates on the server and types on the client (D-004) |
-| Database | MongoDB Atlas + Mongoose | From the brainstorm (D-003). No multi-document transactions (D-015) |
-| Auth | JWT (HS256) + bcrypt | From the brainstorm (D-008) |
-| Security middleware | helmet, cors, express-rate-limit | Engineering baseline |
-| Logging | pino + pino-http | Structured JSON logs, cheap |
-| API tests | Vitest, Supertest, mongodb-memory-server | Smoke tests in gitignored `.scratch/` (D-005, D-015) |
-| Hosting | Render + Atlas M0 | Free, auto-deploy from `main` (D-006) |
-| Package manager | npm workspaces | No extra tool. Expo supports npm monorepos (D-004) |
+| Layer               | Choice                                                             | Why                                                                 |
+| ------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| Mobile              | Expo (latest stable SDK), React Native, TypeScript                 | Course requirement. Expo Go means no native build setup (D-003)     |
+| Navigation          | **React Navigation** (native stack + bottom tabs), not Expo Router | Chosen by Rajdeep (D-003)                                           |
+| Server state        | TanStack Query                                                     | Caching, retries, loading and error states (D-003)                  |
+| Client state        | Zustand                                                            | Auth token and in-progress session UI state only (D-003)            |
+| Token storage       | expo-secure-store                                                  | Keychain/Keystore, not plain AsyncStorage (D-003)                   |
+| Backend             | Node.js (LTS), Express 5, TypeScript                               | From the brainstorm. Express 5 forwards async errors (D-003)        |
+| Validation          | Zod, shared between app and server                                 | One schema validates on the server and types on the client (D-004)  |
+| Database            | MongoDB Atlas + Mongoose                                           | From the brainstorm (D-003). No multi-document transactions (D-015) |
+| Auth                | JWT (HS256) + bcrypt                                               | From the brainstorm (D-008)                                         |
+| Security middleware | helmet, cors, express-rate-limit                                   | Engineering baseline                                                |
+| Logging             | pino + pino-http                                                   | Structured JSON logs, cheap                                         |
+| API tests           | Vitest, Supertest, mongodb-memory-server                           | Smoke tests in gitignored `.scratch/` (D-005, D-015)                |
+| Hosting             | Render + Atlas M0                                                  | Free, auto-deploy from `main` (D-006)                               |
+| Package manager     | npm workspaces                                                     | No extra tool. Expo supports npm monorepos (D-004)                  |
 
 ## 4. Codebase layout
 
@@ -105,18 +106,18 @@ luna/
 
 ## 5. Modules and responsibilities (server)
 
-| Module | Owns | Depends on | Must not |
-|---|---|---|---|
-| auth | register, login, JWT issue/verify, password hashing | users repo | return passwordHash |
-| users | profile, onboarding fields, `/users/me` | — | change XP or streak directly |
-| topics | topic list | — | — |
-| challenges | challenge repo, public projection (no answer key) | — | send `answerKey` / `stages[].answerKey` |
-| sessions | start session, submit answer, complete session | challenges, progress, daily, achievements | trust client time or correctness |
-| progress | XP ledger, levels, streaks, topic progress, mastery, adaptivity | — | award XP twice for the same source |
-| daily | build or return today's Daily Kata per user | challenges, progress | build two circuits for the same user and day |
-| leaderboard | weekly ranking aggregation | progress (XP ledger) | scan unbounded results |
-| duels | REST lobby (create, join, cancel, snapshot, history); live engine over Socket.IO (`live/`: engine, store, runtime, socket, recovery); win bonus | sessions (recordAttempt, finishSession), progress (XP ledger) | let a user join their own duel; accept an answer after the deadline; advance a question twice; send an answer key before the reveal |
-| achievements | evaluate and award badges after session events | progress | award the same badge twice |
+| Module       | Owns                                                                                                                                            | Depends on                                                    | Must not                                                                                                                            |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| auth         | register, login, JWT issue/verify, password hashing                                                                                             | users repo                                                    | return passwordHash                                                                                                                 |
+| users        | profile, onboarding fields, `/users/me`                                                                                                         | —                                                             | change XP or streak directly                                                                                                        |
+| topics       | topic list                                                                                                                                      | —                                                             | —                                                                                                                                   |
+| challenges   | challenge repo, public projection (no answer key)                                                                                               | —                                                             | send `answerKey` / `stages[].answerKey`                                                                                             |
+| sessions     | start session, submit answer, complete session                                                                                                  | challenges, progress, daily, achievements                     | trust client time or correctness                                                                                                    |
+| progress     | XP ledger, levels, streaks, topic progress, mastery, adaptivity                                                                                 | —                                                             | award XP twice for the same source                                                                                                  |
+| daily        | build or return today's Daily Kata per user                                                                                                     | challenges, progress                                          | build two circuits for the same user and day                                                                                        |
+| leaderboard  | weekly ranking aggregation                                                                                                                      | progress (XP ledger)                                          | scan unbounded results                                                                                                              |
+| duels        | REST lobby (create, join, cancel, snapshot, history); live engine over Socket.IO (`live/`: engine, store, runtime, socket, recovery); win bonus | sessions (recordAttempt, finishSession), progress (XP ledger) | let a user join their own duel; accept an answer after the deadline; advance a question twice; send an answer key before the reveal |
+| achievements | evaluate and award badges after session events                                                                                                  | progress                                                      | award the same badge twice                                                                                                          |
 
 ## 6. Layering rules
 
@@ -128,9 +129,9 @@ Query (`src/api` endpoints) → fetch client. Screens never call `fetch` directl
 
 ## 7. External services
 
-| Service | Used for | Failure impact |
-|---|---|---|
-| MongoDB Atlas M0 | all data | API returns 503 `DB_UNAVAILABLE`, the app shows the error state with Retry |
+| Service                 | Used for        | Failure impact                                                                                                                                                            |
+| ----------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MongoDB Atlas M0        | all data        | API returns 503 `DB_UNAVAILABLE`, the app shows the error state with Retry                                                                                                |
 | Render free web service | hosting the API | sleeps after idle. The first request is slow (up to ~50 s). The app shows "Waking the server" after 4 s; each request times out at 15 s and GETs retry twice with backoff |
 
 ## 8. Auth and authorization
@@ -162,16 +163,16 @@ Query (`src/api` endpoints) → fetch client. Screens never call `fetch` directl
 
 ## 10. Configuration
 
-| Env var | Purpose | Required | Example |
-|---|---|---|---|
-| `NODE_ENV` | environment | yes | `development` |
-| `PORT` | API port | no (8080) | `8080` |
-| `MONGODB_URI` | Atlas connection string | yes | `mongodb+srv://...` |
-| `JWT_SECRET` | signing secret, ≥32 chars | yes | — |
-| `JWT_EXPIRES_IN` | token lifetime | no (`7d`) | `7d` |
-| `CORS_ORIGINS` | comma-separated allowed origins | no | `http://localhost:8081` |
-| `LOG_LEVEL` | pino level | no (`info`) | `debug` |
-| `EXPO_PUBLIC_API_URL` | (app) API base URL | yes | `http://192.168.1.5:8080/api/v1` |
+| Env var               | Purpose                         | Required    | Example                          |
+| --------------------- | ------------------------------- | ----------- | -------------------------------- |
+| `NODE_ENV`            | environment                     | yes         | `development`                    |
+| `PORT`                | API port                        | no (8080)   | `8080`                           |
+| `MONGODB_URI`         | Atlas connection string         | yes         | `mongodb+srv://...`              |
+| `JWT_SECRET`          | signing secret, ≥32 chars       | yes         | —                                |
+| `JWT_EXPIRES_IN`      | token lifetime                  | no (`7d`)   | `7d`                             |
+| `CORS_ORIGINS`        | comma-separated allowed origins | no          | `http://localhost:8081`          |
+| `LOG_LEVEL`           | pino level                      | no (`info`) | `debug`                          |
+| `EXPO_PUBLIC_API_URL` | (app) API base URL              | yes         | `http://192.168.1.5:8080/api/v1` |
 
 Game constants (XP table, bonuses and caps, level thresholds and names, mastery and adaptivity
 thresholds, Kata/duel composition, win bonus) live in `server/src/config/game.ts` (live duel clocks in `LIVE_DUEL` and `DUEL_FORMAT_RULES` in `shared`; socket limits in `config/security.ts`),
@@ -179,24 +180,25 @@ not as magic numbers. Their values come from `docs/product/` (approved).
 
 ## 11. Data model
 
-| Collection | Key fields | Indexes / constraints |
-|---|---|---|
-| users | email, username, usernameLower, passwordHash (select: false), avatarId, preferredTopicSlugs, experienceLevel, onboardedAt, totalXP (level and rank are computed from it, not stored), currentStreak, longestStreak, lastDailyDate (`YYYY-MM-DD` local), timezone (IANA) | unique email, unique usernameLower |
-| topics | slug, name, description, icon, order | unique slug |
-| challenges | slug, title, topicSlug (slugs are stable, so no join to topics is needed), subtopic, type (`TRACE`/`BUG_HUNT`/`ENGINEER_CHOICE`/`INCIDENT`), difficulty 1–3, prompt, codeSnippet?, options[{id,text}], answerKey, explanation, misconception, optionFeedback?, hint?, estimatedTimeSec (XP comes from difficulty via config), stages[] (incident only: title, evidence, prompt, options, answerKey, explanation), rootCause?, isActive | unique slug; `{topicId, type, difficulty, isActive}` |
-| sessions | userId, type (`PRACTICE`/`DAILY`/`INCIDENT`/`BASELINE`/`CHECKPOINT`/`DUEL`), topicId?, mode? (`TRACE`/`BUG_HUNT`/`ENGINEER_CHOICE`, PRACTICE mode rounds), dailyDate?, duelId?, duelFormat? (DUEL), endedEarly (Sudden Death), items[{challengeId, order, optionOrders[][], isRevisit, hintsUsed[]}], status (`ACTIVE`/`COMPLETED`), startedAt, completedAt, correctCount, totalQuestions, totalTimeMs, totalXP | `{userId, createdAt:-1}`; unique partial `{userId, dailyDate}` (type DAILY); unique partial `{userId, type, topicSlug, mode}` (ACTIVE PRACTICE/BASELINE/CHECKPOINT); unique partial `{duelId, userId}` (type DUEL); `{userId, status, completedAt:-1, _id:-1}` (history) |
-| answerattempts | userId, sessionId, challengeId, stageIndex (0 for non-incident), answer, isCorrect, usedHint, isTimeout, timeTakenMs (server-measured), topicId, difficulty, createdAt | **unique `{sessionId, challengeId, stageIndex}`** (blocks double submits); `{userId, challengeId}`; `{userId, topicId, createdAt:-1}` |
-| usertopicprogress | userId, topicSlug, answers, correct, recentResults (last 10 booleans, mastery), adaptWindow (answers since last difficulty change, max 5), difficultyLevel 1–3, hasAdvancedCorrect, lastPractisedAt | unique `{userId, topicId}` |
-| xpevents | userId, sourceKey (`challenge:<id>[:<stage>]`, `review:<date>:<id>`, `daily:<date>`, `perfect:<date>`, `first-incident`, `streak<N>:<runStart>`, `duelwin:<localDate>:<1..3>`), amount, weekKey (`2026-W47`), createdAt | **unique `{userId, sourceKey}`** (first-completion XP only); `{weekKey, userId}` |
-| revisititems | userId, challengeId, topicSlug, missedAt, missedDate (local `YYYY-MM-DD`), notBeforeDate? (set when a revisit is missed again) | unique `{userId, challengeId}`; `{userId, missedAt}` |
-| duels | code, creatorId, opponentId?, format (`CLASSIC`/`BLITZ`/`SUDDEN_DEATH`), items[5 or 10]{challengeId, optionOrders[][]}, phase (`LOBBY`/`READY`/`COUNTDOWN`/`QUESTION`/`REVEAL`/`COMPLETED`/`CANCELLED`/`ABANDONED`), currentIndex, questionStartedAt, deadlineAt, phaseEndsAt, lobbyExpiresAt, creatorSeat/opponentSeat {connected, lastSeenAt, readyAt}, creatorResult?/opponentResult? {correct, totalTimeMs, finishedAt}, winnerId?, endReason (`PLAYED`/`FORFEIT`/`CANCELLED`/`ABANDONED`/`EXPIRED` V1), endedAt, finalizedAt, winBonusClaimed, winBonusSettled, winBonusXP; V1 only: status, expiresAt | unique code; unique partial `{creatorId}` where phase LOBBY (one open lobby); `{creatorId, phase}`; `{phase, deadlineAt}` (recovery); `{finalizedAt, phase}`; `{creatorId, createdAt:-1}`, `{opponentId, createdAt:-1}`. A player's DUEL session is found by `{duelId, userId}` |
-| duelanswers | duelId, userId, index, answer (option id / line, null on timeout), isCorrect, timedOut, responseMs (server-measured, clamped), receivedAt | **unique `{duelId, userId, index}`** (one answer per question; a timeout fill and a late answer can't both land); `{duelId, index}` |
-| revisits | userId, challengeId, answersAtMiss, notBefore (date), status | unique `{userId, challengeId}` while open; `{userId, status, notBefore}` |
-| userachievements | userId, key, awardedAt | unique `{userId, key}` |
+| Collection        | Key fields                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Indexes / constraints                                                                                                                                                                                                                                                           |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| users             | email, username, usernameLower, passwordHash (select: false), avatarId, preferredTopicSlugs, experienceLevel, onboardedAt, totalXP (level and rank are computed from it, not stored), currentStreak, longestStreak, lastDailyDate (`YYYY-MM-DD` local), timezone (IANA)                                                                                                                                                                                                                                                                                                                                     | unique email, unique usernameLower                                                                                                                                                                                                                                              |
+| topics            | slug, name, description, icon, order                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | unique slug                                                                                                                                                                                                                                                                     |
+| challenges        | slug, title, topicSlug (slugs are stable, so no join to topics is needed), subtopic, type (`TRACE`/`BUG_HUNT`/`ENGINEER_CHOICE`/`INCIDENT`), difficulty 1–3, prompt, codeSnippet?, options[{id,text}], answerKey, explanation, misconception, optionFeedback?, hint?, estimatedTimeSec (XP comes from difficulty via config), stages[] (incident only: title, evidence, prompt, options, answerKey, explanation), rootCause?, isActive                                                                                                                                                                      | unique slug; `{topicId, type, difficulty, isActive}`                                                                                                                                                                                                                            |
+| sessions          | userId, type (`PRACTICE`/`DAILY`/`INCIDENT`/`BASELINE`/`CHECKPOINT`/`DUEL`), topicId?, mode? (`TRACE`/`BUG_HUNT`/`ENGINEER_CHOICE`, PRACTICE mode rounds), dailyDate?, duelId?, duelFormat? (DUEL), endedEarly (Sudden Death), items[{challengeId, order, optionOrders[][], isRevisit, hintsUsed[]}], status (`ACTIVE`/`COMPLETED`), startedAt, completedAt, correctCount, totalQuestions, totalTimeMs, totalXP                                                                                                                                                                                             | `{userId, createdAt:-1}`; unique partial `{userId, dailyDate}` (type DAILY); unique partial `{userId, type, topicSlug, mode}` (ACTIVE PRACTICE/BASELINE/CHECKPOINT); unique partial `{duelId, userId}` (type DUEL); `{userId, status, completedAt:-1, _id:-1}` (history)        |
+| answerattempts    | userId, sessionId, challengeId, stageIndex (0 for non-incident), answer, isCorrect, usedHint, isTimeout, timeTakenMs (server-measured), topicId, difficulty, createdAt                                                                                                                                                                                                                                                                                                                                                                                                                                      | **unique `{sessionId, challengeId, stageIndex}`** (blocks double submits); `{userId, challengeId}`; `{userId, topicId, createdAt:-1}`                                                                                                                                           |
+| usertopicprogress | userId, topicSlug, answers, correct, recentResults (last 10 booleans, mastery), adaptWindow (answers since last difficulty change, max 5), difficultyLevel 1–3, hasAdvancedCorrect, lastPractisedAt                                                                                                                                                                                                                                                                                                                                                                                                         | unique `{userId, topicId}`                                                                                                                                                                                                                                                      |
+| xpevents          | userId, sourceKey (`challenge:<id>[:<stage>]`, `review:<date>:<id>`, `daily:<date>`, `perfect:<date>`, `first-incident`, `streak<N>:<runStart>`, `duelwin:<localDate>:<1..3>`), amount, weekKey (`2026-W47`), createdAt                                                                                                                                                                                                                                                                                                                                                                                     | **unique `{userId, sourceKey}`** (first-completion XP only); `{weekKey, userId}`                                                                                                                                                                                                |
+| revisititems      | userId, challengeId, topicSlug, missedAt, missedDate (local `YYYY-MM-DD`), notBeforeDate? (set when a revisit is missed again)                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | unique `{userId, challengeId}`; `{userId, missedAt}`                                                                                                                                                                                                                            |
+| duels             | code, creatorId, opponentId?, format (`CLASSIC`/`BLITZ`/`SUDDEN_DEATH`), items[5 or 10]{challengeId, optionOrders[][]}, phase (`LOBBY`/`READY`/`COUNTDOWN`/`QUESTION`/`REVEAL`/`COMPLETED`/`CANCELLED`/`ABANDONED`), currentIndex, questionStartedAt, deadlineAt, phaseEndsAt, lobbyExpiresAt, creatorSeat/opponentSeat {connected, lastSeenAt, readyAt}, creatorResult?/opponentResult? {correct, totalTimeMs, finishedAt}, winnerId?, endReason (`PLAYED`/`FORFEIT`/`CANCELLED`/`ABANDONED`/`EXPIRED` V1), endedAt, finalizedAt, winBonusClaimed, winBonusSettled, winBonusXP; V1 only: status, expiresAt | unique code; unique partial `{creatorId}` where phase LOBBY (one open lobby); `{creatorId, phase}`; `{phase, deadlineAt}` (recovery); `{finalizedAt, phase}`; `{creatorId, createdAt:-1}`, `{opponentId, createdAt:-1}`. A player's DUEL session is found by `{duelId, userId}` |
+| duelanswers       | duelId, userId, index, answer (option id / line, null on timeout), isCorrect, timedOut, responseMs (server-measured, clamped), receivedAt                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | **unique `{duelId, userId, index}`** (one answer per question; a timeout fill and a late answer can't both land); `{duelId, index}`                                                                                                                                             |
+| revisits          | userId, challengeId, answersAtMiss, notBefore (date), status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | unique `{userId, challengeId}` while open; `{userId, status, notBefore}`                                                                                                                                                                                                        |
+| userachievements  | userId, key, awardedAt                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | unique `{userId, key}`                                                                                                                                                                                                                                                          |
 
 ## 12. Key flows and failure handling
 
 **Submit answer** (`POST /sessions/:id/answers`)
+
 1. Load the session by `{_id, userId, status: ACTIVE}`. If it's missing, return 404. A session that is
    already completed returns 409.
 2. Check that the challenge is part of the session (and the stage index is valid for incidents).
@@ -215,7 +217,7 @@ so only the first call does the work, and repeats return the stored summary (ide
 sessions it also awards the daily bonus XpEvent `daily:<date>` and updates the streak with a
 conditional update on `lastDailyDate`, then runs the achievement checks.
 
-**Daily Kata** (`GET /daily`): compute the user's local date from `users.timezone`. The Kata *is* a
+**Daily Kata** (`GET /daily`): compute the user's local date from `users.timezone`. The Kata _is_ a
 `DAILY` session with `dailyDate` set; a unique partial index on `{userId, dailyDate}` (type `DAILY`)
 means two concurrent first opens produce a single Kata, because the loser re-reads the winner's (D-028).
 Answers to a Kata whose day has ended are refused with 409, so a completed Kata was always played on its
@@ -247,44 +249,49 @@ because the streak only moves when a Daily Kata completes and `lastDailyDate` is
 **Live duels (V2, D-052).** Server-authoritative; the state machine and clock live on the duel document, the app
 renders what the server pushes. REST sets a duel up, Socket.IO (WebSocket only, same HTTP server, JWT in the handshake)
 plays it.
-- *Create* (`POST /duels`): a LOBBY with a random 6-character code (unambiguous alphabet, retried on collision) and a
+
+- _Create_ (`POST /duels`): a LOBBY with a random 6-character code (unambiguous alphabet, retried on collision) and a
   10-minute `lobbyExpiresAt`. One open duel per creator (409), enforced for LOBBY by a unique partial index so two
-  concurrent creates can't both succeed. *Join* (`POST /duels/join`, rate-limited): one atomic `findOneAndUpdate` on
+  concurrent creates can't both succeed. _Join_ (`POST /duels/join`, rate-limited): one atomic `findOneAndUpdate` on
   `{code, phase: LOBBY, opponentId: null, creatorId ≠ me, lobbyExpiresAt > now}` → READY, so exactly one of several
-  joiners wins; a player already seated in another live duel gets 409. *Cancel* (`POST /duels/:id/cancel`): creator only,
+  joiners wins; a player already seated in another live duel gets 409. That check and the join are two writes, so
+  after a join the server checks again and, if the player turns out to be seated twice (two codes joined at once),
+  gives the new seat back (READY → LOBBY, only while nobody has said ready) and answers 409 (P15). _Cancel_ (`POST /duels/:id/cancel`): creator only,
   LOBBY/READY. `GET /duels/:id` returns the caller's snapshot; `GET /duels` is a cursor-paginated history.
-- *Socket events* (`DUEL_EVENTS` in `shared`): client `duel:join-room` (participants only; ack = full snapshot),
+- _Socket events_ (`DUEL_EVENTS` in `shared`): client `duel:join-room` (participants only; ack = full snapshot),
   `duel:ready`, `duel:answer {duelId, index, answer}`, `duel:leave`; server `duel:state`, `duel:question`,
   `duel:opponent-answered`, `duel:reveal`, `duel:ended`, `duel:presence`, `duel:superseded`. Every client event is
-  rate-limited per socket (token bucket), Zod-validated and answered with `{ok, data}` or `{ok: false, error}`.
-- *Engine:* `live/engine.ts` is pure (`decide`, `nextWakeAt`, `afterReveal`, `pickWinner`). `live/runtime.ts#tick`
+  rate-limited per user (one token bucket shared by all of that user's sockets, at most 5 sockets per user, frames
+  capped at 16 KB before parsing; `SOCKET_LIMITS`, P15), Zod-validated and answered with `{ok, data}` or `{ok: false, error}`.
+- _Engine:_ `live/engine.ts` is pure (`decide`, `nextWakeAt`, `afterReveal`, `pickWinner`). `live/runtime.ts#tick`
   reads the duel, decides, applies the action through `live/store.ts` as one conditional update on the state it was
   decided from (`phase`, `currentIndex`, seat presence), runs side effects only when it made the move, and arms one timer
-  per duel at the earliest *future* due time. A failed step re-arms a retry. Timers, answers, presence, REST and recovery
+  per duel at the earliest _future_ due time. A failed step re-arms a retry. Timers, answers, presence, REST and recovery
   all go through `tick`, serialized per duel in-process.
-- *Flow:* both seats connected and ready → COUNTDOWN (3 s, both DUEL sessions created) → QUESTION i (timer per format:
+- _Flow:_ both seats connected and ready → COUNTDOWN (3 s, both DUEL sessions created) → QUESTION i (timer per format:
   Classic 5 × 60 s, Blitz 10 × 10 s, Sudden Death up to 10 × 30 s) → REVEAL i when both answered or at `deadlineAt +
-  750 ms` (timeouts written for anyone silent, then both results, the key and the explanation for that question only)
+750 ms` (timeouts written for anyone silent, then both results, the key and the explanation for that question only)
   → after 3 s, QUESTION i+1 or COMPLETED. Sudden Death ends at the first question where exactly one player is wrong.
   Winner: more correct, then lower total server-measured response time, else draw.
-- *Answers:* accepted for the current index in QUESTION until the deadline plus grace (checked again just before the
+- _Answers:_ accepted for the current index in QUESTION until the deadline plus grace (checked again just before the
   insert), once (unique index; a repeat returns the stored receipt). The ack never says right or wrong.
-- *Progress:* every stored duel answer becomes an AnswerAttempt through `sessions.recordAttempt` (mastery, revisits,
+- _Progress:_ every stored duel answer becomes an AnswerAttempt through `sessions.recordAttempt` (mastery, revisits,
   first-correct XP as in every mode); the reveal and the end of each reveal both re-run it idempotently, which heals a
   crash between steps. At the end, `finalizeDuel` pays the win bonus (claimed once, 3 per local day via ledger slots, only
   for PLAYED) and completes both sessions through `sessions.finishSession`; `finalizedAt` marks it done.
-- *Failure handling:* a dropped player keeps their seat 20 s and reconnects with a snapshot; past the grace they forfeit
+- _Failure handling:_ a dropped player keeps their seat 20 s and reconnects with a snapshot; past the grace they forfeit
   (no win bonus) if the rival is there, or the duel is ABANDONED if both are gone. Lobby: creator offline 60 s or TTL
   passed → CANCELLED; a joiner offline 60 s frees the seat (READY → LOBBY). Two devices: the newest socket holds the
   seat; the older gets `duel:superseded`. A stale disconnect write never overwrites a newer reconnect. Boot:
   `migrateV1Duels` (V1 OPEN/ACTIVE → EXPIRED), then recovery ticks every open duel (deadlines passed while down advance
   as timeouts; seats start offline with a fresh grace) and finalizes ended-but-unfinalized ones. Shutdown: timers, then
   sockets and HTTP, then the database.
-- *Scaling note (not built):* one instance owns all timers and the in-memory seat map. To run several instances, add the
+- _Scaling note (not built):_ one instance owns all timers, the in-memory seat map and the per-user socket
+  buckets. To run several instances, add the
   Socket.IO Redis adapter (rooms across instances) and a lease on each duel (`ownerId`, `leaseUntil`) so exactly one
   instance drives its timers; recovery then only takes over duels whose lease expired. The first bottleneck is the
   per-tick duel read plus answer count, fine at capstone scale with the indexes above.
-- *App side (P14, D-053):* one Socket.IO client (`app/src/api/socket.ts`, connected only while a live duel screen is
+- _App side (P14, D-053):_ one Socket.IO client (`app/src/api/socket.ts`, connected only while a live duel screen is
   open) and a Zustand store (`store/liveDuel.ts`) holding the latest snapshot; pure reducers in `lib/live/state.ts`
   fold each event in and decide nothing. `duel:ping` acks the server's time; the app keeps the shortest of three round
   trips as its clock offset and draws every countdown from `deadlineAt − offset`. `screens/duel/LiveDuelScreen.tsx`
@@ -316,15 +323,16 @@ scale with the `{weekKey, userId}` index. Later: a cached `weeklyXP` counter per
 
 ## 13. Test plan
 
-| Layer | Covers | Tool | Command |
-|---|---|---|---|
-| API smoke tests (gitignored) | critical paths: auth and lockout, answer-key leakage, double submit, XP once, streak, Daily Kata once, mastery and adaptivity, revisits, board, achievements, mode rounds and boss incidents, live duels (REST lobby rules and join race, socket auth and validation, full match sync, deadline advance, late/duplicate/wrong-index answers, deadline race, no key before reveal, Sudden Death, reconnect/forfeit/abandon, two devices, boot recovery, win-bonus once and cap), pure engine rules, V1 duel migration, the app's live clock maths, reducers and store against a real server (P14), content audit, weighted sampling, per-player selection variety (149 tests) | Vitest + Supertest + mongodb-memory-server | `cd .scratch/api-tests && npx vitest run` |
-| Frontend | each phase's click-through checklist | manual on Expo Go (Rajdeep) | — |
-| Static | lint + typecheck all workspaces | ESLint, tsc | `npm run lint && npm run typecheck` |
+| Layer                        | Covers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Tool                                       | Command                                   |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ | ----------------------------------------- |
+| API smoke tests (gitignored) | critical paths: auth and lockout, answer-key leakage, double submit, XP once, streak, Daily Kata once, mastery and adaptivity, revisits, board, achievements, mode rounds and boss incidents, live duels (REST lobby rules and join race, socket auth and validation, full match sync, deadline advance, late/duplicate/wrong-index answers, deadline race, no key before reveal, Sudden Death, reconnect/forfeit/abandon, two devices, boot recovery, win-bonus once and cap), pure engine rules, V1 duel migration, the app's live clock maths, reducers and store against a real server (P14), per-user socket limits and the two-lobby join race (P15), content audit (the real bank passes `--strict`), weighted sampling, per-player selection variety (152 tests) | Vitest + Supertest + mongodb-memory-server | `cd .scratch/api-tests && npx vitest run` |
+| Frontend                     | each phase's click-through checklist                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | manual on Expo Go (Rajdeep)                | —                                         |
+| Static                       | lint + typecheck all workspaces                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | ESLint, tsc                                | `npm run lint && npm run typecheck`       |
 
 ## 14. Infrastructure
 
 ### CD / deployment
+
 - **Render web service** (set up in P6): root directory = the **repo root** (not `server/`: the
   server depends on the `shared` workspace and the lockfile lives at the root). Build
   `npm ci --include=dev && npm run build -w server` (`--include=dev` because `NODE_ENV=production`

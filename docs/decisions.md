@@ -2080,3 +2080,118 @@ minimum-round-trip filter, idempotent acks over a socket, navigation guards (`be
 
 **Revisit** if players complain about the reconnect experience (auto-resume a live duel on app launch), or when the
 snapshot can carry my locked choice.
+
+### D-054 — V2 hardening (P15): level-3 distractors, per-user socket limits, the double-join race
+
+- **Date:** 2026-11-27 · **Step:** P15 · **Status:** Active · **Type:** product + technical
+
+**Context.** P15 is the last V2 phase: a full regression, one backend review of everything V2 changed in `server` and
+`shared`, docs synced to the build, version 2.0.0, and a quality pass over the hardest questions. Rajdeep's example of the
+problem was `http-breaking-change`: three of its four options were plainly harmful ("rename it today, the app will
+update eventually"), so a beginner could find the answer by striking out the bad ones without knowing anything about API
+versioning. A level-3 question that a level-1 player can answer by elimination is not a level-3 question.
+
+**Decision 1: rewrite distractors, keep the levels.** I re-read all 90 level-3 singles and the 5 level-3 incidents. The
+rule I used to flag a question: two or more of its wrong options can be ruled out by common sense alone (they are
+harmful, absurd or contradict the prompt), which leaves a beginner a coin toss or a sure thing. Trace and Bug Hunt
+questions passed: a Trace answer depends on knowing the runtime's actual behaviour, and a Bug Hunt option is a line of
+code, so there is nothing to "eliminate". Flagged and rewritten: 17 Engineer's Choice questions (`http-breaking-change`,
+`http-webhook-receiver`, `http-bff-aggregate`, `js-consumer-backpressure`, `js-cancel-on-disconnect`,
+`db-partial-unique-soft-delete`, `db-zero-downtime-rename`, `db-hot-counter-row`, `db-batched-backfill`,
+`cache-stampede`, `queue-backpressure`, `cache-hot-key`, `queue-webhook-dedup-same-tx`, `prod-retry-storm-breaker`,
+`prod-heap-snapshot-leak`, `prod-postmortem-action`, `prod-load-shedding`) and 4 incidents
+(`incident-listener-leak`, `incident-http-retry-storm`, `incident-deadlock`, `incident-poison-message`). Each new
+distractor is a mistake a capable engineer actually makes: a real technique aimed at the wrong problem (TTL jitter for a
+single hot key, edge regions for a chain of dependent calls, `UNIQUE(email, deleted_at)` that forgets NULLs are never
+equal), or a fix that is close but misses one condition (send both fields "for one release cycle" instead of "until
+usage says it is unused"; a "skip if already shipped" check that races; a dual write that forgets old instances during a
+rolling deploy). Every rewritten option got new per-option feedback that names the missing condition. Slugs, answer keys
+and answer positions are unchanged, so players' progress and the audit's position balance are untouched. I chose
+rewriting over re-levelling (moving a question to level 1–2 and writing a new level-3 one) because re-levelling would
+break the 6-per-cell targets that P10–P12 balanced, and because the prompts themselves were genuinely level 3; only the
+options were weak. `audit:content --strict`: 0 errors, 0 warnings afterwards (the new options are longer, which also
+lowers the "longest option is right" tell, which sat at the 50 % limit for databases).
+
+**Decision 2: backend review fixes.** The reviewer (a cavecrew agent over `git diff 896d904...HEAD -- server shared`,
+content excluded) found 0 critical, 0 high, 2 medium and 3 low. No answer-key leak, authZ on every duel route and socket
+event holds, and answer and XP writes are idempotent through unique indexes. I fixed both mediums and two lows:
+
+- *Per-user, not per-socket, rate limits.* The token bucket was created per socket, so a client could open many sockets
+  and get a fresh burst on each. Now every socket of one user shares one bucket, and a user may hold at most 5 sockets
+  (two devices plus reconnect overlap). The handshake refuses the 6th with `TOO_MANY_SOCKETS`. Socket.IO's
+  `maxHttpBufferSize` is set to 16 KB (default 1 MB) so a big frame is refused before it is parsed.
+- *One live match per user, made atomic.* `joinDuel` checked "are you already in a live duel?" and then joined: two
+  writes, so joining two different codes at the same moment could seat a user in two matches. I kept the cheap
+  pre-check and added a re-check after the join; on a clash the join gives its seat back (READY → LOBBY, guarded so it
+  only happens while nobody has said ready) and answers 409. In the worst case both parallel joins give their seat back
+  and the user retries once, which is safe. Rejected: a unique "live seat" marker on the user (a new field and a
+  migration, and it has to be released on every path out of a match, which is more surface than the race deserves).
+  I checked the new test fails without the fix (2 seats) and passes with it.
+- *Magic numbers.* The runtime's `MAX_STEPS`, `RETRY_MS`, `ERROR_RETRY_MS` moved into `DUEL.runtime` in
+  `config/game.ts`.
+- Left in `TODOS.md` (low): `POST /duels` has no per-user limiter and loads the full candidate pool without a projection.
+
+I also removed the V1 leftovers P14 parked for this phase: `SessionView.stepElapsedMs` / `endedEarly` in `shared` and
+`Session.endedEarly` in the model (nothing reads or writes them). `DUEL_TIMEOUT_ANSWER` stays, because the live
+progress code uses it.
+
+**Decision 3: version 2.0.0, no build.** All `package.json` files, `app.json` `version` and the internal
+`@luna/shared` dependency go to 2.0.0, and Android `versionCode` to 2 (Android refuses to install an update with the
+same code over 1.0). The EAS build needs Rajdeep's Expo account, so the exact command is in `TODOS.md` → Release.
+
+**How it works (plain language).** A good multiple-choice question for experts is one where every wrong answer is
+something an expert might really say on a bad day. If a wrong answer is something nobody sensible would say, it isn't
+testing anything. For the sockets: before, each new connection came with its own allowance of messages, like getting a
+new ticket book every time you walk through the door; now the allowance belongs to the person.
+
+**Files.** `server/src/seed/content/*/{choice,incidents}.ts`, `server/src/modules/duels/{duels.service.ts,
+live/socket.ts, live/runtime.ts}`, `server/src/config/{game,security}.ts`, `server/src/models/Session.ts`,
+`shared/src/sessions.ts`, all `package.json`, `app/app.json`, docs (`prd.md`, `architecture.md`,
+`product/competition.md`, `product/game-modes.md`, `README.md`, `TODOS.md`). Tests: `.scratch/api-tests/p15-review.test.ts`.
+
+**Concepts worth learning.** Distractor design in assessments (plausible misconceptions versus "obviously wrong"),
+check-then-act races and compensating writes, per-principal versus per-connection rate limiting.
+
+**Revisit** when players' level-3 accuracy is known: a level-3 question answered right by more than about 80 % of
+level-1 players still has a weak option.
+
+### D-055 — Luna V2 (P8–P15): what shipped, what was cut, what to revisit
+
+- **Date:** 2026-11-27 · **Step:** end of V2 · **Status:** Active · **Type:** product summary
+
+**Context.** Rajdeep's V2 brief (D-047) asked for three outcomes: a much larger, levelled question bank; no two players
+getting the same questions; and live duels instead of asynchronous ones. V2 ran as eight phases, each in a fresh
+session on its own branch, merged into `main` without a PR.
+
+**What shipped.**
+
+- *Content (P9–P12, D-048–D-051):* a level rubric, a content audit that runs in the build, and 290 questions
+  (270 singles at 6 per topic, kind and level, plus 20 incidents), up from 58. V1 questions were kept where they met the
+  rubric, re-levelled where they didn't. P15 (D-054) rewrote the weak options of 21 level-3 items.
+- *Variety (P9, D-048):* every set (Daily Kata, rounds, incidents, checkpoint, baseline, duels) is drawn by weighted
+  random sampling with unseen-first and difficulty tiers, from a crypto-backed RNG that tests can replace.
+- *Live duels (P13–P14, D-052, D-053):* Socket.IO, a server-owned state machine stored on the duel, one timer per duel,
+  idempotent answers, reconnect grace, forfeit and abandon, two-device hand-over, boot recovery, and an app that only
+  draws the server's snapshot with a clock-offset countdown. P15 tightened the socket limits and closed the double-join race.
+- *Release:* version 2.0.0; docs describe the V2 build; 152 API tests, lint and typecheck clean.
+
+**What was cut or deferred, and why.**
+
+- *The APK build.* It needs Rajdeep's Expo account; the command is in `TODOS.md`.
+- *Seeding production.* `server/.env` points at the live Atlas cluster, so no phase seeded it; Rajdeep runs it once.
+- *Multi-instance live duels.* One Render instance owns every timer, seat and socket bucket. The plan (Socket.IO Redis
+  adapter plus a per-duel lease) is in `architecture.md` §12 and `TODOS.md`. Not needed at capstone scale.
+- *Async duels.* Removed, not kept beside live ones: two duel systems would double the rules and the UI for a small user
+  base. The cost is that a friend has to be online now; the 10-minute lobby and the Share button are the answer.
+- *Matchmaking, leagues, mini-games (P16).* Unchanged: they need more players or new engine work.
+
+**What to revisit.**
+
+- Live duel completion rate and how often matches end by forfeit: if many end by drop, look at the 20 s grace and at
+  auto-resuming a live duel on app launch (`TODOS.md`).
+- Per-question accuracy by player level, to find level-3 questions that are still too easy or level-1 ones that are
+  too hard; the audit checks structure, not difficulty.
+- How fast regular players exhaust unseen questions at their level (about 18 singles per kind per topic): the next
+  content phase should be driven by that number, not by a round target.
+- The P13 debt that is still open: re-checking the JWT after the socket handshake, the win-bonus claim/pay gap, and
+  `migrateV1Duels` on every boot once production is migrated.

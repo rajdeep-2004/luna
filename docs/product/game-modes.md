@@ -5,12 +5,12 @@
 Each challenge tests one skill. In every type, the server holds the answer and the app only
 learns it after the user submits.
 
-| Mode | Skill tested | Interaction | Answer format | Target time |
-|---|---|---|---|---|
-| **Trace the Stack** | Predicting how code, a query or an HTTP exchange behaves | Read the snippet, pick 1 of 4 options | option id | ~40 s |
-| **Bug Hunt** | Spotting the defect | Tap the line that contains the bug (snippets are 4–12 lines) | line number | ~50 s |
-| **Engineer's Choice** | Weighing trade-offs | Read the scenario, pick 1 of 4 options | option id | ~40 s |
-| **Incident Room** | Investigating step by step | 3 stages (Alert → Investigation → Resolution), 1 of 4 options at each stage. New evidence appears after every stage | option id per stage | ~45 s per stage, ~2.5 min total |
+| Mode                  | Skill tested                                             | Interaction                                                                                                         | Answer format       | Target time                     |
+| --------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------- | ------------------------------- |
+| **Trace the Stack**   | Predicting how code, a query or an HTTP exchange behaves | Read the snippet, pick 1 of 4 options                                                                               | option id           | ~40 s                           |
+| **Bug Hunt**          | Spotting the defect                                      | Tap the line that contains the bug (snippets are 4–12 lines)                                                        | line number         | ~50 s                           |
+| **Engineer's Choice** | Weighing trade-offs                                      | Read the scenario, pick 1 of 4 options                                                                              | option id           | ~40 s                           |
+| **Incident Room**     | Investigating step by step                               | 3 stages (Alert → Investigation → Resolution), 1 of 4 options at each stage. New evidence appears after every stage | option id per stage | ~45 s per stage, ~2.5 min total |
 
 ### Mode rules
 
@@ -35,14 +35,14 @@ learns it after the user submits.
 
 A session is a group of challenges played in one sitting.
 
-| Session | Started from | Contents | Target duration | Repeatable? |
-|---|---|---|---|---|
-| **Daily Kata** | Home (main button) | 5 challenges: 1 Trace, 1 Bug Hunt, 2 Engineer's Choice, 1 Incident Room | 4–6 min | Once per calendar day. Reopening the same day resumes or shows the result |
-| **Topic Practice** | Explore → a topic | 5 challenges from that topic, any type except Incident, at the user's difficulty for that topic | 3–4 min | Unlimited |
-| **Incident Room** (solo) | Explore → Incident Room card | 1 incident | ~2.5 min | Unlimited |
-| **Baseline** | End of onboarding (skippable) | 5 beginner challenges, one per topic, no Incident | ~2 min | Once |
-| **Checkpoint** *(proposed, see benchmarks.md)* | Home card after 7 active days | 5 intermediate challenges, one per topic | ~3 min | Every 7 active days |
-| **Duel** | Duel screen | 5 single challenges (no Incident), same set for both players | ~4 min | Unlimited (see competition.md) |
+| Session                                        | Started from                  | Contents                                                                                                                               | Target duration | Repeatable?                                                               |
+| ---------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------- |
+| **Daily Kata**                                 | Home (main button)            | 5 challenges: 1 Trace, 1 Bug Hunt, 2 Engineer's Choice, 1 Incident Room                                                                | 4–6 min         | Once per calendar day. Reopening the same day resumes or shows the result |
+| **Topic Practice**                             | Explore → a topic             | 5 challenges from that topic, any type except Incident, at the user's difficulty for that topic                                        | 3–4 min         | Unlimited                                                                 |
+| **Incident Room** (solo)                       | Explore → Incident Room card  | 1 incident                                                                                                                             | ~2.5 min        | Unlimited                                                                 |
+| **Baseline**                                   | End of onboarding (skippable) | 5 beginner challenges, one per topic, no Incident                                                                                      | ~2 min          | Once                                                                      |
+| **Checkpoint** _(proposed, see benchmarks.md)_ | Home card after 7 active days | 5 intermediate challenges, one per topic                                                                                               | ~3 min          | Every 7 active days                                                       |
+| **Duel** (live, V2)                            | Duel screen                   | Classic 5, Blitz 10 or Sudden Death up to 10 single challenges (no Incident), the same set for both players, played at the same moment | 2–6 min         | Unlimited, one live match at a time (see competition.md)                  |
 
 **Daily Kata time check:** 40 s + 50 s + 2 × 40 s + 150 s ≈ 5.3 min. That's inside the brainstorm's
 4–6 minute target.
@@ -61,10 +61,10 @@ mastery, but the Kata bonus and the streak are not awarded.
 
 ## 4. Timer
 
-| Session | Timer | On expiry |
-|---|---|---|
-| Daily Kata, Practice, Incident, Baseline, Checkpoint | **No countdown.** A small elapsed clock is shown | — |
-| Duel | **60 s countdown** per challenge | Counts as a wrong answer. Moves on automatically |
+| Session                                              | Timer                                                                          | On expiry                                                                                       |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| Daily Kata, Practice, Incident, Baseline, Checkpoint | **No countdown.** A small elapsed clock is shown                               | —                                                                                               |
+| Duel (live)                                          | **Server countdown** per question: Classic 60 s, Blitz 10 s, Sudden Death 30 s | Counts as a wrong answer (timeout). The question ends for both players at once, then the reveal |
 
 **Why:** the brainstorm warns against excluding beginners. Countdowns punish slow readers more
 than wrong thinkers. Learning sessions are untimed, but still measured (time shows on the summary).
@@ -79,14 +79,14 @@ arrived), never taken from the client.
 
 ### Per topic (single challenges)
 
-| Topic | Trace | Bug Hunt | Choice | Total | Beginner / Intermediate / Advanced |
-|---|---:|---:|---:|---:|---|
-| JavaScript & Async | 5 | 3 | 2 | 10 | 4 / 4 / 2 |
-| HTTP & APIs | 3 | 2 | 5 | 10 | 4 / 4 / 2 |
-| Databases | 3 | 3 | 4 | 10 | 4 / 4 / 2 |
-| Caching & Queues | 1 | 2 | 7 | 10 | 4 / 4 / 2 |
-| Debugging & Production | 1 | 3 | 6 | 10 | 4 / 4 / 2 |
-| **Total** | **13** | **13** | **24** | **50** | 20 / 20 / 10 |
+| Topic                  |  Trace | Bug Hunt | Choice |  Total | Beginner / Intermediate / Advanced |
+| ---------------------- | -----: | -------: | -----: | -----: | ---------------------------------- |
+| JavaScript & Async     |      5 |        3 |      2 |     10 | 4 / 4 / 2                          |
+| HTTP & APIs            |      3 |        2 |      5 |     10 | 4 / 4 / 2                          |
+| Databases              |      3 |        3 |      4 |     10 | 4 / 4 / 2                          |
+| Caching & Queues       |      1 |        2 |      7 |     10 | 4 / 4 / 2                          |
+| Debugging & Production |      1 |        3 |      6 |     10 | 4 / 4 / 2                          |
+| **Total**              | **13** |   **13** | **24** | **50** | 20 / 20 / 10                       |
 
 The type mix per topic follows what that topic naturally tests. Caching is about trade-offs, so it
 gets more Engineer's Choice. JavaScript is about execution order, so it gets more Trace. The overall
@@ -94,16 +94,16 @@ ratio of about 1 : 1 : 2 matches the Daily Kata's mix.
 
 ### Incident Room scenarios (8)
 
-| # | Working title | Primary topic | Difficulty |
-|---|---|---|---|
-| 1 | Production is slowing down (missing index) | Databases | 1 |
-| 2 | The checkout that charged twice (non-idempotent retry) | HTTP & APIs | 2 |
-| 3 | Stale prices after a sale (cache invalidation) | Caching & Queues | 2 |
-| 4 | The queue that never drains (poison message) | Caching & Queues | 3 |
-| 5 | 502s after deploy (bad env var / health check) | Debugging & Production | 1 |
-| 6 | Memory climbs every hour (event-listener leak) | JavaScript & Async | 3 |
-| 7 | Login works locally, fails in prod (CORS / cookie flags) | Debugging & Production | 2 |
-| 8 | Deadlock at month-end (transaction ordering) | Databases | 3 |
+| #   | Working title                                            | Primary topic          | Difficulty |
+| --- | -------------------------------------------------------- | ---------------------- | ---------- |
+| 1   | Production is slowing down (missing index)               | Databases              | 1          |
+| 2   | The checkout that charged twice (non-idempotent retry)   | HTTP & APIs            | 2          |
+| 3   | Stale prices after a sale (cache invalidation)           | Caching & Queues       | 2          |
+| 4   | The queue that never drains (poison message)             | Caching & Queues       | 3          |
+| 5   | 502s after deploy (bad env var / health check)           | Debugging & Production | 1          |
+| 6   | Memory climbs every hour (event-listener leak)           | JavaScript & Async     | 3          |
+| 7   | Login works locally, fails in prod (CORS / cookie flags) | Debugging & Production | 2          |
+| 8   | Deadlock at month-end (transaction ordering)             | Databases              | 3          |
 
 ### Content lifetime (honest limit)
 
@@ -117,13 +117,16 @@ first item in `TODOS.md`.
 
 1. Tests exactly one concept, which is tagged as the `subtopic`.
 2. Exactly one defensible correct answer, and no trick wording.
-3. Wrong options are *plausible misconceptions*, not jokes. (The brainstorm's "Replace HTTP with
+3. Wrong options are _plausible misconceptions_, not jokes. At level 3 they are the mistakes a capable engineer makes
+   (a real technique applied to the wrong problem, a fix that is close but misses one condition), so the answer can't be
+   found by striking out the obviously harmful options (P15 content pass, D-054). (The brainstorm's "Replace HTTP with
    WebSocket" is borderline, so it gets rewritten.)
 4. Code snippets are at most 12 lines and need no horizontal scrolling on a 360 px wide phone, where possible.
-5. Explanations teach the *why* in 2–4 sentences, plus 1 sentence on the common misconception.
+5. Explanations teach the _why_ in 2–4 sentences, plus 1 sentence on the common misconception.
 
 ## Decide
-- [ ] Is it OK that only Duels have a countdown (60 s)?
+
+- [x] Only Duels have a countdown (per format since D-042; server-owned since V2).
 - [ ] Do Duels exclude Incident Room?
 - [ ] Is the content plan of 50 + 8 OK, with the type mix per topic above?
 - [ ] Is a hint costing half the XP OK?

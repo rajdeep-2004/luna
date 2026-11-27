@@ -25,7 +25,7 @@ import * as runtime from './runtime';
 
 /**
  * The live duel transport (D-052): Socket.IO on the API's HTTP server, WebSocket only. The JWT is
- * checked in the handshake with the same verify as REST; every event is rate-limited per socket,
+ * checked in the handshake with the same verify as REST; every event is rate-limited per user,
  * validated with the shared Zod schemas and answered through an ack, so a bad payload gets an error
  * ack and never throws inside Socket.IO.
  */
@@ -36,6 +36,22 @@ type Ack<T> = (res: DuelAck<T>) => void;
 
 const room = (duelId: string) => `duel:${duelId}`;
 const seatKey = (duelId: string, userId: string) => `${duelId}:${userId}`;
+
+/**
+ * Rate limits are per user, not per socket (P15 review): every socket of one user shares one
+ * bucket, so opening more sockets buys no extra burst, and the number of sockets is capped.
+ */
+type UserConn = { bucket: TokenBucket; sockets: number };
+const users = new Map<string, UserConn>();
+
+function connFor(userId: string): UserConn {
+  let conn = users.get(userId);
+  if (!conn) {
+    conn = { bucket: new TokenBucket(SOCKET_LIMITS.burst, SOCKET_LIMITS.perSecond), sockets: 0 };
+    users.set(userId, conn);
+  }
+  return conn;
+}
 
 /** The one socket that holds each player's seat in each duel: the latest one to join (two devices). */
 const seats = new Map<string, string>();
@@ -146,6 +162,8 @@ function register(io: Server, socket: LiveSocket) {
   });
 
   socket.on('disconnect', () => {
+    const conn = users.get(userId);
+    if (conn && --conn.sockets <= 0) users.delete(userId);
     for (const duelId of socket.data.duels) {
       const key = seatKey(duelId, userId);
       // Only the seat holder's drop counts: a replaced device going away changes nothing.
@@ -169,6 +187,8 @@ export function attachLiveDuels(
     path: '/socket.io',
     transports: ['websocket'],
     serveClient: false,
+    // Client events are tiny (an id, an option); refuse big frames before they are parsed.
+    maxHttpBufferSize: SOCKET_LIMITS.maxMessageBytes,
     // The native app sends no Origin header; CORS only matters for Expo web in dev.
     cors: { origin: env.CORS_ORIGINS.length ? env.CORS_ORIGINS : false },
   });
@@ -178,14 +198,15 @@ export function attachLiveDuels(
     const token = typeof auth?.token === 'string' ? auth.token : '';
     const userId = token ? verifyToken(token) : null;
     if (!userId) return next(new Error('UNAUTHORIZED'));
-    socket.data = {
-      userId,
-      bucket: new TokenBucket(SOCKET_LIMITS.burst, SOCKET_LIMITS.perSecond),
-      duels: new Set(),
-    } satisfies Data;
+    const conn = connFor(userId);
+    if (conn.sockets >= SOCKET_LIMITS.maxSocketsPerUser) return next(new Error('TOO_MANY_SOCKETS'));
+    socket.data = { userId, bucket: conn.bucket, duels: new Set() } satisfies Data;
     next();
   });
-  io.on('connection', (socket) => register(io, socket as LiveSocket));
+  io.on('connection', (socket) => {
+    connFor(socket.data.userId as string).sockets += 1;
+    register(io, socket as LiveSocket);
+  });
 
   runtime.startRuntime({
     timings: opts.timings,
@@ -203,6 +224,7 @@ export function attachLiveDuels(
     close: async () => {
       runtime.stopRuntime();
       seats.clear();
+      users.clear();
       await new Promise<void>((resolve) => {
         io.close(() => resolve());
       });

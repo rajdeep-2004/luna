@@ -27,8 +27,6 @@ const sessionSchema = new Schema(
     duelId: { type: Schema.Types.ObjectId, ref: 'Duel', default: null },
     /** DUEL only: copied from the duel so every answer can read its timer without a second query. */
     duelFormat: { type: String, enum: [...DUEL_FORMATS, null], default: null },
-    /** Sudden Death only: set by the first miss; the session may then complete with fewer answers. */
-    endedEarly: { type: Boolean, default: false },
     status: { type: String, enum: ['ACTIVE', 'COMPLETED'], default: 'ACTIVE' },
     startedAt: { type: Date, default: () => new Date() },
     completedAt: { type: Date, default: null },

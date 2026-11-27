@@ -5,6 +5,7 @@ import {
   type DuelPhase,
   type DuelQuestionEvent,
 } from '@luna/shared';
+import { DUEL } from '../../../config/game';
 import { logger } from '../../../lib/logger';
 import { DuelModel, type DuelDoc } from '../../../models/Duel';
 import { toPublicChallenge } from '../../challenges/challenges.projection';
@@ -37,12 +38,11 @@ export interface DuelHub {
 type Runtime = { hub: DuelHub | null; timings: Timings; now: () => number; started: boolean };
 const rt: Runtime = { hub: null, timings: DEFAULT_TIMINGS, now: () => Date.now(), started: false };
 
-/** A safety bound on how many transitions one tick may chain (recovery can chain a few). */
-const MAX_STEPS = 8;
-/** After a lost race the duel is re-checked this soon, never in a tight loop. */
-const RETRY_MS = 250;
-/** After a failed step (a transient database error) the duel is retried this soon. */
-const ERROR_RETRY_MS = 2_000;
+const {
+  maxStepsPerTick: MAX_STEPS,
+  raceRetryMs: RETRY_MS,
+  errorRetryMs: ERROR_RETRY_MS,
+} = DUEL.runtime;
 
 export function startRuntime(opts: { hub: DuelHub; timings?: Partial<Timings> }): void {
   rt.hub = opts.hub;

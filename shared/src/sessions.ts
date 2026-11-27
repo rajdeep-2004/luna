@@ -58,15 +58,8 @@ export type SessionView = {
   startedAt: string;
   totalAnswers: number;
   items: SessionItemView[];
-  /**
-   * DUEL only: server-measured time already spent on the current question, so a resumed duel
-   * shows the real remaining seconds of the 60 s timer (no phone-clock skew).
-   */
-  stepElapsedMs?: number;
   /** DUEL only: the duel's format, which sets the timer (DUEL_FORMAT_RULES). */
   duelFormat?: DuelFormat;
-  /** Sudden Death only: the run ended at a miss, so the session is ready to complete early. */
-  endedEarly?: boolean;
 };
 
 export type AnswerResult = {

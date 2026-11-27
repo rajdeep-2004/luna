@@ -17,7 +17,14 @@ export const RATE_LIMITS = {
 } as const;
 
 /**
- * Per-socket token bucket for live duel events (D-052): `burst` events at once, refilled at
- * `perSecond`. A normal client sends a handful per question, so this only stops floods.
+ * Live duel socket limits (D-052, tightened in P15): one token bucket per user shared by all of
+ * their sockets (`burst` events at once, refilled at `perSecond`); at most `maxSocketsPerUser`
+ * open sockets (two devices plus reconnect overlap); client frames capped at `maxMessageBytes`.
+ * A normal client sends a handful of tiny events per question, so this only stops floods.
  */
-export const SOCKET_LIMITS = { burst: 10, perSecond: 3 } as const;
+export const SOCKET_LIMITS = {
+  burst: 10,
+  perSecond: 3,
+  maxSocketsPerUser: 5,
+  maxMessageBytes: 16 * 1024,
+} as const;

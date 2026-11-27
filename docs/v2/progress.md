@@ -56,7 +56,7 @@ One block per phase, written by the phase itself (`docs/v2/runbook.md` §5).
 9. **Kill for more than 20 s:** force-quit B and wait. A's duel ends: result page "You win by default", no win bonus. B reopens → Finished list shows "You lost by default".
 10. **Forfeit on purpose:** mid-match tap ✕ → "Forfeit the duel?" → Forfeit → result page; the rival sees "You win by default". "Stay" keeps you in.
 11. **Sudden Death ending:** play Sudden Death; at the first question where exactly one of you is wrong, the reveal is followed by the result page with the seal. If both miss, play continues.
-12. **Cancel lobby:** create a duel → "Cancel duel" (or Android back / ✕) → "Cancel the duel?" → Cancel duel → back on the Duel tab; the code no longer works on B ("not found" message).
+12. **Cancel lobby:** create a duel → "Cancel duel" (or Android back / ✕) → "Cancel the duel?" → Cancel duel → back on the Duel tab; joining that code from B shows an error message.
 13. **Expired code:** create a lobby and leave it open for 10 minutes → the lobby shows "The invite expired". Joining that code from B shows an error, not a duel.
 14. **Two devices, one account:** open the same live duel on a second phone signed in as A → the first shows "Open on another device" with "Play on this phone".
 15. **Waking server:** after the Render API has slept, open a duel → "Waking the dojo…" with the lantern until it connects.
